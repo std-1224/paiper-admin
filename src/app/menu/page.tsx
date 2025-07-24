@@ -1,16 +1,18 @@
 "use client"
 
 import { useState } from "react"
-import { Box, DollarSign } from "lucide-react"
+import { Box, CheckCircle, DollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 import StockManagement from "../(components)/stock-management"
 import PriceManagement from "../(components)/price-managment"
+import { CustomDrinks } from "@/components/products/CustomDrinks"
 
 export default function Home() {
   const [selectedOption, setSelectedOption] = useState("stock")
   
   const options = [
     { id: "stock", label: "Administrar stock", icon: Box },
+    { id: "custom", label: "Tragos Personalizados", icon: CheckCircle },
     { id: "prices", label: "Gestión de precios", icon: DollarSign },
   ]
 
@@ -40,6 +42,7 @@ export default function Home() {
 
       <div className="mt-6">
         {selectedOption === "stock" && <StockManagement />}
+        {selectedOption === "custom" && <CustomDrinks selectedBar="all" showCheckboxes={false} />}
         {selectedOption === "prices" && <PriceManagement />}
       </div>
     </div>

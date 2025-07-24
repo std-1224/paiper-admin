@@ -45,7 +45,6 @@ import { StockTransfers } from "@/components/bars/StockTransfers";
 import { StockAdjustment } from "@/components/stock/StockAdjustment";
 import { StockAdjustmentHistory } from "@/components/stock/StockAdjustmentHistory";
 import { MultipleTransfer } from "@/components/stock/MultipleTransfer";
-import { CustomDrinks } from "@/components/products/CustomDrinks";
 import RecipeConfiguration from "../(components)/recipe-configuration";
 import {
   ArrowRight,
@@ -559,12 +558,11 @@ const Stock = () => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="stock">En Stock y Reasignaciones</TabsTrigger>
-              <TabsTrigger value="custom">Tragos Personalizados</TabsTrigger>
               <TabsTrigger value="recipes">
                 <ClipboardList className="h-4 w-4 mr-2" />
-                Bebidas personalizadas
+                Configurar recetas
               </TabsTrigger>
               <TabsTrigger value="transfers">Transferencias</TabsTrigger>
               <TabsTrigger value="adjustments">Ajustes</TabsTrigger>
@@ -692,14 +690,6 @@ const Stock = () => {
                   ))}
                 </TableBody>
               </Table>
-            </TabsContent>
-
-            {/* Tragos Personalizados */}
-            <TabsContent value="custom">
-              <CustomDrinks
-                selectedBar={selectedBar.toLowerCase()}
-                showCheckboxes={true}
-              />
             </TabsContent>
 
             {/* Configurar Recetas */}
