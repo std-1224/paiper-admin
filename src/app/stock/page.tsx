@@ -46,6 +46,7 @@ import { StockAdjustment } from "@/components/stock/StockAdjustment";
 import { StockAdjustmentHistory } from "@/components/stock/StockAdjustmentHistory";
 import { MultipleTransfer } from "@/components/stock/MultipleTransfer";
 import { CustomDrinks } from "@/components/products/CustomDrinks";
+import RecipeConfiguration from "../(components)/recipe-configuration";
 import {
   ArrowRight,
   Box,
@@ -57,6 +58,7 @@ import {
   Plus,
   Trash,
   Filter,
+  ClipboardList,
 } from "lucide-react";
 import { ProductDetailModal } from "@/components/products/ProductDetailModal";
 import { useAppContext } from "@/context/AppContext";
@@ -557,9 +559,13 @@ const Stock = () => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="stock">En Stock y Reasignaciones</TabsTrigger>
               <TabsTrigger value="custom">Tragos Personalizados</TabsTrigger>
+              <TabsTrigger value="recipes">
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Bebidas personalizadas
+              </TabsTrigger>
               <TabsTrigger value="transfers">Transferencias</TabsTrigger>
               <TabsTrigger value="adjustments">Ajustes</TabsTrigger>
             </TabsList>
@@ -694,6 +700,11 @@ const Stock = () => {
                 selectedBar={selectedBar.toLowerCase()}
                 showCheckboxes={true}
               />
+            </TabsContent>
+
+            {/* Configurar Recetas */}
+            <TabsContent value="recipes">
+              <RecipeConfiguration />
             </TabsContent>
 
             {/* Transferencias */}

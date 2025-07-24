@@ -1,10 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Box, ClipboardList, DollarSign } from "lucide-react"
+import { Box, DollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 import StockManagement from "../(components)/stock-management"
-import RecipeConfiguration from "../(components)/recipe-configuration"
 import PriceManagement from "../(components)/price-managment"
 
 export default function Home() {
@@ -12,7 +11,6 @@ export default function Home() {
   
   const options = [
     { id: "stock", label: "Administrar stock", icon: Box },
-    { id: "recipes", label: "Configurar recetas", icon: ClipboardList },
     { id: "prices", label: "Gestión de precios", icon: DollarSign },
   ]
 
@@ -42,7 +40,6 @@ export default function Home() {
 
       <div className="mt-6">
         {selectedOption === "stock" && <StockManagement />}
-        {selectedOption === "recipes" && <RecipeConfiguration />}
         {selectedOption === "prices" && <PriceManagement />}
       </div>
     </div>
