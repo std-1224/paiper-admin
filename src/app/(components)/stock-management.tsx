@@ -17,6 +17,11 @@ import {
   Pencil,
   Loader2,
   Info,
+  History,
+  Download,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +66,7 @@ export default function StockManagement() {
   // State management
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState("all");
+  const [salesFilter, setSalesFilter] = useState("all");
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,13 +75,16 @@ export default function StockManagement() {
   // Modal states
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showProductDetailModal, setShowProductDetailModal] = useState(false);
+  const [showTransactionHistoryModal, setShowTransactionHistoryModal] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState<Product | null>(null);
   const [isTokenPRModalOpen, setIsTokenPRModalOpen] = useState(false);
   const [isCourtesyModalOpen, setIsCourtesyModalOpen] = useState(false);
   const [importingProducts, setImportingProducts] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importedProducts, setImportedProducts] = useState<Product[]>([]);
+  const [transactionHistory, setTransactionHistory] = useState<any[]>([]);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const { uploadImageToSupabase } = useAppContext();
@@ -126,27 +135,121 @@ export default function StockManagement() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv'
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Tipo de archivo no válido. Use archivos Excel (.xlsx, .xls) o CSV.");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("El archivo es demasiado grande. Máximo 5MB.");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
-      const data = new Uint8Array(e.target?.result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: "array" });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json<Product>(firstSheet);
-      // Validate and format the data if needed
-      const formattedData = jsonData.map((item) => ({
-        ...item,
-        // Ensure required fields exist, add defaults if necessary
-        name: item.name || "Unknown",
-        description: item.description || "Unknown",
-        category: item.category || "bebida",
-        purchase_price: item.purchase_price || 0,
-        sale_price: item.sale_price || 0,
-        stock: item.stock || 0,
-      }));
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
 
-      setImportedProducts(formattedData);
-      setImportingProducts(true);
+        if (workbook.SheetNames.length === 0) {
+          toast.error("El archivo no contiene hojas de cálculo válidas.");
+          return;
+        }
+
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json<any>(firstSheet);
+
+        if (jsonData.length === 0) {
+          toast.error("El archivo está vacío o no contiene datos válidos.");
+          return;
+        }
+
+        // Enhanced validation and formatting
+        const validationErrors: string[] = [];
+        const formattedData: Product[] = [];
+
+        jsonData.forEach((item, index) => {
+          const rowNumber = index + 2; // +2 because Excel rows start at 1 and we skip header
+
+          // Validate required fields
+          if (!item.name || typeof item.name !== 'string' || item.name.trim() === '') {
+            validationErrors.push(`Fila ${rowNumber}: Nombre es requerido`);
+            return;
+          }
+
+          // Validate numeric fields
+          const purchasePrice = parseFloat(item.purchase_price) || 0;
+          const salePrice = parseFloat(item.sale_price) || 0;
+          const stock = parseInt(item.stock) || 0;
+
+          if (purchasePrice < 0) {
+            validationErrors.push(`Fila ${rowNumber}: Precio de compra no puede ser negativo`);
+          }
+
+          if (salePrice < 0) {
+            validationErrors.push(`Fila ${rowNumber}: Precio de venta no puede ser negativo`);
+          }
+
+          if (stock < 0) {
+            validationErrors.push(`Fila ${rowNumber}: Stock no puede ser negativo`);
+          }
+
+          // Format the product data
+          const formattedProduct: Product = {
+            id: item.id || `temp-${Date.now()}-${index}`,
+            name: item.name.trim(),
+            description: item.description?.trim() || "",
+            category: item.category?.trim() || "bebida",
+            purchase_price: purchasePrice,
+            sale_price: salePrice,
+            stock: stock,
+            image_url: item.image_url?.trim() || "",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            has_recipe: Boolean(item.has_recipe),
+            is_active: item.is_active !== false, // Default to true unless explicitly false
+            is_pr: Boolean(item.is_pr),
+            is_courtsey: Boolean(item.is_courtsey)
+          };
+
+          formattedData.push(formattedProduct);
+        });
+
+        // Show validation errors if any
+        if (validationErrors.length > 0) {
+          const errorMessage = validationErrors.slice(0, 5).join('\n') +
+            (validationErrors.length > 5 ? `\n... y ${validationErrors.length - 5} errores más` : '');
+          toast.error(`Errores de validación:\n${errorMessage}`);
+          return;
+        }
+
+        if (formattedData.length === 0) {
+          toast.error("No se encontraron productos válidos para importar.");
+          return;
+        }
+
+        setImportedProducts(formattedData);
+        setImportingProducts(true);
+        toast.success(`${formattedData.length} productos listos para importar. Revise la vista previa antes de confirmar.`);
+
+      } catch (error) {
+        console.error("Error processing file:", error);
+        toast.error("Error al procesar el archivo. Verifique que sea un archivo Excel válido.");
+      }
     };
+
+    reader.onerror = () => {
+      toast.error("Error al leer el archivo.");
+    };
+
     reader.readAsArrayBuffer(file);
   };
 
@@ -221,20 +324,50 @@ export default function StockManagement() {
     };
   }, [productsData]);
 
-  // Filter products based on search and filter
+  // Filter products based on search, category filter, and sales filter
   const filteredProducts = useMemo(() => {
-    return productsData.filter((product) => {
+    let filtered = productsData.filter((product) => {
       const matchesSearch = product.name
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
-      if (filter === "all") return matchesSearch;
-      if (filter === "normal")
-        return matchesSearch && product.category !== "elaborated";
-      if (filter === "elaborated")
-        return matchesSearch && product.category === "elaborated";
-      return matchesSearch;
+
+      // Category filter
+      let matchesCategory = true;
+      if (filter === "normal") {
+        matchesCategory = product.category !== "elaborated";
+      } else if (filter === "elaborated") {
+        matchesCategory = product.category === "elaborated";
+      }
+
+      return matchesSearch && matchesCategory;
     });
-  }, [productsData, searchTerm, filter]);
+
+    // Sales performance filter (mock data for now)
+    if (salesFilter !== "all") {
+      // Mock sales data - replace with actual sales data from API
+      const mockSalesData = filtered.map(product => ({
+        ...product,
+        totalSales: Math.floor(Math.random() * 100) + 1,
+        salesTrend: Math.random() > 0.5 ? 'up' : 'down'
+      }));
+
+      if (salesFilter === "best-selling") {
+        filtered = mockSalesData
+          .sort((a, b) => b.totalSales - a.totalSales)
+          .slice(0, Math.ceil(mockSalesData.length * 0.3));
+      } else if (salesFilter === "least-selling") {
+        filtered = mockSalesData
+          .sort((a, b) => a.totalSales - b.totalSales)
+          .slice(0, Math.ceil(mockSalesData.length * 0.3));
+      } else if (salesFilter === "trending-up") {
+        filtered = mockSalesData.filter(p => p.salesTrend === 'up');
+      } else if (salesFilter === "trending-down") {
+        filtered = mockSalesData.filter(p => p.salesTrend === 'down');
+      }
+    }
+
+    return filtered;
+  }, [productsData, searchTerm, filter, salesFilter]);
 
   const toggleSelectAll = useCallback(() => {
     setSelectedProducts((prev) =>
@@ -375,21 +508,155 @@ export default function StockManagement() {
     }
   };
 
+  // Fetch transaction history for a specific product
+  const fetchTransactionHistory = async (productId: string) => {
+    try {
+      setIsLoading(true);
+      // Mock data for now - replace with actual API call
+      const mockHistory = [
+        {
+          id: 1,
+          date: "2024-01-15",
+          type: "sale",
+          quantity: 5,
+          user: "Juan Pérez",
+          details: "Venta en Bar Central",
+          price: 15.50
+        },
+        {
+          id: 2,
+          date: "2024-01-14",
+          type: "purchase",
+          quantity: 20,
+          user: "Admin",
+          details: "Compra de inventario",
+          price: 12.00
+        },
+        {
+          id: 3,
+          date: "2024-01-13",
+          type: "adjustment",
+          quantity: -2,
+          user: "María García",
+          details: "Ajuste por merma",
+          price: 0
+        }
+      ];
+      setTransactionHistory(mockHistory);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error fetching transaction history");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle showing transaction history
+  const handleShowTransactionHistory = (product: Product) => {
+    setSelectedProductForHistory(product);
+    setShowTransactionHistoryModal(true);
+    fetchTransactionHistory(product.id);
+  };
+
+  // Export to Excel functionality
+  const handleExportToExcel = () => {
+    const exportData = filteredProducts.map(product => ({
+      'Nombre': product.name,
+      'Categoría': product.category,
+      'Precio Compra': product.purchase_price,
+      'Precio Venta': product.sale_price,
+      'Stock': product.stock,
+      'Estado': calculateStatus(product.stock),
+      'Visible Courtesy': product.is_courtsey ? 'Sí' : 'No',
+      'Visible PR Token': product.is_pr ? 'Sí' : 'No',
+      'Activo': product.is_active ? 'Sí' : 'No',
+      'Fecha Actualización': product.updated_at
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Productos");
+
+    // Auto-size columns
+    const colWidths = Object.keys(exportData[0] || {}).map(key => ({
+      wch: Math.max(key.length, 15)
+    }));
+    ws['!cols'] = colWidths;
+
+    XLSX.writeFile(wb, `productos_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success("Productos exportados exitosamente");
+  };
+
   return (
     <div className="space-y-4">
       {/* Header and Summary Cards (same as before) */}
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar producto..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row justify-between gap-4">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar producto..."
+              className="pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportToExcel}>
+              <Download size={16} className="mr-2" />
+              Exportar Excel
+            </Button>
+          </div>
         </div>
+
+        {/* Filter Controls */}
+        <div className="flex flex-wrap gap-2">
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrar por categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las categorías</SelectItem>
+              <SelectItem value="normal">Productos normales</SelectItem>
+              <SelectItem value="elaborated">Productos elaborados</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={salesFilter} onValueChange={setSalesFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrar por ventas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los productos</SelectItem>
+              <SelectItem value="best-selling">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Más vendidos
+                </div>
+              </SelectItem>
+              <SelectItem value="least-selling">
+                <div className="flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4" />
+                  Menos vendidos
+                </div>
+              </SelectItem>
+              <SelectItem value="trending-up">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Tendencia al alza
+                </div>
+              </SelectItem>
+              <SelectItem value="trending-down">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Tendencia a la baja
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="flex gap-2">
           <div className="relative">
             <Button asChild variant="outline" size="sm">
@@ -407,8 +674,17 @@ export default function StockManagement() {
               onChange={handleFileUpload}
             />
           </div>
-          <Button variant="outline" size="sm" onClick={() => fetchProducts()}>
-            <RefreshCw size={16} className="mr-2" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchProducts()}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 size={16} className="mr-2 animate-spin" />
+            ) : (
+              <RefreshCw size={16} className="mr-2" />
+            )}
             Actualizar
           </Button>
           <Button onClick={() => setShowAddProductModal(true)}>
@@ -433,7 +709,7 @@ export default function StockManagement() {
                     onCheckedChange={toggleSelectAll}
                   />
                 </th>
-                <th className="text-left p-3 font-medium">Producto</th>
+                <th className="text-left p-3 font-medium">Historial de producto</th>
                 <th className="text-left p-3 font-medium">Vis. Courtesy</th>
                 <th className="text-left p-3 font-medium">Vis. PR Token</th>
                 <th className="text-left p-3 font-medium">Categoría</th>
@@ -464,27 +740,37 @@ export default function StockManagement() {
                         />
                       </td>
                       <td className="p-3">
-                        <div
-                          className="flex items-center gap-2 cursor-pointer"
-                          onClick={() => viewProductDetails(product)}
-                        >
-                          {product.image_url ? (
-                            <img
-                              src={product.image_url}
-                              alt={product.name}
-                              className="h-10 w-10 rounded object-cover"
-                            />
-                          ) : (
-                            <div className="bg-slate-100 p-2 rounded">
-                              <Package className="h-5 w-5 text-slate-500" />
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-medium">{product.name}</div>
-                            <div className="text-xs text-muted-foreground line-clamp-1">
-                              {product.description}
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="flex items-center gap-2 cursor-pointer flex-1"
+                            onClick={() => viewProductDetails(product)}
+                          >
+                            {product.image_url ? (
+                              <img
+                                src={product.image_url}
+                                alt={product.name}
+                                className="h-10 w-10 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="bg-slate-100 p-2 rounded">
+                                <Package className="h-5 w-5 text-slate-500" />
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-xs text-muted-foreground line-clamp-1">
+                                {product.description}
+                              </div>
                             </div>
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleShowTransactionHistory(product)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <History className="h-4 w-4" />
+                          </Button>
                         </div>
                       </td>
 
@@ -783,11 +1069,12 @@ export default function StockManagement() {
                 <Input
                   id="purchase_price"
                   type="number"
-                  value={newProduct.purchase_price}
+                  value={newProduct.purchase_price === 0 ? "" : newProduct.purchase_price}
+                  placeholder="0.00"
                   onChange={(e) =>
                     setNewProduct({
                       ...newProduct,
-                      purchase_price: Number(e.target.value),
+                      purchase_price: e.target.value === "" ? 0 : Number(e.target.value),
                     })
                   }
                 />
@@ -797,11 +1084,12 @@ export default function StockManagement() {
                 <Input
                   id="sale_price"
                   type="number"
-                  value={newProduct.sale_price}
+                  value={newProduct.sale_price === 0 ? "" : newProduct.sale_price}
+                  placeholder="0.00"
                   onChange={(e) =>
                     setNewProduct({
                       ...newProduct,
-                      sale_price: Number(e.target.value),
+                      sale_price: e.target.value === "" ? 0 : Number(e.target.value),
                     })
                   }
                 />
@@ -812,11 +1100,12 @@ export default function StockManagement() {
               <Input
                 id="stock"
                 type="number"
-                value={newProduct.stock}
+                value={newProduct.stock === 0 ? "" : newProduct.stock}
+                placeholder="0"
                 onChange={(e) =>
                   setNewProduct({
                     ...newProduct,
-                    stock: Number(e.target.value),
+                    stock: e.target.value === "" ? 0 : Number(e.target.value),
                   })
                 }
               />
@@ -973,21 +1262,37 @@ export default function StockManagement() {
           setSearchTerm("");
         }}
       >
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] ">
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] ">
           <DialogHeader>
-            <DialogTitle>Lista de Productos Importados</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Vista Previa de Importación
+            </DialogTitle>
             <DialogDescription>
-              <>
-                Lista de Productos Importados.
-                <br />
-                <a
-                  href="https://docs.google.com/spreadsheets/d/1QpEvbKSXW9LKDI1lIV-osKoQjw2qbYEMO1Ux_dLIF-Q/edit?usp=sharing"
-                  className="text-blue-500 hover:underline"
-                  target="_blank"
-                >
-                  Documento de ejemplo de productos
-                </a>
-              </>
+              <div className="space-y-2">
+                <div className="flex items-center gap-4">
+                  <span>Se importarán {importedProducts.length} productos</span>
+                  <Badge variant="outline">
+                    {importedProducts.filter(p => p.is_active).length} activos
+                  </Badge>
+                  <Badge variant="outline">
+                    {importedProducts.filter(p => p.is_pr).length} PR Token
+                  </Badge>
+                  <Badge variant="outline">
+                    {importedProducts.filter(p => p.is_courtsey).length} Cortesía
+                  </Badge>
+                </div>
+                <div>
+                  Revise los datos antes de confirmar la importación.
+                  <a
+                    href="https://docs.google.com/spreadsheets/d/1QpEvbKSXW9LKDI1lIV-osKoQjw2qbYEMO1Ux_dLIF-Q/edit?usp=sharing"
+                    className="text-blue-500 hover:underline ml-1"
+                    target="_blank"
+                  >
+                    Ver plantilla de ejemplo
+                  </a>
+                </div>
+              </div>
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4 h-[calc(90vh-14rem)] overflow-y-auto">
@@ -1007,6 +1312,9 @@ export default function StockManagement() {
                         Vis. PR Token
                       </th>
                       <th className="text-left p-3 font-medium">Categoría</th>
+                      <th className="text-left p-3 font-medium">
+                        Precio Compra
+                      </th>
                       <th className="text-left p-3 font-medium">
                         Precio Venta
                       </th>
@@ -1078,6 +1386,9 @@ export default function StockManagement() {
                               (c) => c.value === product.category
                             )?.label || product.category}
                           </Badge>
+                        </td>
+                        <td className="p-3">
+                          ${product.purchase_price.toFixed(2)}
                         </td>
                         <td className="p-3">
                           ${product.sale_price.toFixed(2)}
@@ -1153,6 +1464,80 @@ export default function StockManagement() {
           }}
           product={null}
         />
+      )}
+
+      {/* Transaction History Modal */}
+      {showTransactionHistoryModal && selectedProductForHistory && (
+        <Dialog open={showTransactionHistoryModal} onOpenChange={setShowTransactionHistoryModal}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <History className="h-5 w-5" />
+                Historial de Transacciones - {selectedProductForHistory.name}
+              </DialogTitle>
+              <DialogDescription>
+                Historial completo de movimientos para este producto
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {transactionHistory.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No hay transacciones registradas para este producto
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-muted/50">
+                        <th className="text-left p-3 font-medium">Fecha</th>
+                        <th className="text-left p-3 font-medium">Tipo</th>
+                        <th className="text-left p-3 font-medium">Cantidad</th>
+                        <th className="text-left p-3 font-medium">Usuario</th>
+                        <th className="text-left p-3 font-medium">Precio</th>
+                        <th className="text-left p-3 font-medium">Detalles</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactionHistory.map((transaction) => (
+                        <tr key={transaction.id} className="border-t">
+                          <td className="p-3">
+                            {new Date(transaction.date).toLocaleDateString()}
+                          </td>
+                          <td className="p-3">
+                            <Badge
+                              variant={
+                                transaction.type === 'sale' ? 'default' :
+                                transaction.type === 'purchase' ? 'secondary' :
+                                'destructive'
+                              }
+                            >
+                              {transaction.type === 'sale' ? 'Venta' :
+                               transaction.type === 'purchase' ? 'Compra' :
+                               'Ajuste'}
+                            </Badge>
+                          </td>
+                          <td className="p-3">
+                            <span className={transaction.quantity > 0 ? 'text-green-600' : 'text-red-600'}>
+                              {transaction.quantity > 0 ? '+' : ''}{transaction.quantity}
+                            </span>
+                          </td>
+                          <td className="p-3">{transaction.user}</td>
+                          <td className="p-3">
+                            {transaction.price > 0 ? `$${transaction.price.toFixed(2)}` : '-'}
+                          </td>
+                          <td className="p-3 text-sm text-muted-foreground">
+                            {transaction.details}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
