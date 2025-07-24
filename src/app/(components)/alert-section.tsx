@@ -37,7 +37,7 @@ export function AlertSection() {
 				// Filter out of stock products
 				const outOfStock = products.filter((product) => {
 					const stock = Number(product.stock);
-					return stock === 0;
+					return stock;
 				});
 
 				// For affected products, we need to check if any products are used in recipes

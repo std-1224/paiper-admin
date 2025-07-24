@@ -7,7 +7,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, CartesianGrid, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, CartesianGrid, LineChart, Line, Cell } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { useAppContext } from "@/context/AppContext";
 
@@ -36,10 +36,12 @@ export function SalesChart() {
 
   // State for payment methods data
   const [paymentMethodData, setPaymentMethodData] = useState([
-    { name: "Mercado Pago", value: 0 },
-    { name: "Cash", value: 0 },
-    { name: "Balance", value: 0 },
-    { name: "Gifts", value: 0 },
+    { name: "Mercado Pago", value: 0, color: "hsl(var(--chart-1))" },
+    { name: "Cash", value: 0, color: "hsl(var(--chart-2))" },
+    { name: "Balance", value: 0, color: "hsl(var(--chart-3))" },
+    { name: "Gifts", value: 0, color: "hsl(var(--chart-4))" },
+    { name: "Courtesy Transactions", value: 0, color: "hsl(var(--chart-5))" },
+    { name: "PR Tokens", value: 0, color: "#8b5cf6" },
   ]);
 
   // State for peak hours data
@@ -53,6 +55,8 @@ export function SalesChart() {
     { hour: "8PM", orders: 0 },
     { hour: "10PM", orders: 0 },
   ]);
+
+  
 
   // Fetch payment methods data
   useEffect(() => {
@@ -97,11 +101,45 @@ export function SalesChart() {
           }
         });
 
-        // Update payment method data
+        // Calculate courtesy and PR token transactions
+        let courtesyCount = 0;
+        let prTokenCount = 0;
+
+        // Fetch products data to check is_courtsey and is_pr flags
+        const productsResponse = await fetch('/api/products');
+        const productsData = await productsResponse.json();
+
+        // Create a map for quick product lookup
+        const productsMap = new Map();
+        productsData.forEach((product: any) => {
+          productsMap.set(product.id, product);
+        });
+
+        // Count courtesy and PR token transactions from today's orders
+        orders.forEach((order) => {
+          if (order.order_items) {
+            order.order_items.forEach((item: any) => {
+              const product = productsMap.get(item.product_id);
+              if (product) {
+                if (product.is_courtsey) {
+                  courtesyCount += item.quantity;
+                }
+                if (product.is_pr) {
+                  prTokenCount += item.quantity;
+                }
+              }
+            });
+          }
+        });
+
+        // Update payment method data including courtesy and PR tokens
         setPaymentMethodData([
-          { name: "Mercado Pago", value: paymentTotals.mercadopago },
-          { name: "Cash", value: paymentTotals.cash },
-          { name: "Balance", value: paymentTotals?.balance },
+          { name: "Mercado Pago", value: paymentTotals.mercadopago, color: "hsl(var(--chart-1))" },
+          { name: "Cash", value: paymentTotals.cash, color: "hsl(var(--chart-2))" },
+          { name: "Balance", value: paymentTotals?.balance, color: "hsl(var(--chart-3))" },
+          { name: "Gifts", value: 0, color: "hsl(var(--chart-4))" }, // You can implement gifts logic if needed
+          { name: "Courtesy Transactions", value: courtesyCount, color: "hsl(var(--chart-5))" },
+          { name: "PR Tokens", value: prTokenCount, color: "#8b5cf6" },
         ]);
 
         // Fetch orders for peak hours analysis

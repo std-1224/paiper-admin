@@ -77,8 +77,8 @@ const mainNavItems = [
 export function AppSidebar() {
   const pathname = usePathname();
   return (
-    <Sidebar className="bg-white">
-      <SidebarHeader className="p-4 border-b bg-white">
+    <Sidebar>
+      <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-2">
           <Image
             src="/assets/Logo.png"
@@ -90,7 +90,7 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-white">
+      <SidebarContent>
         <SidebarGroup>
           {/* <SidebarGroupLabel className="text-gray-500">
             Principal
@@ -99,17 +99,13 @@ export function AppSidebar() {
             <SidebarMenu>
               {mainNavItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild isActive={pathname === item.path}>
                     <Link
                       href={item.path}
-                      className={`w-full justify-start text-left hover:bg-gray-200 ${
-                        pathname === item.path
-                          ? "bg-gray-200 dark:bg-gray-800"
-                          : "dark:text-gray-300 dark:hover:bg-gray-800"
-                      }`}
+                      className="w-full justify-start text-left"
                     >
                       <item.icon className="h-3 w-3" />
-                      <span className="">{item.title}</span>
+                      <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

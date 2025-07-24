@@ -107,7 +107,7 @@ export default function Header({
 
       <div className="flex items-center space-x-4">
         <Button
-          className="bg-green-600 hover:bg-green-700 flex items-center"
+          className="bg-black flex items-center"
           onClick={() => router.push("/new-order")}
         >
           <PlusIcon className="mr-2 h-4 w-4" />
@@ -140,7 +140,6 @@ export default function Header({
             </Badge>
           )}
         </Button>
-        <span className="text-sm font-medium dark:text-gray-300">ES</span>
         <MenuAvatar />
       </div>
     </header>

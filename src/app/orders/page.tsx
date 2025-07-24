@@ -485,10 +485,6 @@ export default function OrdersManagement() {
             <QrCodeIcon className="h-4 w-4 mr-2" />
             Escanear código QR
           </Button>
-          <Button variant="outline" size="sm">
-            <FilterIcon className="h-4 w-4 mr-2" />
-            Filtrar
-          </Button>
           <Button variant="outline" size="sm" onClick={fetchOrders}>
             <RefreshCwIcon className="h-4 w-4 mr-2" />
             Actualizar

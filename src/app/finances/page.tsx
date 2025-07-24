@@ -31,7 +31,7 @@ const DEFAULT_METRICS = [
   },
   {
     id: "urgent-orders",
-    title: "Pedidos Urgentes",
+    title: "Margen de beneficio",
     value: "0",
     change: "0% vs mes anterior",
     icon: "alert",
@@ -39,7 +39,7 @@ const DEFAULT_METRICS = [
   },
   {
     id: "average-balance",
-    title: "Saldo Promedio",
+    title: "Ganancias por Fecha",
     value: "$0",
     change: "0% vs mes anterior",
     icon: "wallet",
@@ -140,7 +140,7 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
       },
       {
         id: "urgent-orders",
-        title: "Pedidos Urgentes",
+        title: "Margen de beneficio",
         value: `${urgentOrders}`,
         change: `${urgentChange.toFixed(2)}% vs mes anterior`,
         icon: "alert",
@@ -148,7 +148,7 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
       },
       {
         id: "average-balance",
-        title: "Saldo Promedio",
+        title: "Ganancias por Fecha",
         value: "$0.00",
         change: "0% vs mes anterior",
         icon: "wallet",
