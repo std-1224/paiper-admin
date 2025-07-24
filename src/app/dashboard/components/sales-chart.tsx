@@ -137,7 +137,7 @@ export function SalesChart() {
           { name: "Mercado Pago", value: paymentTotals.mercadopago, color: "hsl(var(--chart-1))" },
           { name: "Cash", value: paymentTotals.cash, color: "hsl(var(--chart-2))" },
           { name: "Balance", value: paymentTotals?.balance, color: "hsl(var(--chart-3))" },
-          { name: "Gifts", value: 0, color: "hsl(var(--chart-4))" }, // You can implement gifts logic if needed
+          // { name: "Gifts", value: 0, color: "hsl(var(--chart-4))" }, // You can implement gifts logic if needed
           { name: "Courtesy Transactions", value: courtesyCount, color: "hsl(var(--chart-5))" },
           { name: "PR Tokens", value: prTokenCount, color: "#8b5cf6" },
         ]);
