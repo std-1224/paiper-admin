@@ -76,6 +76,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Loading from "../(components)/loading";
 import { useAuth } from "@/context/AuthContext";
 import { Popover } from "radix-ui";
+import * as XLSX from "xlsx";
 
 interface User {
   name: string;
@@ -118,6 +119,16 @@ export default function QrTracking() {
   const [totalOrders, setTotalOrders] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalUniqueUsers, setTotalUniqueUsers] = useState(0);
+
+  // Global statistics for all QR codes
+  const [globalStats, setGlobalStats] = useState({
+    totalQROrders: 0,
+    totalQRRevenue: 0,
+    totalQRUniqueUsers: 0,
+    previousMonthOrders: 0,
+    previousMonthRevenue: 0,
+    previousMonthUsers: 0
+  });
 
   const { qrCodesData, ordersData, fetchOrders, fetchQRCodes } =
     useAppContext();
@@ -206,9 +217,95 @@ export default function QrTracking() {
     }
   };
 
+  // Calculate global statistics
+  const calculateGlobalStats = () => {
+    if (!ordersData || ordersData.length === 0) {
+      setGlobalStats({
+        totalQROrders: 0,
+        totalQRRevenue: 0,
+        totalQRUniqueUsers: 0,
+        previousMonthOrders: 0,
+        previousMonthRevenue: 0,
+        previousMonthUsers: 0
+      });
+      return;
+    }
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+    // Filter orders for current period (based on dateRange)
+    let filteredOrders = ordersData;
+    if (dateRange !== "all") {
+      const cutoffDate = new Date();
+      switch (dateRange) {
+        case "week":
+          cutoffDate.setDate(cutoffDate.getDate() - 7);
+          break;
+        case "month":
+          cutoffDate.setMonth(cutoffDate.getMonth() - 1);
+          break;
+        case "quarter":
+          cutoffDate.setMonth(cutoffDate.getMonth() - 3);
+          break;
+        case "year":
+          cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
+          break;
+      }
+      filteredOrders = ordersData.filter(order =>
+        new Date(order.created_at) >= cutoffDate
+      );
+    }
+
+    // Calculate current period stats
+    const totalQROrders = filteredOrders.length;
+    const totalQRRevenue = filteredOrders.reduce((sum, order) =>
+      sum + Number(order.total_amount), 0
+    );
+    const uniqueUserIds = new Set(
+      filteredOrders
+        .filter(order => order.user_id)
+        .map(order => order.user_id)
+    );
+    const totalQRUniqueUsers = uniqueUserIds.size;
+
+    // Calculate previous period stats for comparison
+    const previousPeriodOrders = ordersData.filter(order => {
+      const orderDate = new Date(order.created_at);
+      return orderDate.getMonth() === previousMonth &&
+             orderDate.getFullYear() === previousYear;
+    });
+
+    const previousMonthOrders = previousPeriodOrders.length;
+    const previousMonthRevenue = previousPeriodOrders.reduce((sum, order) =>
+      sum + Number(order.total_amount), 0
+    );
+    const previousMonthUniqueUsers = new Set(
+      previousPeriodOrders
+        .filter(order => order.user_id)
+        .map(order => order.user_id)
+    ).size;
+
+    setGlobalStats({
+      totalQROrders,
+      totalQRRevenue,
+      totalQRUniqueUsers,
+      previousMonthOrders,
+      previousMonthRevenue,
+      previousMonthUsers: previousMonthUniqueUsers
+    });
+  };
+
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  useEffect(() => {
+    calculateGlobalStats();
+  }, [ordersData, dateRange]);
 
   useEffect(() => {
     if (selectedUserId) {
@@ -278,17 +375,49 @@ export default function QrTracking() {
       return new Set(userIds).size;
     };
 
-    let filteredCodes = qrCodesData.map((qr) => ({
-      ...qr,
-      orders: ordersData.filter((order) => order.qr_id === qr.id).length,
-      revenue: ordersData
-        .filter((order) => order.qr_id === qr.id)
-        .reduce((total, order) => total + Number(order.total_amount), 0),
-      uniqueUsers: getUniqueUserCount(
-        ordersData.filter((order) => order.qr_id === qr.id)
-      ),
-      last_used: qr.created_at,
-    }));
+    // Filter orders based on date range
+    const getFilteredOrdersByDate = (orders: typeof ordersData) => {
+      if (dateRange === "all") return orders;
+
+      const now = new Date();
+      const cutoffDate = new Date();
+
+      switch (dateRange) {
+        case "week":
+          cutoffDate.setDate(now.getDate() - 7);
+          break;
+        case "month":
+          cutoffDate.setMonth(now.getMonth() - 1);
+          break;
+        case "quarter":
+          cutoffDate.setMonth(now.getMonth() - 3);
+          break;
+        case "year":
+          cutoffDate.setFullYear(now.getFullYear() - 1);
+          break;
+        default:
+          return orders;
+      }
+
+      return orders.filter(order => new Date(order.created_at) >= cutoffDate);
+    };
+
+    const filteredOrdersByDate = getFilteredOrdersByDate(ordersData);
+
+    let filteredCodes = qrCodesData.map((qr) => {
+      const qrOrders = filteredOrdersByDate.filter((order) => order.qr_id === qr.id);
+      const lastOrder = qrOrders.sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+
+      return {
+        ...qr,
+        orders: qrOrders.length,
+        revenue: qrOrders.reduce((total, order) => total + Number(order.total_amount), 0),
+        uniqueUsers: getUniqueUserCount(qrOrders),
+        last_used: lastOrder ? lastOrder.created_at : qr.created_at,
+      };
+    });
 
     if (searchQuery) {
       filteredCodes = filteredCodes.filter(
@@ -348,7 +477,7 @@ export default function QrTracking() {
   // Memoize sorted QR codes to prevent unnecessary re-sorting
   const sortedQrCodes = useMemo(
     () => getSortedQrCodes(),
-    [qrCodesData, sortField, sortDirection, searchQuery]
+    [qrCodesData, ordersData, sortField, sortDirection, searchQuery, dateRange]
   );
 
   const handleQrClick = (qr: QRCodeData) => {
@@ -361,21 +490,111 @@ export default function QrTracking() {
     setIsUserDetailsOpen(true);
   };
 
+  // Handle refresh/update functionality
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    try {
+      await Promise.all([
+        fetchOrders(),
+        fetchQRCodes()
+      ]);
+      toast({
+        title: "Datos actualizados",
+        description: "Los datos de QR tracking han sido actualizados exitosamente.",
+      });
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron actualizar los datos.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle export functionality
+  const handleExport = () => {
+    try {
+      const exportData = sortedQrCodes.map(qr => ({
+        'Nombre': qr.name,
+        'Ubicación': qr.location,
+        'Barra': qr.bars?.name || 'N/A',
+        'Total Pedidos': qr.orders,
+        'Ingresos Totales': `$${qr.revenue.toFixed(2)}`,
+        'Usuarios Únicos': qr.uniqueUsers,
+        'Último Uso': format(new Date(qr.last_used || ''), 'dd/MM/yyyy'),
+        'Fecha Creación': format(new Date(qr.created_at || ''), 'dd/MM/yyyy'),
+        'Estado': qr.orders > 0 ? 'Activo' : 'Inactivo'
+      }));
+
+      // Create workbook and worksheet
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "QR Tracking");
+
+      // Auto-size columns
+      const colWidths = Object.keys(exportData[0] || {}).map(key => ({
+        wch: Math.max(key.length, 15)
+      }));
+      ws['!cols'] = colWidths;
+
+      // Generate filename with current date and time
+      const now = new Date();
+      const filename = `qr_tracking_${format(now, 'yyyy-MM-dd_HH-mm')}.xlsx`;
+
+      // Download file
+      XLSX.writeFile(wb, filename);
+
+      toast({
+        title: "Exportación exitosa",
+        description: `Los datos han sido exportados a ${filename}`,
+      });
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron exportar los datos.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const [deletingQrId, setDeletingQrId] = useState<string | null>(null);
+
   const handleDeleteQr = async (qrId: string | undefined) => {
     if (!qrId) return;
+
+    setDeletingQrId(qrId);
     try {
       const res = await fetch("api/qr-codes", {
         method: "DELETE",
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ id: qrId }),
       });
-      fetchQRCodes();
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete QR code');
+      }
+
+      await fetchQRCodes();
+      toast({
+        title: "QR eliminado",
+        description: "El código QR ha sido eliminado exitosamente.",
+      });
     } catch (error) {
       console.error("Error deleting QR code:", error);
       toast({
         title: "Error",
-        description: "No se pudo eliminar el código QR.",
+        description: error instanceof Error ? error.message : "No se pudo eliminar el código QR.",
         variant: "destructive",
       });
+    } finally {
+      setDeletingQrId(null);
     }
   };
 
@@ -436,26 +655,25 @@ export default function QrTracking() {
               <SelectItem value="custom">Personalizado</SelectItem>
             </SelectContent>
           </Select>
-
           <Button
             variant="outline"
             className="dark:border-gray-700 dark:text-gray-300"
+            onClick={handleRefresh}
+            disabled={isLoading}
           >
-            <FilterIcon className="h-4 w-4 mr-2" />
-            Filtrar
-          </Button>
-
-          <Button
-            variant="outline"
-            className="dark:border-gray-700 dark:text-gray-300"
-          >
-            <RefreshCwIcon className="h-4 w-4 mr-2" />
+            {isLoading ? (
+              <Loader2Icon className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCwIcon className="h-4 w-4 mr-2" />
+            )}
             Actualizar
           </Button>
 
           <Button
             variant="outline"
             className="dark:border-gray-700 dark:text-gray-300"
+            onClick={handleExport}
+            disabled={isLoading || sortedQrCodes.length === 0}
           >
             <DownloadIcon className="h-4 w-4 mr-2" />
             Exportar
@@ -471,8 +689,26 @@ export default function QrTracking() {
               <p className="text-sm text-muted-foreground dark:text-gray-400">
                 Total de Pedidos vía QR
               </p>
-              <p className="text-2xl font-bold dark:text-white">869</p>
-              <p className="text-xs text-green-500">+12.5% vs mes anterior</p>
+              <p className="text-2xl font-bold dark:text-white">
+                {isLoading ? (
+                  <Skeleton className="h-8 w-20" />
+                ) : (
+                  globalStats.totalQROrders.toLocaleString()
+                )}
+              </p>
+              <p className={`text-xs ${
+                globalStats.totalQROrders >= globalStats.previousMonthOrders
+                  ? 'text-green-500'
+                  : 'text-red-500'
+              }`}>
+                {globalStats.previousMonthOrders > 0 ? (
+                  `${globalStats.totalQROrders >= globalStats.previousMonthOrders ? '+' : ''}${
+                    (((globalStats.totalQROrders - globalStats.previousMonthOrders) / globalStats.previousMonthOrders) * 100).toFixed(1)
+                  }% vs mes anterior`
+                ) : (
+                  'Sin datos del mes anterior'
+                )}
+              </p>
             </div>
             <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/20">
               <QrCodeIcon className="h-6 w-6 text-blue-500" />
@@ -486,8 +722,26 @@ export default function QrTracking() {
               <p className="text-sm text-muted-foreground dark:text-gray-400">
                 Ingresos Totales vía QR
               </p>
-              <p className="text-2xl font-bold dark:text-white">$17,162.45</p>
-              <p className="text-xs text-green-500">+8.3% vs mes anterior</p>
+              <p className="text-2xl font-bold dark:text-white">
+                {isLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  `$${globalStats.totalQRRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                )}
+              </p>
+              <p className={`text-xs ${
+                globalStats.totalQRRevenue >= globalStats.previousMonthRevenue
+                  ? 'text-green-500'
+                  : 'text-red-500'
+              }`}>
+                {globalStats.previousMonthRevenue > 0 ? (
+                  `${globalStats.totalQRRevenue >= globalStats.previousMonthRevenue ? '+' : ''}${
+                    (((globalStats.totalQRRevenue - globalStats.previousMonthRevenue) / globalStats.previousMonthRevenue) * 100).toFixed(1)
+                  }% vs mes anterior`
+                ) : (
+                  'Sin datos del mes anterior'
+                )}
+              </p>
             </div>
             <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/20">
               <DollarSignIcon className="h-6 w-6 text-green-500" />
@@ -501,8 +755,26 @@ export default function QrTracking() {
               <p className="text-sm text-muted-foreground dark:text-gray-400">
                 Usuarios Únicos vía QR
               </p>
-              <p className="text-2xl font-bold dark:text-white">558</p>
-              <p className="text-xs text-green-500">+15.2% vs mes anterior</p>
+              <p className="text-2xl font-bold dark:text-white">
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  globalStats.totalQRUniqueUsers.toLocaleString()
+                )}
+              </p>
+              <p className={`text-xs ${
+                globalStats.totalQRUniqueUsers >= globalStats.previousMonthUsers
+                  ? 'text-green-500'
+                  : 'text-red-500'
+              }`}>
+                {globalStats.previousMonthUsers > 0 ? (
+                  `${globalStats.totalQRUniqueUsers >= globalStats.previousMonthUsers ? '+' : ''}${
+                    (((globalStats.totalQRUniqueUsers - globalStats.previousMonthUsers) / globalStats.previousMonthUsers) * 100).toFixed(1)
+                  }% vs mes anterior`
+                ) : (
+                  'Sin datos del mes anterior'
+                )}
+              </p>
             </div>
             <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/20">
               <UsersIcon className="h-6 w-6 text-purple-500" />
@@ -717,51 +989,56 @@ export default function QrTracking() {
                       </Popover.Trigger>
                       <Popover.Portal>
                         <Popover.Content
-                          className="PopoverContent"
+                          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-50"
                           sideOffset={5}
                         >
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 10,
-                            }}
-                          >
-                            <p className="Text" style={{ marginBottom: 10 }}>
-                              Are you sure to delete?
+                          <div className="flex flex-col gap-3">
+                            <div className="flex items-center gap-2">
+                              <TrashIcon className="h-4 w-4 text-red-500" />
+                              <p className="text-sm font-medium dark:text-white">
+                                ¿Eliminar código QR?
+                              </p>
+                            </div>
+                            <p className="text-xs text-muted-foreground dark:text-gray-400">
+                              Esta acción no se puede deshacer. Se eliminará permanentemente el código QR "{qr.name}".
                             </p>
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "flex-end",
-                                gap: 10,
-                              }}
-                            >
-                              {/* <Button
+                            <div className="flex justify-end gap-2 pt-2">
+                              <Popover.Close asChild>
+                                <Button
                                   variant="ghost"
-                                  onClick={() => setIsDeleteDialogOpen(false)}
+                                  size="sm"
+                                  className="text-xs"
                                 >
-                                  Cancel
-                                </Button> */}
+                                  Cancelar
+                                </Button>
+                              </Popover.Close>
                               <Button
                                 variant="destructive"
+                                size="sm"
+                                className="text-xs"
+                                disabled={deletingQrId === qr.id}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setIsQrDetailsOpen(false);
                                   handleDeleteQr(qr.id);
                                 }}
                               >
-                                Delete
+                                {deletingQrId === qr.id ? (
+                                  <>
+                                    <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
+                                    Eliminando...
+                                  </>
+                                ) : (
+                                  'Eliminar'
+                                )}
                               </Button>
                             </div>
                           </div>
                           <Popover.Close
-                            className="PopoverClose"
+                            className="absolute top-2 right-2 p-1 rounded-sm opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                             aria-label="Close"
                           >
-                            <Cross2Icon />
+                            <Cross2Icon className="h-3 w-3" />
                           </Popover.Close>
-                          <Popover.Arrow className="PopoverArrow" />
                         </Popover.Content>
                       </Popover.Portal>
                     </Popover.Root>
