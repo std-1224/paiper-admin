@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FinanceMetrics } from "(components)/finance-metrics";
 import { SalesAnalysisChart } from "(components)/sales-analysis-chart";
 import { TopProducts } from "(components)/top-products";
-import { FilterIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
+import { RefreshCwIcon, SearchIcon, CalendarIcon } from "lucide-react";
 import Transactions from "pages/transactions";
 import { useAppContext } from "@/context/AppContext";
 import { Order } from "@/types/types";
@@ -38,12 +38,12 @@ const DEFAULT_METRICS = [
     color: "yellow",
   },
   {
-    id: "average-balance",
-    title: "Ganancias por Fecha",
+    id: "balance-load",
+    title: "Balance Load",
     value: "$0",
-    change: "0% vs mes anterior",
-    icon: "wallet",
-    color: "purple",
+    change: "$0 unused balance",
+    icon: "plus-circle",
+    color: "blue",
   },
 ];
 
@@ -69,26 +69,94 @@ interface FilteredSalesData {
 
 const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
   const [activeTab, setActiveTab] = useState("general");
-  const { ordersData, productsData, fetchOrders, fetchProducts } = useAppContext();
+  const { ordersData, fetchOrders } = useAppContext();
   const [metricsData, setMetricsData] = useState(DEFAULT_METRICS);
+  const [balanceTransactions, setBalanceTransactions] = useState<any[]>([]);
+  const [userBalances, setUserBalances] = useState<any[]>([]);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filteredSalesData, setFilteredSalesData] = useState<FilteredSalesData>({
     day: [],
     week: [],
     month: [],
   });
 
-  useEffect(() => {
-    fetchOrders();
-    // fetchProducts();
+  // Comprehensive refresh function
+  const refreshAllData = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        fetchOrders(),
+        fetchBalanceTransactions(),
+        fetchUserBalances()
+      ]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchOrders]);
+
+  // Fetch balance transactions function
+  const fetchBalanceTransactions = useCallback(async () => {
+    try {
+      const response = await fetch('/api/transactions');
+      if (response.ok) {
+        const data = await response.json();
+        setBalanceTransactions(data);
+      }
+    } catch (error) {
+      console.error('Error fetching balance transactions:', error);
+    }
   }, []);
+
+  // Fetch user balances function
+  const fetchUserBalances = useCallback(async () => {
+    try {
+      const response = await fetch('/api/user-balances');
+      if (response.ok) {
+        const data = await response.json();
+        setUserBalances(data);
+      }
+    } catch (error) {
+      console.error('Error fetching user balances:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshAllData();
+  }, [refreshAllData]);
+
+
 
   // Memoized calculation of metrics
   const calculateMetrics = useCallback(() => {
-    if (!ordersData?.length) return DEFAULT_METRICS;
+    if (!ordersData?.length && !balanceTransactions?.length) return DEFAULT_METRICS;
 
     const today = new Date();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
+
+    // Apply date range filtering if dates are provided
+    let filteredOrders = ordersData || [];
+    let filteredBalanceTransactions = balanceTransactions || [];
+
+    if (fromDate && toDate) {
+      const from = new Date(fromDate);
+      const to = new Date(toDate);
+      to.setHours(23, 59, 59, 999); // Include the entire end date
+
+      filteredOrders = ordersData?.filter(order => {
+        const orderDate = new Date(order.created_at);
+        return orderDate >= from && orderDate <= to;
+      }) || [];
+
+      filteredBalanceTransactions = balanceTransactions?.filter(transaction => {
+        const transactionDate = new Date(transaction.created_at);
+        return transactionDate >= from && transactionDate <= to;
+      }) || [];
+    }
 
     const filterByMonth = (orders: Order[], monthOffset = 0) => 
       orders.filter(order => {
@@ -102,31 +170,69 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
         );
       });
 
-    const lastMonthOrders = filterByMonth(ordersData, 1);
-    const thisMonthOrders = filterByMonth(ordersData);
+    // Use filtered data for calculations
+    const lastMonthOrders = fromDate && toDate ? [] : filterByMonth(ordersData || [], 1);
+    const thisMonthOrders = fromDate && toDate ? filteredOrders : filterByMonth(filteredOrders);
 
-    const calculateChange = (current: number, previous: number) => 
+    const calculateChange = (current: number, previous: number) =>
       previous === 0 ? 0 : ((current - previous) / previous) * 100;
 
-    const totalSales = ordersData.reduce((total, order) => total + (order.total_amount || 0), 0);
+    const totalSales = filteredOrders.reduce((total, order) => total + (order.total_amount || 0), 0);
     const thisMonthSales = thisMonthOrders.reduce((total, order) => total + (order.total_amount || 0), 0);
     const lastMonthSales = lastMonthOrders.reduce((total, order) => total + (order.total_amount || 0), 0);
-    const salesChange = calculateChange(thisMonthSales, lastMonthSales);
+    const salesChange = fromDate && toDate ? 0 : calculateChange(thisMonthSales, lastMonthSales);
 
-    const completedOrders = ordersData.filter(order => order.status === 'delivered').length;
+    const completedOrders = filteredOrders.filter(order => order.status === 'delivered').length;
     const lastMonthCompleted = lastMonthOrders.filter(order => order.status === 'delivered').length;
-    const completedChange = calculateChange(completedOrders, lastMonthCompleted);
+    const completedChange = fromDate && toDate ? 0 : calculateChange(completedOrders, lastMonthCompleted);
 
-    const urgentOrders = ordersData.filter(order => order.status === 'urgent').length;
+    const urgentOrders = filteredOrders.filter(order => order.status === 'urgent').length;
     const lastMonthUrgent = lastMonthOrders.filter(order => order.status === 'urgent').length;
-    const urgentChange = calculateChange(urgentOrders, lastMonthUrgent);
+    const urgentChange = fromDate && toDate ? 0 : calculateChange(urgentOrders, lastMonthUrgent);
+
+    // Calculate balance load metrics
+    const thisMonthBalanceTransactions = fromDate && toDate
+      ? filteredBalanceTransactions
+      : balanceTransactions.filter(transaction => {
+          const transactionDate = new Date(transaction.created_at);
+          return (
+            transactionDate.getMonth() === currentMonth &&
+            transactionDate.getFullYear() === currentYear
+          );
+        });
+
+    const lastMonthBalanceTransactions = fromDate && toDate
+      ? []
+      : balanceTransactions.filter(transaction => {
+          const transactionDate = new Date(transaction.created_at);
+          const targetMonth = currentMonth - 1;
+          const targetYear = targetMonth < 0 ? currentYear - 1 : currentYear;
+          return (
+            transactionDate.getMonth() === (targetMonth + 12) % 12 &&
+            transactionDate.getFullYear() === targetYear
+          );
+        });
+
+    const totalBalanceLoaded = thisMonthBalanceTransactions.reduce((total, transaction) =>
+      total + (transaction.amount || 0), 0);
+    const lastMonthBalanceLoaded = lastMonthBalanceTransactions.reduce((total, transaction) =>
+      total + (transaction.amount || 0), 0);
+    const balanceLoadChange = fromDate && toDate ? 0 : calculateChange(totalBalanceLoaded, lastMonthBalanceLoaded);
+
+    // Calculate total unused balance across all users
+    const totalUnusedBalance = userBalances.reduce((total, user) =>
+      total + (user.balance || 0), 0);
+
+    const dateRangeLabel = fromDate && toDate
+      ? `${fromDate} to ${toDate}`
+      : "vs mes anterior";
 
     return [
       {
         id: "total-sales",
         title: "Ventas Totales",
         value: `$${totalSales.toFixed(2)}`,
-        change: `${salesChange.toFixed(2)}% vs mes anterior`,
+        change: fromDate && toDate ? dateRangeLabel : `${salesChange.toFixed(2)}% vs mes anterior`,
         icon: "chart-line",
         color: "orange",
       },
@@ -134,7 +240,7 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
         id: "completed-orders",
         title: "Pedidos Completados",
         value: `${completedOrders}`,
-        change: `${completedChange.toFixed(2)}% vs mes anterior`,
+        change: fromDate && toDate ? dateRangeLabel : `${completedChange.toFixed(2)}% vs mes anterior`,
         icon: "check",
         color: "green",
       },
@@ -142,20 +248,20 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
         id: "urgent-orders",
         title: "Margen de beneficio",
         value: `${urgentOrders}`,
-        change: `${urgentChange.toFixed(2)}% vs mes anterior`,
+        change: fromDate && toDate ? dateRangeLabel : `${urgentChange.toFixed(2)}% vs mes anterior`,
         icon: "alert",
         color: "yellow",
       },
       {
-        id: "average-balance",
-        title: "Ganancias por Fecha",
-        value: "$0.00",
-        change: "0% vs mes anterior",
-        icon: "wallet",
-        color: "purple",
+        id: "balance-load",
+        title: "Balance Load",
+        value: `$${totalBalanceLoaded.toFixed(2)}`,
+        change: `$${totalUnusedBalance.toFixed(2)} unused balance`,
+        icon: "plus-circle",
+        color: "blue",
       },
     ];
-  }, [ordersData]);
+  }, [ordersData, balanceTransactions, userBalances, fromDate, toDate]);
 
 
   // if (timeFilter === 'day') {
@@ -188,6 +294,19 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
   // }
   useEffect(() => {
     if (!ordersData?.length) return;
+
+    // Apply date range filtering to orders data
+    let filteredOrdersForChart = ordersData;
+    if (fromDate && toDate) {
+      const from = new Date(fromDate);
+      const to = new Date(toDate);
+      to.setHours(23, 59, 59, 999);
+
+      filteredOrdersForChart = ordersData.filter(order => {
+        const orderDate = new Date(order.created_at);
+        return orderDate >= from && orderDate <= to;
+      });
+    }
   
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -208,7 +327,7 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
     // Calculate start of month
     const startOfMonth = new Date(currentYear, currentMonth, 1);
   
-    ordersData.forEach(order => {
+    filteredOrdersForChart.forEach(order => {
       const orderDate = new Date(order.created_at);
       const sales = order.total_amount || 0;
   
@@ -271,7 +390,7 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
       week: thisWeekDailyData,
       month: thisMonthDailyData
     });
-  }, [ordersData]);
+  }, [ordersData, fromDate, toDate]);
 
   // Update metrics when ordersData changes
   React.useEffect(() => {
@@ -281,7 +400,21 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
   // Memoized top products data
   const topProductsData = useMemo(() => {
     if (!ordersData?.length) return [];
-    const orderItems = ordersData.flatMap(order => order.order_items);
+
+    // Apply date range filtering to orders data
+    let filteredOrdersForProducts = ordersData;
+    if (fromDate && toDate) {
+      const from = new Date(fromDate);
+      const to = new Date(toDate);
+      to.setHours(23, 59, 59, 999);
+
+      filteredOrdersForProducts = ordersData.filter(order => {
+        const orderDate = new Date(order.created_at);
+        return orderDate >= from && orderDate <= to;
+      });
+    }
+
+    const orderItems = filteredOrdersForProducts.flatMap(order => order.order_items);
     const productSales = orderItems.reduce((acc, item) => {
       if (!item?.product_id) return acc;
       if (!acc[item?.product_id]) {
@@ -301,7 +434,7 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
       .sort((a, b) => b.sales - a.sales)
       .slice(0, 4 );
     return topProducts;
-  }, [ordersData]);
+  }, [ordersData, fromDate, toDate]);
 
 
   return (
@@ -340,18 +473,56 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
                   {option.label}
                 </Button>
               ))}
-              <Button variant="outline" size="sm">
-                <FilterIcon className="h-4 w-4 mr-2" />
-                Filtrar
-              </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
-                onClick={() => setMetricsData(calculateMetrics())}
+                onClick={refreshAllData}
+                disabled={isRefreshing}
               >
-                <RefreshCwIcon className="h-4 w-4 mr-2" />
-                Actualizar
+                <RefreshCwIcon className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Actualizando...' : 'Actualizar'}
               </Button>
+            </div>
+          </div>
+
+          {/* Date Range Filter */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-md p-2">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground dark:text-gray-400">From:</span>
+                <Input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="border-0 p-0 h-auto w-auto dark:bg-transparent dark:text-white"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-md p-2">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground dark:text-gray-400">To:</span>
+                <Input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="border-0 p-0 h-auto w-auto dark:bg-transparent dark:text-white"
+                />
+              </div>
+
+              {(fromDate || toDate) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFromDate('');
+                    setToDate('');
+                  }}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Clear Dates
+                </Button>
+              )}
             </div>
           </div>
 

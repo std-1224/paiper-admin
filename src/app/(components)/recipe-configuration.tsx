@@ -24,7 +24,7 @@ export default function RecipeConfiguration() {
 	const [quantity, setQuantity] = useState('');
 	const [unit, setUnit] = useState('ml');
 	const [selectedRecipe, setSelectedRecipe] = useState<number | null>(null);
-	const [amount, setAmount] = useState<number>(0);
+	const [amount, setAmount] = useState<string>('');
 	const {fetchRecipes, recipesData} = useAppContext();
 	const [category, setCategory] = useState('bebida');
 	const [loading, setLoading] = useState(false);
@@ -67,9 +67,11 @@ export default function RecipeConfiguration() {
 
 	const addNewRecipe = async () => {
 		setLoading(true);
+		// Convert amount to number, default to 0 if empty or invalid
+		const numericAmount = amount === '' ? 0 : Number(amount);
 		const res = await fetch('/api/recipe', {
 			method: 'POST',
-			body: JSON.stringify({ name: recipeName, ingredients: JSON.stringify(newIngredients), amount: amount, category: category }),
+			body: JSON.stringify({ name: recipeName, ingredients: JSON.stringify(newIngredients), amount: numericAmount, category: category }),
 		});
 
 		if (!res.ok) {
@@ -85,15 +87,17 @@ export default function RecipeConfiguration() {
 		setNewIngredients([]);
 		setShowAddRecipeModal(false);
 		setSelectedRecipe(null);
-		setAmount(0);
+		setAmount('');
 		setCategory('');
 	};
 
 	const updateRecipe = async () => {
 		setLoading(true)
+		// Convert amount to number, default to 0 if empty or invalid
+		const numericAmount = amount === '' ? 0 : Number(amount);
 		const res = await fetch('/api/recipe', {
 			method: 'PUT',
-			body: JSON.stringify({ id: selectedRecipe, name: recipeName, ingredients: JSON.stringify(newIngredients), amount: amount, category: category }),
+			body: JSON.stringify({ id: selectedRecipe, name: recipeName, ingredients: JSON.stringify(newIngredients), amount: numericAmount, category: category }),
 		});
 
 		if (!res.ok) {
@@ -107,7 +111,7 @@ export default function RecipeConfiguration() {
 	const handleEditRecipe = (id: number) => {
 		setSelectedRecipe(id);
 		setRecipeName(recipesData.find((recipe) => recipe.id === id)?.name || '');
-		setAmount(recipesData.find((recipe) => recipe.id === id)?.stock || 0);
+		setAmount(String(recipesData.find((recipe) => recipe.id === id)?.stock || ''));
 		setNewIngredients(recipesData.find((recipe) => recipe.id === id)?.ingredients || []);
 		fetchRecipes();
 		setShowAddRecipeModal(true);
@@ -279,9 +283,23 @@ export default function RecipeConfiguration() {
 							<Label>Cantidad</Label>
 							<Input
 								type='number'
-								placeholder='Cantidad'
+								placeholder='Ingrese la cantidad'
 								value={amount}
-								onChange={(e) => setAmount(Number(e.target.value))}
+								onChange={(e) => {
+									const value = e.target.value;
+									// Only allow positive numbers and empty string
+									if (value === '' || (Number(value) >= 0 && !value.includes('-'))) {
+										setAmount(value);
+									}
+								}}
+								onKeyDown={(e) => {
+									// Prevent minus key, plus key, and 'e' key
+									if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+										e.preventDefault();
+									}
+								}}
+								min="0"
+								step="0.01"
 							/>
 						</div>
 
@@ -357,9 +375,23 @@ export default function RecipeConfiguration() {
 									</Label>
 									<Input
 										type='number'
-										placeholder='Cantidad'
+										placeholder='Ingrese cantidad'
 										value={quantity}
-										onChange={(e) => setQuantity(e.target.value)}
+										onChange={(e) => {
+											const value = e.target.value;
+											// Only allow positive numbers and empty string
+											if (value === '' || (Number(value) >= 0 && !value.includes('-'))) {
+												setQuantity(value);
+											}
+										}}
+										onKeyDown={(e) => {
+											// Prevent minus key, plus key, and 'e' key
+											if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+												e.preventDefault();
+											}
+										}}
+										min="0"
+										step="0.01"
 									/>
 								</div>
 								<div className='col-span-2'>

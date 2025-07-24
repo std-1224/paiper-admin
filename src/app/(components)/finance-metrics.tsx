@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { TrendingUpIcon, CheckIcon, AlertTriangleIcon, WalletIcon } from 'lucide-react';
+import { TrendingUpIcon, CheckIcon, AlertTriangleIcon, WalletIcon, PlusCircleIcon } from 'lucide-react';
 
 interface FinanceMetricProps {
 	id: string;
@@ -26,6 +26,8 @@ export function FinanceMetrics({ data }: { data: FinanceMetricProps[] }) {
 				return <AlertTriangleIcon className={iconClass} />;
 			case 'wallet':
 				return <WalletIcon className={iconClass} />;
+			case 'plus-circle':
+				return <PlusCircleIcon className={iconClass} />;
 			default:
 				return <TrendingUpIcon className={iconClass} />;
 		}

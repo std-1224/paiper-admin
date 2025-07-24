@@ -58,6 +58,11 @@ import {
   Trash,
   Filter,
   ClipboardList,
+  DollarSign,
+  TrendingUp,
+  AlertTriangle,
+  XCircle,
+  BarChart3,
 } from "lucide-react";
 import { ProductDetailModal } from "@/components/products/ProductDetailModal";
 import { useAppContext } from "@/context/AppContext";
@@ -162,6 +167,9 @@ const Stock = () => {
     number[]
   >([]);
   const [showUnredeemed, setShowUnredeemed] = useState(false);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [productDetailOpen, setProductDetailOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<ProductDetail | null>(
     null
@@ -194,10 +202,45 @@ const Stock = () => {
     fetchBars,
   } = useAppContext();
 
+  // Calculate statistics from real data
   const totalStock = productsData.reduce(
     (total, product) => total + product.stock,
     0
   );
+
+  // Calculate total purchase value
+  const totalPurchaseValue = productsData.reduce(
+    (total, product) => total + (product.purchase_price * product.stock),
+    0
+  );
+
+  // Calculate total sale value
+  const totalSaleValue = productsData.reduce(
+    (total, product) => total + (product.sale_price * product.stock),
+    0
+  );
+
+  // Calculate transfers from stock movements
+  const totalTransfers = stocksData.filter(item =>
+    item.status === 'transferred' || item.status === 'in_transit'
+  ).length;
+
+  // Calculate low stock items (items with stock below 10)
+  const lowStockItems = productsData.filter(product => product.stock < 10 && product.stock > 0).length;
+
+  // Calculate out of stock items
+  const outOfStockItems = productsData.filter(product => product.stock === 0).length;
+
+  // Calculate pending items from stock data
+  const pendingItems = stocksData.filter(item =>
+    item.status === 'pending' || item.status === 'unredeemed'
+  ).length;
+
+  // Calculate total products count
+  const totalProducts = productsData.length;
+
+  // Calculate average stock per product
+  const averageStock = totalProducts > 0 ? Math.round(totalStock / totalProducts) : 0;
 
   useEffect(() => {
     fetchStocksOfBar();
@@ -223,6 +266,47 @@ const Stock = () => {
   const handleAdjustStock = (product: Product) => {
     setSelectedProduct(product);
     setStockAdjustmentOpen(true);
+  };
+
+  // Handle opening delete confirmation
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteConfirmOpen(true);
+  };
+
+  // Handle product deletion
+  const handleDeleteProduct = async () => {
+    if (!productToDelete?.id) return;
+
+    setDeletingProductId(productToDelete.id);
+    try {
+      const response = await fetch(`/api/products/${productToDelete.id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to delete product");
+      }
+
+      // Refresh the products data
+      await fetchProducts();
+
+      // Show success message
+      toast.success("Producto eliminado exitosamente del inventario");
+
+      // Close dialog
+      setDeleteConfirmOpen(false);
+      setProductToDelete(null);
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el producto");
+    } finally {
+      setDeletingProductId(null);
+    }
   };
   const handleNewTransfer = () => {
     setTransferDialogOpen(true);
@@ -427,7 +511,7 @@ const Stock = () => {
   return (
     <>
       <PageHeader
-        title="Gestión de Stock Avanzado"
+        title=""
         description="Control de inventario y transferencias"
       >
         {/* <Button className="mr-2" onClick={handleMultipleTransfer}>
@@ -448,37 +532,125 @@ const Stock = () => {
         </Button> */}
       </PageHeader>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Stock Total</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Box className="h-5 w-5 text-blue-600" />
+              Stock Total
+            </CardTitle>
             <CardDescription>Productos disponibles</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{totalStock}</div>
+            <div className="text-3xl font-bold">{totalStock.toLocaleString()}</div>
             <p className="text-sm text-gray-500">En todos los bares</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Transferencias</CardTitle>
-            <CardDescription>Último mes</CardDescription>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Valor de Compra
+            </CardTitle>
+            <CardDescription>Inversión total en stock</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">79</div>
-            <p className="text-sm text-gray-500">Entre bares</p>
+            <div className="text-3xl font-bold">
+              ${totalPurchaseValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <p className="text-sm text-gray-500">Precio de compra total</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Pendientes</CardTitle>
-            <CardDescription>Sin retirar o en tránsito</CardDescription>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-600" />
+              Valor de Venta
+            </CardTitle>
+            <CardDescription>Valor potencial de venta</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">45</div>
-            <p className="text-sm text-gray-500">Valor: $8,250</p>
+            <div className="text-3xl font-bold">
+              ${totalSaleValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <p className="text-sm text-gray-500">
+              Margen: ${(totalSaleValue - totalPurchaseValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5 text-purple-600" />
+              Transferencias
+            </CardTitle>
+            <CardDescription>Movimientos de stock</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{totalTransfers}</div>
+            <p className="text-sm text-gray-500">Entre bares</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Additional Statistics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-indigo-600" />
+              Total Productos
+            </CardTitle>
+            <CardDescription>Productos únicos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{totalProducts}</div>
+            <p className="text-sm text-gray-500">En catálogo</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-cyan-600" />
+              Stock Promedio
+            </CardTitle>
+            <CardDescription>Por producto</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{averageStock}</div>
+            <p className="text-sm text-gray-500">Unidades promedio</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              Stock Bajo
+            </CardTitle>
+            <CardDescription>Productos con poco stock</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-orange-600">{lowStockItems}</div>
+            <p className="text-sm text-gray-500">Menos de 10 unidades</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-600" />
+              Sin Stock
+            </CardTitle>
+            <CardDescription>Productos agotados</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-red-600">{outOfStockItems}</div>
+            <p className="text-sm text-gray-500">Requieren reposición</p>
           </CardContent>
         </Card>
       </div>
@@ -582,6 +754,7 @@ const Stock = () => {
                     <TableHead>Producto</TableHead>
                     <TableHead>Vis. Menu</TableHead>
                     <TableHead>Categoría</TableHead>
+                    <TableHead>Precio Compra</TableHead>
                     <TableHead>Cantidad</TableHead>
                     <TableHead>Bar</TableHead>
                     <TableHead>Estado</TableHead>
@@ -625,6 +798,11 @@ const Stock = () => {
                       </TableCell>
                       <TableCell>
                         {"category" in item ? item.category : "N/A"}
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium text-green-600">
+                          ${item.purchase_price?.toFixed(2) || "0.00"}
+                        </span>
                       </TableCell>
                       <TableCell>{item.stock}</TableCell>
                       <TableCell>
@@ -670,20 +848,28 @@ const Stock = () => {
                             size="sm"
                             onClick={() => handleAssignStock(item)}
                           >
-                            {
-                              <>
-                                <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                Asignar
-                              </>
-                            }
+                            <ArrowRightLeft className="mr-2 h-4 w-4" />
+                            Asignar
                           </Button>
-                          {/* <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleAdjustStock(item)}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                            onClick={() => handleDeleteClick(item)}
+                            disabled={deletingProductId === item.id}
                           >
-                            <PackagePlus className="h-4 w-4" />
-                          </Button> */}
+                            {deletingProductId === item.id ? (
+                              <>
+                                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                                Eliminando...
+                              </>
+                            ) : (
+                              <>
+                                <Trash className="mr-2 h-4 w-4" />
+                                Eliminar
+                              </>
+                            )}
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -936,6 +1122,54 @@ const Stock = () => {
         onOpenChange={setProductDetailOpen}
         product={currentProduct}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash className="h-5 w-5 text-red-600" />
+              Confirmar Eliminación
+            </DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas eliminar el producto "{productToDelete?.name}"?
+              <br />
+              <span className="text-red-600 font-medium">
+                Esta acción no se puede deshacer y eliminará permanentemente el producto del inventario.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                setProductToDelete(null);
+              }}
+              disabled={deletingProductId !== null}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteProduct}
+              disabled={deletingProductId !== null}
+            >
+              {deletingProductId ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash className="mr-2 h-4 w-4" />
+                  Eliminar Producto
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

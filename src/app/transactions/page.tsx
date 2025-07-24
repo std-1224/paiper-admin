@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { SearchIcon, FilterIcon, RefreshCwIcon, CalendarIcon, ArrowUpDownIcon, CreditCardIcon, DollarSignIcon, WalletIcon } from 'lucide-react';
+import { SearchIcon, FilterIcon, RefreshCwIcon, CalendarIcon, ArrowUpDownIcon, CreditCardIcon, DollarSignIcon, WalletIcon, PlusCircleIcon } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { format } from "date-fns";
 
@@ -17,6 +17,7 @@ interface Transaction {
   date: string;
   amount: string;
   status: string;
+  type: 'order' | 'balance_load';
 }
 
 export default function Transactions() {
@@ -26,10 +27,27 @@ export default function Transactions() {
   const [sortDirection, setSortDirection] = useState('desc');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [balanceTransactions, setBalanceTransactions] = useState<any[]>([]);
 
+  // Fetch balance transactions
+  useEffect(() => {
+    const fetchBalanceTransactions = async () => {
+      try {
+        const response = await fetch('/api/transactions');
+        if (response.ok) {
+          const data = await response.json();
+          setBalanceTransactions(data);
+        }
+      } catch (error) {
+        console.error('Error fetching balance transactions:', error);
+      }
+    };
 
-  // Transform orders data into transactions
-  const transactions: Transaction[] = ordersData?.map(order => ({
+    fetchBalanceTransactions();
+  }, []);
+
+  // Transform orders data into order transactions
+  const orderTransactions: Transaction[] = ordersData?.map(order => ({
     id: order.id,
     user: order.user_name || "Unknown",
     userId: order.user_id || "",
@@ -38,7 +56,24 @@ export default function Transactions() {
     date: order.created_at,
     amount: order.total_amount?.toString() || "0",
     status: order.status,
+    type: 'order' as const,
   })) || [];
+
+  // Transform balance transactions
+  const balanceTransactionsList: Transaction[] = balanceTransactions?.map(transaction => ({
+    id: transaction.id,
+    user: transaction.user?.name || transaction.user?.email || "Unknown",
+    userId: transaction.user_id || "",
+    order: "Balance Load",
+    paymentMethod: transaction.type === 'cash' ? 'cash' : transaction.type === 'charge' ? 'mercadopago' : transaction.type,
+    date: transaction.created_at,
+    amount: transaction.amount?.toString() || "0",
+    status: transaction.status,
+    type: 'balance_load' as const,
+  })) || [];
+
+  // Combine all transactions
+  const transactions: Transaction[] = [...orderTransactions, ...balanceTransactionsList];
 
   // Handle sorting
   const handleSort = (field: string) => {
@@ -136,13 +171,17 @@ export default function Transactions() {
   };
 
   // Get icon for payment method
-  const getPaymentMethodIcon = (method: string) => {
+  const getPaymentMethodIcon = (method: string, transactionType: string) => {
+    if (transactionType === 'balance_load') {
+      return <PlusCircleIcon className='h-4 w-4 mr-2 text-green-600' />;
+    }
+
     switch (method) {
       case 'mercadopago':
         return <CreditCardIcon className='h-4 w-4 mr-2' />;
       case 'cash':
         return <DollarSignIcon className='h-4 w-4 mr-2' />;
-      case 'cashless':
+      case 'balance':
         return <WalletIcon className='h-4 w-4 mr-2' />;
       default:
         return null;
@@ -194,16 +233,6 @@ export default function Transactions() {
               className='border-0 p-0 h-auto w-auto dark:bg-transparent dark:text-white'
             />
           </div>
-
-          <Button variant='outline' className='dark:border-gray-700 dark:text-gray-300'>
-            <FilterIcon className='h-4 w-4 mr-2' />
-            Filter
-          </Button>
-
-          <Button variant='outline' className='dark:border-gray-700 dark:text-gray-300'>
-            <RefreshCwIcon className='h-4 w-4 mr-2' />
-            Refresh
-          </Button>
         </div>
       </div>
 
@@ -229,7 +258,8 @@ export default function Transactions() {
                     {sortField === 'order' && <ArrowUpDownIcon className={`h-4 w-4 ml-1 ${sortDirection === 'asc' ? 'transform rotate-180' : ''}`} />}
                   </div>
                 </th>
-                <th 
+                <th className='p-4 font-medium text-muted-foreground dark:text-gray-400'>TYPE</th>
+                <th
                   className='p-4 font-medium text-muted-foreground dark:text-gray-400 cursor-pointer'
                   onClick={() => handleSort('paymentMethod')}>
                   <div className='flex items-center'>
@@ -268,9 +298,19 @@ export default function Transactions() {
                     {transaction.order}
                   </td>
                   <td className='p-4 dark:text-white'>
+                    <Badge
+                      className={
+                        transaction.type === 'balance_load'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+                          : 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
+                      }>
+                      {transaction.type === 'balance_load' ? 'Balance Load' : 'Order'}
+                    </Badge>
+                  </td>
+                  <td className='p-4 dark:text-white'>
                     <div className='flex items-center'>
-                      {getPaymentMethodIcon(transaction.paymentMethod)}
-                      {transaction.paymentMethod}
+                      {getPaymentMethodIcon(transaction.paymentMethod, transaction.type)}
+                      {transaction.type === 'balance_load' ? 'Balance Load' : transaction.paymentMethod}
                     </div>
                   </td>
                   <td className='p-4 dark:text-white'>
@@ -282,9 +322,11 @@ export default function Transactions() {
                   <td className='p-4'>
                     <Badge
                       className={
-                        transaction.status === 'delivered'
+                        transaction.status === 'delivered' || transaction.status === 'approved'
                           ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                          : transaction.status === 'pending'
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
                       }>
                       {transaction.status}
                     </Badge>
