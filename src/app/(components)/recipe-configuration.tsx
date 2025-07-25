@@ -359,6 +359,9 @@ export default function RecipeConfiguration() {
 											<SelectValue placeholder='Seleccionar ingrediente' />
 										</SelectTrigger>
 										<SelectContent>
+											<SelectItem value='Ginebra'>Ginebra</SelectItem>
+											<SelectItem value='vodka'>Vodka</SelectItem>
+											<SelectItem value='tónica'>Tónica</SelectItem>
 											<SelectItem value='ron'>Ron</SelectItem>
 											<SelectItem value='tequila'>Tequila</SelectItem>
 											<SelectItem value='limon'>Limón</SelectItem>

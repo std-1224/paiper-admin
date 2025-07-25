@@ -915,12 +915,33 @@ const Stock = () => {
                 <Input
                   id="quantity"
                   type="number"
+                  min={1}
                   max={selectedProduct?.stock}
+                  onKeyDown={(e) => {
+                    // Prevent minus key, plus key, and 'e' key
+                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                      e.preventDefault();
+                    }
+                  }}
                   {...assignForm.register("quantity", {
                     valueAsNumber: true,
+                    min: {
+                      value: 1,
+                      message: "La cantidad debe ser al menos 1",
+                    },
                     max: {
                       value: selectedProduct?.stock || 0,
                       message: `No puedes asignar más de ${selectedProduct?.stock} unidades`,
+                    },
+                    onChange: (e) => {
+                      const value = e.target.value;
+                      // Only allow positive numbers and empty string
+                      if (value === '' || (Number(value) >= 1 && !value.includes('-'))) {
+                        return value;
+                      }
+                      // If invalid, set to 1
+                      e.target.value = '1';
+                      return '1';
                     },
                   })}
                 />
@@ -996,12 +1017,28 @@ const Stock = () => {
                   id="quantity"
                   type="number"
                   min={1}
+                  onKeyDown={(e) => {
+                    // Prevent minus key, plus key, and 'e' key
+                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                      e.preventDefault();
+                    }
+                  }}
                   {...transferForm.register("quantity", {
                     valueAsNumber: true,
                     required: "La cantidad es requerida",
                     min: {
                       value: 1,
                       message: "La cantidad debe ser mayor a 0",
+                    },
+                    onChange: (e) => {
+                      const value = e.target.value;
+                      // Only allow positive numbers and empty string
+                      if (value === '' || (Number(value) >= 1 && !value.includes('-'))) {
+                        return value;
+                      }
+                      // If invalid, set to 1
+                      e.target.value = '1';
+                      return '1';
                     },
                   })}
                 />

@@ -580,13 +580,23 @@ export function OrderCard({
                               (product) => product.id === item.product_id
                             )?.stock || 0
                           }
-                          onChange={(e) =>
-                            handleItemChange(
-                              index,
-                              "quantity",
-                              parseInt(e.target.value) || 0
-                            )
-                          }
+                          onKeyDown={(e) => {
+                            // Prevent minus key, plus key, and 'e' key
+                            if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                              e.preventDefault();
+                            }
+                          }}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Only allow positive numbers and empty string
+                            if (value === '' || (Number(value) >= 1 && !value.includes('-'))) {
+                              handleItemChange(
+                                index,
+                                "quantity",
+                                parseInt(value) || 1
+                              );
+                            }
+                          }}
                         />
                       </div>
                       <div className="col-span-3 text-center">
