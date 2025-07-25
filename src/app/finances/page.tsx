@@ -177,9 +177,10 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
     const calculateChange = (current: number, previous: number) =>
       previous === 0 ? 0 : ((current - previous) / previous) * 100;
 
-    const totalSales = filteredOrders.reduce((total, order) => total + (order.total_amount || 0), 0);
-    const thisMonthSales = thisMonthOrders.reduce((total, order) => total + (order.total_amount || 0), 0);
-    const lastMonthSales = lastMonthOrders.reduce((total, order) => total + (order.total_amount || 0), 0);
+    // Only count sales from delivered orders
+    const totalSales = filteredOrders.filter(order => order.status === 'delivered' || order.status === 'approved').reduce((total, order) => total + (order.total_amount || 0), 0);
+    const thisMonthSales = thisMonthOrders.filter(order => order.status === 'delivered' || order.status === 'approved').reduce((total, order) => total + (order.total_amount || 0), 0);
+    const lastMonthSales = lastMonthOrders.filter(order => order.status === 'delivered' || order.status === 'approved').reduce((total, order) => total + (order.total_amount || 0), 0);
     const salesChange = fromDate && toDate ? 0 : calculateChange(thisMonthSales, lastMonthSales);
 
     const completedOrders = filteredOrders.filter(order => order.status === 'delivered').length;
@@ -295,14 +296,16 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
   useEffect(() => {
     if (!ordersData?.length) return;
 
-    // Apply date range filtering to orders data
-    let filteredOrdersForChart = ordersData;
+    // Apply date range filtering and status filtering to orders data
+    // Only include orders with "delivered" status for sales analysis
+    let filteredOrdersForChart = ordersData.filter(order => order.status === 'delivered' || order.status === 'approved');
+
     if (fromDate && toDate) {
       const from = new Date(fromDate);
       const to = new Date(toDate);
       to.setHours(23, 59, 59, 999);
 
-      filteredOrdersForChart = ordersData.filter(order => {
+      filteredOrdersForChart = filteredOrdersForChart.filter(order => {
         const orderDate = new Date(order.created_at);
         return orderDate >= from && orderDate <= to;
       });
@@ -401,14 +404,16 @@ const [timeFilter, setTimeFilter] = useState<TimeFilterType>("week");
   const topProductsData = useMemo(() => {
     if (!ordersData?.length) return [];
 
-    // Apply date range filtering to orders data
-    let filteredOrdersForProducts = ordersData;
+    // Apply date range filtering and status filtering to orders data
+    // Only include orders with "delivered" status for top products calculation
+    let filteredOrdersForProducts = ordersData.filter(order => order.status === 'delivered' || order.status === 'approved');
+
     if (fromDate && toDate) {
       const from = new Date(fromDate);
       const to = new Date(toDate);
       to.setHours(23, 59, 59, 999);
 
-      filteredOrdersForProducts = ordersData.filter(order => {
+      filteredOrdersForProducts = filteredOrdersForProducts.filter(order => {
         const orderDate = new Date(order.created_at);
         return orderDate >= from && orderDate <= to;
       });
