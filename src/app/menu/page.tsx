@@ -12,7 +12,7 @@ export default function Home() {
   
   const options = [
     { id: "stock", label: "Administrar stock", icon: Box },
-    { id: "custom", label: "Tragos Personalizados", icon: CheckCircle },
+    // { id: "custom", label: "Tragos Personalizados", icon: CheckCircle },
     { id: "prices", label: "Gestión de precios", icon: DollarSign },
   ]
 
@@ -42,7 +42,7 @@ export default function Home() {
 
       <div className="mt-6">
         {selectedOption === "stock" && <StockManagement />}
-        {selectedOption === "custom" && <CustomDrinks selectedBar="all" showCheckboxes={false} />}
+        {/* {selectedOption === "custom" && <CustomDrinks selectedBar="all" showCheckboxes={false} />} */}
         {selectedOption === "prices" && <PriceManagement />}
       </div>
     </div>
