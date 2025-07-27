@@ -1,6 +1,94 @@
 import { NextResponse } from "next/server";
 import { supabase as supabaseServerClient } from "@/lib/supabaseClient";
 
+// Helper function to deduct recipe ingredients from stock
+async function deductRecipeIngredients(productId: string, quantity: number, barId: number) {
+  try {
+    // Get the product with its recipe ingredients (stored as JSON in the ingredients field)
+    const { data: product, error: productError } = await supabaseServerClient
+      .from("products")
+      .select("ingredients, has_recipe")
+      .eq("id", productId)
+      .single();
+
+    if (productError || !product || !product.has_recipe || !product.ingredients) {
+      return false; // No recipe, use regular stock deduction
+    }
+
+    // Parse the ingredients JSON
+    let recipeIngredients;
+    try {
+      recipeIngredients = JSON.parse(product.ingredients);
+    } catch (parseError) {
+      console.error("Error parsing recipe ingredients JSON:", parseError);
+      return false;
+    }
+
+    if (!Array.isArray(recipeIngredients) || recipeIngredients.length === 0) {
+      return false; // No valid ingredients, use regular stock deduction
+    }
+
+    // Deduct each ingredient from inventory/stock
+    for (const ingredient of recipeIngredients) {
+      const ingredientQuantity = parseFloat(ingredient.quantity) * quantity;
+
+      // Find the product by name (using name matching)
+      const { data: ingredientProducts, error: searchError } = await supabaseServerClient
+        .from("products")
+        .select("id, name, stock")
+        .ilike("name", `%${ingredient.name}%`);
+
+      if (searchError || !ingredientProducts || ingredientProducts.length === 0) {
+        console.warn(`Ingredient product not found: ${ingredient.name}`);
+        continue; // Skip this ingredient and continue with others
+      }
+
+      // Use the first matching product
+      const ingredientProduct = ingredientProducts[0];
+      const ingredientProductId = ingredientProduct.id;
+
+      // Try to find ingredient in inventory first (bar-specific stock)
+      if (barId) {
+        const { data: inventory } = await supabaseServerClient
+          .from("inventory")
+          .select("*")
+          .eq("bar_id", barId)
+          .eq("product_id", ingredientProductId)
+          .single();
+
+        if (inventory && inventory.quantity >= ingredientQuantity) {
+          // Deduct from inventory
+          await supabaseServerClient
+            .from("inventory")
+            .update({
+              quantity: inventory.quantity - ingredientQuantity,
+            })
+            .eq("id", inventory.id);
+          continue; // Successfully deducted from inventory, move to next ingredient
+        }
+      }
+
+      // Deduct from general product stock
+      if (ingredientProduct.stock >= ingredientQuantity) {
+        await supabaseServerClient
+          .from("products")
+          .update({
+            stock: ingredientProduct.stock - ingredientQuantity,
+          })
+          .eq("id", ingredientProductId);
+      } else {
+        console.warn(`Insufficient stock for ingredient: ${ingredient.name}. Available: ${ingredientProduct.stock}, Required: ${ingredientQuantity}`);
+        // Continue with other ingredients even if one fails
+      }
+    }
+
+    return true; // Recipe ingredients were processed
+  } catch (error) {
+    console.error("Error deducting recipe ingredients:", error);
+    return false; // Fall back to regular stock deduction
+  }
+}
+
 export const GET = async () => {
   try {
     const { data, error } = await supabaseServerClient
@@ -141,6 +229,7 @@ export const PUT = async (req: Request) => {
 
       if (order.error) throw order.error;
       if (!order.data) throw new Error("Order not found");
+      
       if (order.data.payment_method == "balance") {
         const { data: userUpdate, error: userError } =
           await supabaseServerClient
@@ -152,43 +241,50 @@ export const PUT = async (req: Request) => {
             .select()
             .single();
       }
+
       for (const item of order.data.order_items) {
-        const { data: inventory } = await supabaseServerClient
-          .from("inventory")
-          .select("*")
-          .eq("product_id", item.product_id)
-          .eq("bar_id", user?.qr?.bar_id)
-          .single();
-        console.log("Inventory:", inventory);
-        if (inventory && inventory.quantity > item.quantity) {
-          // if (inventory.quantity < item.quantity) {
-          //     throw new Error("Not enough stock in inventory");
-          // }
-          const { data: inventoryUpdate, error: inventoryError } =
-            await supabaseServerClient
-              .from("inventory")
-              .update({
-                quantity: inventory.quantity - item.quantity,
-              })
-              .eq("product_id", item.product_id)
-              .eq("bar_id", user?.qr?.bar_id)
-              .select()
-              .single();
-          if (inventoryError) throw inventoryError;
-        } else {
-          // if (item.products.stock < item.quantity) {
-          //     throw new Error("Not enough stock");
-          // }
-          const { data: productUpdate, error: productError } =
-            await supabaseServerClient
-              .from("products")
-              .update({
-                stock: item.products.stock - item.quantity,
-              })
-              .eq("id", item.product_id)
-              .select()
-              .single();
-          if (productError) throw productError;
+        // Try recipe-based stock deduction first
+        const recipeProcessed = await deductRecipeIngredients(
+          item.product_id,
+          item.quantity,
+          user?.qr?.bar_id
+        );
+
+        // If no recipe was processed, use regular stock deduction
+        if (!recipeProcessed) {
+          const { data: inventory } = await supabaseServerClient
+            .from("inventory")
+            .select("*")
+            .eq("product_id", item.product_id)
+            .eq("bar_id", user?.qr?.bar_id)
+            .single();
+
+          if (inventory && inventory.quantity > item.quantity) {
+            // Deduct from inventory
+            const { data: inventoryUpdate, error: inventoryError } =
+              await supabaseServerClient
+                .from("inventory")
+                .update({
+                  quantity: inventory.quantity - item.quantity,
+                })
+                .eq("product_id", item.product_id)
+                .eq("bar_id", user?.qr?.bar_id)
+                .select()
+                .single();
+            if (inventoryError) throw inventoryError;
+          } else {
+            // Deduct from product stock
+            const { data: productUpdate, error: productError } =
+              await supabaseServerClient
+                .from("products")
+                .update({
+                  stock: item.products.stock - item.quantity,
+                })
+                .eq("id", item.product_id)
+                .select()
+                .single();
+            if (productError) throw productError;
+          }
         }
       }
     }
@@ -202,16 +298,18 @@ export const PUT = async (req: Request) => {
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
+
     const { data: updatedOrder } = await supabaseServerClient
       .from("orders")
       .select("*, user:profiles!user_id (email)")
       .eq("id", id)
       .single();
+
     if (error) {
       throw error;
     }
 
-    return NextResponse.json(orderData, { status: 200 }); // Return the updated user
+    return NextResponse.json(orderData, { status: 200 });
   } catch (error: any) {
     console.error("Error updating order:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -220,11 +318,9 @@ export const PUT = async (req: Request) => {
 
 export const DELETE = async (req: Request) => {
   try {
-    // Parse the request body
     const body = await req.json();
     const { id } = body;
 
-    // Validate that the `id` is provided
     if (!id) {
       return NextResponse.json(
         { error: "Order ID is required" },
@@ -232,11 +328,10 @@ export const DELETE = async (req: Request) => {
       );
     }
 
-    // Delete the user from the 'profiles' table
     const { data, error } = await supabaseServerClient
-      .from("orders") // Replace 'profiles' with your actual table name
+      .from("orders")
       .delete()
-      .eq("id", id); // Match the user by ID
+      .eq("id", id);
 
     if (error) {
       throw error;
@@ -251,3 +346,15 @@ export const DELETE = async (req: Request) => {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 };
+
+
+
+
+
+
+
+
+
+
+
+

@@ -78,32 +78,49 @@ export const DELETE = async (req: Request) => {
     try {
         // Parse the request body
         const body = await req.json();
-        const { id } = body;
+        const { id, clearAll } = body;
 
-        // Validate that the `id` is provided
+        if (clearAll) {
+            // Clear all transfer records
+            const { data, error } = await supabaseServerClient
+                .from("transfer")
+                .delete()
+                .neq("id", 0); // Delete all records
+
+            if (error) {
+                throw error;
+            }
+
+            return NextResponse.json(
+                { message: "All transfer records cleared successfully", data },
+                { status: 200 }
+            );
+        }
+
+        // Validate that the `id` is provided for single deletion
         if (!id) {
             return NextResponse.json(
-                { error: "User ID is required" },
+                { error: "Transfer ID is required" },
                 { status: 400 }
             );
         }
 
-        // Delete the user from the 'profiles' table
+        // Delete single transfer record
         const { data, error } = await supabaseServerClient
-            .from("adjust") // Replace 'profiles' with your actual table name
+            .from("transfer")
             .delete()
-            .eq("id", id); // Match the user by ID
+            .eq("id", id);
 
         if (error) {
             throw error;
         }
 
         return NextResponse.json(
-            { message: "User deleted successfully", data },
+            { message: "Transfer deleted successfully", data },
             { status: 200 }
         );
     } catch (error: any) {
-        console.error("Error deleting user:", error.message);
+        console.error("Error deleting transfer:", error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 };

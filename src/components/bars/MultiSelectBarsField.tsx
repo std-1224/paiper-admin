@@ -38,6 +38,7 @@ interface MultiSelectBarsFieldProps {
   initialSelection?: string[];
   singleSelection?: boolean;
   disabled?: boolean;
+  includeGeneralStock?: boolean;
 }
 
 export function MultiSelectBarsField({
@@ -47,6 +48,7 @@ export function MultiSelectBarsField({
   initialSelection = [],
   singleSelection = false,
   disabled = false,
+  includeGeneralStock = false,
 }: MultiSelectBarsFieldProps) {
   const [open, setOpen] = useState(false);
   const [selectedValues, setSelectedValues] =
@@ -56,8 +58,14 @@ export function MultiSelectBarsField({
     if (initialSelection.length > 0) setSelectedValues(initialSelection);
   }, [initialSelection]);
 
-  const selectedBars = barsData.filter((bar) =>
-    selectedValues.includes(bar.id || "")
+  // Create combined list of bars and general stock option
+  const allOptions = [
+    ...barsData,
+    ...(includeGeneralStock ? [{ id: "general-stock", name: "Stock General" }] : [])
+  ];
+
+  const selectedBars = allOptions.filter((option) =>
+    selectedValues.includes(option.id || "")
   );
 
   const handleSelect = (barId: string) => {
@@ -114,27 +122,29 @@ export function MultiSelectBarsField({
           <CommandList>
             <CommandEmpty>No se encontraron barras.</CommandEmpty>
             <CommandGroup>
-              {barsData?.map((bar) => (
+              {allOptions?.map((option) => (
                 <CommandItem
-                  key={bar.id}
-                  value={bar.id}
-                  onSelect={() => handleSelect(bar.id || "")}
+                  key={option.id}
+                  value={option.id}
+                  onSelect={() => handleSelect(option.id || "")}
                   disabled={disabled}
                 >
                   <div className="flex items-center w-full">
                     <div
                       className={cn(
                         "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border",
-                        selectedValues.includes(bar.id || "")
+                        selectedValues.includes(option.id || "")
                           ? "bg-primary border-primary text-primary-foreground"
                           : "border-primary opacity-50"
                       )}
                     >
-                      {selectedValues.includes(bar.id || "") && (
+                      {selectedValues.includes(option.id || "") && (
                         <Check className="h-3 w-3" />
                       )}
                     </div>
-                    <span>{bar.name}</span>
+                    <span className={option.id === "general-stock" ? "font-medium text-blue-600" : ""}>
+                      {option.name}
+                    </span>
                   </div>
                 </CommandItem>
               ))}

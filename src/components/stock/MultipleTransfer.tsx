@@ -185,40 +185,70 @@ export function MultipleTransfer({ onClose, onSuccess }: MultipleTransferProps) 
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Transferencia de Stock</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <span>Transferencia Múltiple de Stock</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              Paso {currentStep} de 4
+            </span>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4].map((step) => (
+                <div
+                  key={step}
+                  className={`w-3 h-3 rounded-full flex items-center justify-center text-xs font-medium ${
+                    step <= currentStep
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {step}
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardTitle>
         <CardDescription>
-          Paso {currentStep} de 4: {
-            currentStep === 1 ? "Seleccionar origen" : 
-            currentStep === 2 ? "Seleccionar productos" :
-            currentStep === 3 ? "Seleccionar destino" : 
-            "Confirmación"
-          }
+          {currentStep === 1 && "Selecciona la barra de origen para la transferencia"}
+          {currentStep === 2 && "Elige los productos y cantidades a transferir"}
+          {currentStep === 3 && "Selecciona la barra de destino"}
+          {currentStep === 4 && "Revisa y confirma la transferencia"}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {currentStep === 1 && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Origen de la transferencia
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <label className="block text-sm font-medium">
+                ¿Desde qué barra quieres transferir productos?
               </label>
               <Select value={sourceBar} onValueChange={setSourceBar}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar origen" />
+                <SelectTrigger className="h-12">
+                  <SelectValue placeholder="Selecciona la barra de origen" />
                 </SelectTrigger>
                 <SelectContent>
                   {bars.map((bar) => (
-                    <SelectItem key={bar} value={bar}>{bar}</SelectItem>
+                    <SelectItem key={bar} value={bar} className="py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                        {bar}
+                      </div>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            
+
             {sourceBar && (
-              <div className="rounded-md bg-muted p-4">
-                <h3 className="font-medium mb-2">Productos disponibles en {sourceBar}</h3>
-                <p className="text-sm text-muted-foreground">
+              <div className="rounded-lg border bg-green-50 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  <h3 className="font-medium text-green-900">Barra seleccionada: {sourceBar}</h3>
+                </div>
+                <p className="text-sm text-green-700">
                   {availableProducts.length} productos disponibles para transferir
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Haz clic en "Siguiente" para seleccionar los productos
                 </p>
               </div>
             )}
@@ -226,12 +256,15 @@ export function MultipleTransfer({ onClose, onSuccess }: MultipleTransferProps) 
         )}
         
         {currentStep === 2 && (
-          <div className="space-y-4">
-            <div className="flex items-center mb-4">
-              <div className="flex-1">
-                <h3 className="font-medium">Productos disponibles en {sourceBar}</h3>
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-lg">Selecciona productos de {sourceBar}</h3>
+                <p className="text-sm text-muted-foreground">
+                  Elige los productos y cantidades que deseas transferir
+                </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg">
                 <Checkbox
                   id="selectAll"
                   checked={selectAll}
@@ -239,19 +272,19 @@ export function MultipleTransfer({ onClose, onSuccess }: MultipleTransferProps) 
                 />
                 <label
                   htmlFor="selectAll"
-                  className="text-sm font-medium cursor-pointer"
+                  className="text-sm font-medium cursor-pointer text-blue-900"
                 >
                   Seleccionar todos
                 </label>
               </div>
             </div>
             
-            <div className="border rounded-md">
-              <div className="grid grid-cols-12 gap-2 py-2 px-4 bg-muted text-sm font-medium">
-                <div className="col-span-1">Sel.</div>
+            <div className="border rounded-lg overflow-hidden">
+              <div className="grid grid-cols-12 gap-2 py-3 px-4 bg-slate-50 text-sm font-medium border-b">
+                <div className="col-span-1 text-center">✓</div>
                 <div className="col-span-5">Producto</div>
-                <div className="col-span-2">Stock</div>
-                <div className="col-span-4">Cantidad</div>
+                <div className="col-span-2 text-center">Stock Disponible</div>
+                <div className="col-span-4 text-center">Cantidad a Transferir</div>
               </div>
               
               <div className="divide-y max-h-[400px] overflow-y-auto">
@@ -282,10 +315,22 @@ export function MultipleTransfer({ onClose, onSuccess }: MultipleTransferProps) 
                     <div className="col-span-4">
                       <Input
                         type="number"
-                        min={0}
+                        min={1}
                         max={product.quantity}
                         value={getProductQuantity(product.id) || ""}
-                        onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value) || 0)}
+                        onKeyDown={(e) => {
+                          // Prevent minus key, plus key, and 'e' key
+                          if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                            e.preventDefault();
+                          }
+                        }}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Only allow positive numbers and empty string
+                          if (value === '' || (Number(value) >= 1 && !value.includes('-'))) {
+                            handleQuantityChange(product.id, parseInt(value) || 1);
+                          }
+                        }}
                         disabled={!isProductSelected(product.id)}
                         className="w-full"
                       />

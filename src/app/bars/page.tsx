@@ -9,6 +9,7 @@ import {
   DollarSign,
   BoxesIcon,
   Plus,
+  Eye,
 } from "lucide-react";
 import { StatsCard } from "@/components/StatsCard";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -122,6 +123,14 @@ const Bars = () => {
         title="Gestión de Barras & QRs"
         description="Control de barras, QRs, ingresos y transferencias"
       >
+        <Button
+          onClick={() => window.location.href = '/bars/qr-view'}
+          variant="outline"
+          className="mr-2"
+        >
+          <Eye className="mr-2 h-4 w-4" />
+          Ver QRs
+        </Button>
         <Button
           onClick={() => setQrGeneratorOpen(true)}
           className="mr-2 bg-stone-900 hover:bg-stone-800"

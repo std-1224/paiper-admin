@@ -20,9 +20,11 @@ import { useAppContext } from "@/context/AppContext";
 
 interface MenuProps {
   onAddToCart: (item: Product) => void;
+  userTableId?: string | null;
+  isTableOrder?: boolean;
 }
 
-export function Menu({ onAddToCart }: MenuProps) {
+export function Menu({ onAddToCart, userTableId, isTableOrder = false }: MenuProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const { fetchProducts, productsData } = useAppContext();
@@ -31,23 +33,61 @@ export function Menu({ onAddToCart }: MenuProps) {
     fetchProducts();
   }, []);
 
-  // Filter products based on search query and active category
+  // Filter products based on search query, active category, and table restrictions
   const filteredProducts = productsData.filter((product) => {
     const matchesSearch = product.name
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
-    if (activeCategory === "all") return matchesSearch;
-    return matchesSearch && product.category === activeCategory;
+
+    // Apply category filter
+    const matchesCategory = activeCategory === "all" || product.category === activeCategory;
+
+    // Apply table restrictions - if user is at a table, only show bottles and specific categories
+    const matchesTableRestriction = !isTableOrder || !userTableId ||
+      product.category === "bottles" ||
+      product.category === "champagne" ||
+      product.category === "whisky" ||
+      product.category === "vodka" ||
+      product.category === "gin" ||
+      product.category === "rum" ||
+      product.category === "tequila";
+
+    return matchesSearch && matchesCategory && matchesTableRestriction;
   });
 
-  // Get unique categories from products
+  // Get unique categories from products, filtered by table restrictions if applicable
+  const availableProducts = isTableOrder && userTableId
+    ? productsData.filter(product =>
+        product.category === "bottles" ||
+        product.category === "champagne" ||
+        product.category === "whisky" ||
+        product.category === "vodka" ||
+        product.category === "gin" ||
+        product.category === "rum" ||
+        product.category === "tequila"
+      )
+    : productsData;
+
   const categories = [
     "all",
-    ...Array.from(new Set(productsData.map((product) => product.category))),
+    ...Array.from(new Set(availableProducts.map((product) => product.category))),
   ];
 
   return (
     <div className="flex flex-col h-full">
+      {/* Table restriction indicator */}
+      {isTableOrder && userTableId && (
+        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+          <div className="flex">
+            <div className="ml-3">
+              <p className="text-sm text-blue-700">
+                <strong>Menú de Mesa:</strong> Solo se muestran botellas y bebidas premium disponibles para mesas.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center space-x-2 p-4">
         <div className="relative flex-1">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />

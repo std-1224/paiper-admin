@@ -191,8 +191,8 @@ export function BarVisualization({ className }: BarVisualizationProps) {
                   <div className="text-xs text-muted-foreground">QRs</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{statistics.find((stat) => stat.barId === bar.id)?.totalStaff || 0}</div>
-                  <div className="text-xs text-muted-foreground">Staff</div>
+                  <div className="text-2xl font-bold">{statistics.find((stat) => stat.barId === bar.id)?.totalProducts || 0}</div>
+                  <div className="text-xs text-muted-foreground">Productos</div>
                 </div>
               </div>
 

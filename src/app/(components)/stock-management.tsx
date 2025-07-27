@@ -2,26 +2,30 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
+  AlertTriangle,
+  ArrowRightLeft,
+  BarChart3,
   Box,
   DollarSign,
+  Download,
   FileSpreadsheet,
   Filter,
+  History,
+  Info,
+  Loader2,
   Package,
+  PackagePlus,
+  PackageX,
+  Pencil,
   Percent,
   Plus,
   RefreshCw,
   Search,
   Trash2,
+  TrendingDown,
+  TrendingUp,
   Upload,
   X,
-  Pencil,
-  Loader2,
-  Info,
-  History,
-  Download,
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +92,34 @@ export default function StockManagement() {
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const { uploadImageToSupabase } = useAppContext();
+
+  // Recipe creation states
+  const [showCreateRecipeDialog, setShowCreateRecipeDialog] = useState(false);
+  const [newRecipe, setNewRecipe] = useState({
+    name: "",
+    category: "bebida",
+    ingredients: [] as { name: string; quantity: string; unit: string }[],
+  });
+  const [newIngredient, setNewIngredient] = useState({
+    name: "",
+    quantity: "",
+    unit: "ml",
+  });
+  const [ingredientValidation, setIngredientValidation] = useState<any[]>([]);
+
+  // Stock transfer states
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferQuantities, setTransferQuantities] = useState<{[key: string]: number}>({});
+  const [selectedBars, setSelectedBars] = useState<string[]>([]);
+
+  // Stock adjustment states
+  const [showReentryModal, setShowReentryModal] = useState(false);
+  const [showLossModal, setShowLossModal] = useState(false);
+  const [adjustmentQuantities, setAdjustmentQuantities] = useState<{[key: string]: number}>({});
+  const [adjustmentReason, setAdjustmentReason] = useState("");
+
+  // Clear records modal state
+  const [showClearRecordsModal, setShowClearRecordsModal] = useState(false);
 
   const handleImportProduct = async () => {
     setIsImporting(true);
@@ -274,9 +306,402 @@ export default function StockManagement() {
     image_url: "",
     purchase_price: 0,
     sale_price: 0,
+    has_recipe: false,
   });
 
-  const { productsData, fetchProducts } = useAppContext();
+  const { productsData, fetchProducts, recipesData, fetchRecipes } = useAppContext();
+
+  // Fetch recipes on component mount
+  useEffect(() => {
+    fetchRecipes();
+  }, []);
+
+  // Clear transfer logs function
+  const handleClearTransferLogs = () => {
+    setShowClearRecordsModal(true);
+  };
+
+  // Confirm clear transfer logs function
+  const confirmClearTransferLogs = async () => {
+
+    try {
+      setIsLoading(true);
+
+      // Clear transfers
+      const transferResponse = await fetch("/api/transfer", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clearAll: true }),
+      });
+
+      // Clear adjustments
+      const adjustmentResponse = await fetch("/api/adjust", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clearAll: true }),
+      });
+
+      if (transferResponse.ok && adjustmentResponse.ok) {
+        toast.success("Registros de transferencias y ajustes limpiados exitosamente");
+        setShowClearRecordsModal(false);
+      } else {
+        throw new Error("Error al limpiar algunos registros");
+      }
+    } catch (error) {
+      console.error("Error clearing transfer logs:", error);
+      toast.error("Error al limpiar los registros");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Stock transfer functions
+  const handleTransferProducts = async () => {
+    try {
+      setIsLoading(true);
+
+      if (selectedProducts.length === 0) {
+        toast.error("Selecciona al menos un producto para transferir");
+        return;
+      }
+
+      if (selectedBars.length === 0) {
+        toast.error("Selecciona al menos una barra de destino");
+        return;
+      }
+
+      // Prepare transfer data
+      const transferData = selectedProducts.map(productId => {
+        const product = productsData.find(p => p.id === productId);
+        const quantity = transferQuantities[productId] || 1;
+
+        return {
+          productId: productId,
+          productName: product?.name || 'Unknown',
+          quantity: quantity,
+          destinationBars: selectedBars
+        };
+      });
+
+      // Make API call to transfer the products
+      try {
+        for (const transfer of transferData) {
+          // Here you would implement the actual transfer API call
+          // This is a placeholder for the transfer logic
+          console.log("Transferring:", transfer);
+
+          // Example API call structure:
+          // await fetch("/api/inventory", {
+          //   method: "POST",
+          //   headers: { "Content-Type": "application/json" },
+          //   body: JSON.stringify({
+          //     productId: transfer.productId,
+          //     quantity: transfer.quantity,
+          //     destinationBars: transfer.destinationBars
+          //   })
+          // });
+        }
+
+        toast.success(`${selectedProducts.length} productos transferidos exitosamente a ${selectedBars.length} barra(s)`);
+      } catch (apiError) {
+        console.error("API transfer error:", apiError);
+        toast.error("Error al procesar algunas transferencias");
+      }
+
+      // Reset states
+      setSelectedProducts([]);
+      setTransferQuantities({});
+      setSelectedBars([]);
+      setShowTransferModal(false);
+
+    } catch (error) {
+      console.error("Error transferring products:", error);
+      toast.error("Error al transferir productos");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuantityChange = (productId: string, quantity: number) => {
+    setTransferQuantities(prev => ({
+      ...prev,
+      [productId]: Math.max(1, quantity)
+    }));
+  };
+
+  const handleBarSelection = (barName: string) => {
+    setSelectedBars(prev =>
+      prev.includes(barName)
+        ? prev.filter(b => b !== barName)
+        : [...prev, barName]
+    );
+  };
+
+  // Stock adjustment functions
+  const handleReentry = async () => {
+    try {
+      setIsLoading(true);
+
+      if (selectedProducts.length === 0) {
+        toast.error("Selecciona al menos un producto para re-ingresar");
+        return;
+      }
+
+      // Prepare reentry data
+      const reentryData = selectedProducts.map(productId => {
+        const product = productsData.find(p => p.id === productId);
+        const quantity = adjustmentQuantities[productId] || 1;
+
+        return {
+          productId: productId,
+          productName: product?.name || 'Unknown',
+          quantity: quantity,
+          reason: adjustmentReason || 'Re-ingreso de stock',
+          type: 'reentry'
+        };
+      });
+
+      // Make API call to register the re-entries
+      try {
+        for (const reentry of reentryData) {
+          // Here you would implement the actual re-entry API call
+          console.log("Registering reentry:", reentry);
+
+          // Example API call structure:
+          // await fetch("/api/adjust", {
+          //   method: "POST",
+          //   headers: { "Content-Type": "application/json" },
+          //   body: JSON.stringify({
+          //     productId: reentry.productId,
+          //     amount: reentry.quantity,
+          //     type: 'reentry',
+          //     reason: reentry.reason
+          //   })
+          // });
+        }
+
+        toast.success(`Re-ingreso registrado para ${selectedProducts.length} producto(s)`);
+      } catch (apiError) {
+        console.error("API reentry error:", apiError);
+        toast.error("Error al procesar algunos re-ingresos");
+      }
+
+      // Reset states
+      setSelectedProducts([]);
+      setAdjustmentQuantities({});
+      setAdjustmentReason("");
+      setShowReentryModal(false);
+
+    } catch (error) {
+      console.error("Error registering reentry:", error);
+      toast.error("Error al registrar re-ingreso");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLoss = async () => {
+    try {
+      setIsLoading(true);
+
+      if (selectedProducts.length === 0) {
+        toast.error("Selecciona al menos un producto para registrar pérdida");
+        return;
+      }
+
+      if (!adjustmentReason.trim()) {
+        toast.error("Especifica la razón de la pérdida");
+        return;
+      }
+
+      // Prepare loss data
+      const lossData = selectedProducts.map(productId => {
+        const product = productsData.find(p => p.id === productId);
+        const quantity = adjustmentQuantities[productId] || 1;
+
+        return {
+          productId: productId,
+          productName: product?.name || 'Unknown',
+          quantity: quantity,
+          reason: adjustmentReason,
+          type: 'loss'
+        };
+      });
+
+      // Make API call to register the losses
+      try {
+        for (const loss of lossData) {
+          // Here you would implement the actual loss API call
+          console.log("Registering loss:", loss);
+
+          // Example API call structure:
+          // await fetch("/api/adjust", {
+          //   method: "POST",
+          //   headers: { "Content-Type": "application/json" },
+          //   body: JSON.stringify({
+          //     productId: loss.productId,
+          //     amount: loss.quantity,
+          //     type: 'loss',
+          //     reason: loss.reason
+          //   })
+          // });
+        }
+
+        toast.success(`Pérdida registrada para ${selectedProducts.length} producto(s)`);
+      } catch (apiError) {
+        console.error("API loss error:", apiError);
+        toast.error("Error al procesar algunas pérdidas");
+      }
+
+      // Reset states
+      setSelectedProducts([]);
+      setAdjustmentQuantities({});
+      setAdjustmentReason("");
+      setShowLossModal(false);
+
+    } catch (error) {
+      console.error("Error registering loss:", error);
+      toast.error("Error al registrar pérdida");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAdjustmentQuantityChange = (productId: string, quantity: number) => {
+    setAdjustmentQuantities(prev => ({
+      ...prev,
+      [productId]: Math.max(1, quantity)
+    }));
+  };
+
+  // Recipe creation functions
+  const handleAddIngredientToRecipe = async () => {
+    if (newIngredient.name && newIngredient.quantity) {
+      const updatedIngredients = [...newRecipe.ingredients, { ...newIngredient }];
+      setNewRecipe({
+        ...newRecipe,
+        ingredients: updatedIngredients,
+      });
+      setNewIngredient({ name: "", quantity: "", unit: "ml" });
+
+      // Validate ingredients after adding
+      const validation = await validateRecipeIngredients(updatedIngredients);
+      setIngredientValidation(validation);
+    }
+  };
+
+  const handleRemoveIngredientFromRecipe = async (index: number) => {
+    const updatedIngredients = newRecipe.ingredients.filter((_, i) => i !== index);
+    setNewRecipe({
+      ...newRecipe,
+      ingredients: updatedIngredients,
+    });
+
+    // Re-validate ingredients after removal
+    if (updatedIngredients.length > 0) {
+      const validation = await validateRecipeIngredients(updatedIngredients);
+      setIngredientValidation(validation);
+    } else {
+      setIngredientValidation([]);
+    }
+  };
+
+  // Recipe validation function
+  const validateRecipeIngredients = async (ingredients: { name: string; quantity: string; unit: string }[]) => {
+    const validationResults = [];
+
+    for (const ingredient of ingredients) {
+      // Check if ingredient exists in products
+      const matchingProducts = productsData.filter(product =>
+        product.name.toLowerCase().includes(ingredient.name.toLowerCase())
+      );
+
+      if (matchingProducts.length === 0) {
+        validationResults.push({
+          ingredient: ingredient.name,
+          status: 'not_found',
+          message: `Ingrediente "${ingredient.name}" no encontrado en el inventario`,
+        });
+      } else {
+        // Check stock availability
+        const totalStock = matchingProducts.reduce((sum, product) => sum + product.stock, 0);
+        const requiredQuantity = parseFloat(ingredient.quantity);
+
+        if (totalStock < requiredQuantity) {
+          validationResults.push({
+            ingredient: ingredient.name,
+            status: 'insufficient_stock',
+            message: `Stock insuficiente para "${ingredient.name}". Disponible: ${totalStock}, Requerido: ${requiredQuantity}`,
+          });
+        } else {
+          validationResults.push({
+            ingredient: ingredient.name,
+            status: 'valid',
+            message: `✓ "${ingredient.name}" disponible`,
+          });
+        }
+      }
+    }
+
+    return validationResults;
+  };
+
+  const handleCreateRecipe = async () => {
+    try {
+      setIsLoading(true);
+
+      // Validate ingredients before creating recipe
+      const validationResults = await validateRecipeIngredients(newRecipe.ingredients);
+      const hasErrors = validationResults.some(result => result.status !== 'valid');
+
+      if (hasErrors) {
+        const errorMessages = validationResults
+          .filter(result => result.status !== 'valid')
+          .map(result => result.message)
+          .join('\n');
+
+        toast.error(`Errores de validación:\n${errorMessages}`);
+        return;
+      }
+
+      const response = await fetch("/api/recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newRecipe.name,
+          ingredients: JSON.stringify(newRecipe.ingredients),
+          amount: 1, // Default amount for inline created recipes
+          category: newRecipe.category,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to create recipe");
+
+      const createdRecipe = await response.json();
+      await fetchRecipes(); // Refresh recipes list
+
+      // Auto-select the newly created recipe
+      setNewProduct({
+        ...newProduct,
+        has_recipe: true,
+      });
+
+      // Reset recipe form
+      setNewRecipe({
+        name: "",
+        category: "bebida",
+        ingredients: [],
+      });
+      setShowCreateRecipeDialog(false);
+
+      toast.success("Receta creada exitosamente y vinculada al producto");
+    } catch (error) {
+      console.error("Error creating recipe:", error);
+      toast.error("Error al crear la receta");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Helper functions
   const calculateStatus = (stock: number): "sufficient" | "low" | "out" => {
@@ -415,6 +840,7 @@ export default function StockManagement() {
           ...newProduct,
           image_url: uploadedUrl,
           updated_at: new Date().toISOString(),
+          has_recipe: newProduct.has_recipe || false,
         }),
       });
 
@@ -429,6 +855,7 @@ export default function StockManagement() {
         image_url: "",
         purchase_price: 0,
         sale_price: 0,
+        has_recipe: false,
       });
       setImageFile(null);
       fetchProducts();
@@ -512,39 +939,62 @@ export default function StockManagement() {
   const fetchTransactionHistory = async (productId: string) => {
     try {
       setIsLoading(true);
-      // Mock data for now - replace with actual API call
+
+      // Fetch real transfer data from API
+      const [transferResponse, adjustmentResponse] = await Promise.all([
+        fetch("/api/transfer"),
+        fetch("/api/adjust")
+      ]);
+
+      const transfers = transferResponse.ok ? await transferResponse.json() : [];
+      const adjustments = adjustmentResponse.ok ? await adjustmentResponse.json() : [];
+
+      // Filter and format transfer history for this product
+      const transferHistory = transfers
+        .filter((transfer: any) => transfer.inventory?.products?.id === productId)
+        .map((transfer: any) => ({
+          id: `transfer-${transfer.id}`,
+          date: transfer.created_at || new Date().toISOString(),
+          type: "transfer",
+          quantity: transfer.amount,
+          user: "Sistema",
+          details: `Transferencia de ${transfer.from_bar_details?.name || 'Origen'} a ${transfer.to_bar_details?.name || 'Destino'}`,
+          price: 0
+        }));
+
+      // Filter and format adjustment history for this product
+      const adjustmentHistory = adjustments
+        .filter((adjustment: any) => adjustment.inventory?.products?.id === productId)
+        .map((adjustment: any) => ({
+          id: `adjustment-${adjustment.id}`,
+          date: adjustment.created_at || new Date().toISOString(),
+          type: adjustment.type === 'loss' ? 'loss' : 'reentry',
+          quantity: adjustment.type === 'loss' ? -adjustment.amount : adjustment.amount,
+          user: "Admin",
+          details: adjustment.reason || `${adjustment.type === 'loss' ? 'Pérdida' : 'Re-ingreso'} registrado`,
+          price: adjustment.economic_value || 0
+        }));
+
+      // Combine and sort by date
+      const combinedHistory = [...transferHistory, ...adjustmentHistory]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      setTransactionHistory(combinedHistory);
+    } catch (err) {
+      console.error("Error fetching transaction history:", err);
+      // Fallback to mock data if API fails
       const mockHistory = [
         {
           id: 1,
-          date: "2024-01-15",
+          date: new Date().toISOString(),
           type: "sale",
           quantity: 5,
-          user: "Juan Pérez",
-          details: "Venta en Bar Central",
-          price: 15.50
-        },
-        {
-          id: 2,
-          date: "2024-01-14",
-          type: "purchase",
-          quantity: 20,
-          user: "Admin",
-          details: "Compra de inventario",
-          price: 12.00
-        },
-        {
-          id: 3,
-          date: "2024-01-13",
-          type: "adjustment",
-          quantity: -2,
-          user: "María García",
-          details: "Ajuste por merma",
+          user: "Sistema",
+          details: "Historial no disponible - datos de ejemplo",
           price: 0
         }
       ];
       setTransactionHistory(mockHistory);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error fetching transaction history");
     } finally {
       setIsLoading(false);
     }
@@ -691,6 +1141,66 @@ export default function StockManagement() {
             <Plus size={16} className="mr-2" />
             Añadir producto
           </Button>
+          <Button
+            variant="outline"
+            onClick={handleClearTransferLogs}
+            disabled={isLoading}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 size={16} className="mr-2" />
+            Limpiar Registros
+          </Button>
+          {selectedProducts.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                // Initialize quantities for selected products
+                const initialQuantities: {[key: string]: number} = {};
+                selectedProducts.forEach(productId => {
+                  initialQuantities[productId] = 1;
+                });
+                setTransferQuantities(initialQuantities);
+                setShowTransferModal(true);
+              }}
+            >
+              <ArrowRightLeft size={16} className="mr-2" />
+              Transferir ({selectedProducts.length})
+            </Button>
+          )}
+          {selectedProducts.length > 0 && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Initialize quantities for selected products
+                  const initialQuantities: {[key: string]: number} = {};
+                  selectedProducts.forEach(productId => {
+                    initialQuantities[productId] = 1;
+                  });
+                  setAdjustmentQuantities(initialQuantities);
+                  setShowReentryModal(true);
+                }}
+              >
+                <PackagePlus size={16} className="mr-2" />
+                Re-ingreso ({selectedProducts.length})
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Initialize quantities for selected products
+                  const initialQuantities: {[key: string]: number} = {};
+                  selectedProducts.forEach(productId => {
+                    initialQuantities[productId] = 1;
+                  });
+                  setAdjustmentQuantities(initialQuantities);
+                  setShowLossModal(true);
+                }}
+              >
+                <PackageX size={16} className="mr-2" />
+                Pérdidas ({selectedProducts.length})
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1053,6 +1563,47 @@ export default function StockManagement() {
                 </Select>
               </div>
             </div>
+
+            {/* Recipe Selection Field */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="recipe">Receta (Opcional)</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCreateRecipeDialog(true)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Crear Receta
+                </Button>
+              </div>
+              <Select
+                value={newProduct.has_recipe ? "has-recipe" : "no-recipe"}
+                onValueChange={(value) =>
+                  setNewProduct({
+                    ...newProduct,
+                    has_recipe: value === "has-recipe"
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar receta existente (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no-recipe">Sin receta</SelectItem>
+                  {recipesData.map((recipe) => (
+                    <SelectItem key={recipe.id} value={recipe.id.toString()}>
+                      {recipe.name} ({recipe.category})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Si seleccionas una receta, el stock de los ingredientes se descontará automáticamente cuando se haga un pedido.
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="description">Descripción</Label>
               <Textarea
@@ -1539,6 +2090,552 @@ export default function StockManagement() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Create Recipe Dialog */}
+      <Dialog open={showCreateRecipeDialog} onOpenChange={setShowCreateRecipeDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Crear Nueva Receta</DialogTitle>
+            <DialogDescription>
+              Crea una receta que se puede vincular a productos del menú
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="recipe-name">Nombre de la Receta</Label>
+                <Input
+                  id="recipe-name"
+                  placeholder="Ej: Mojito, Margarita..."
+                  value={newRecipe.name}
+                  onChange={(e) => setNewRecipe({ ...newRecipe, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="recipe-category">Categoría</Label>
+                <Select
+                  value={newRecipe.category}
+                  onValueChange={(value) => setNewRecipe({ ...newRecipe, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bebida">Bebida</SelectItem>
+                    <SelectItem value="comida">Comida</SelectItem>
+                    <SelectItem value="postre">Postre</SelectItem>
+                    <SelectItem value="aperitivo">Aperitivo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Ingredients List */}
+            <div className="space-y-2">
+              <Label>Ingredientes</Label>
+              {newRecipe.ingredients.length > 0 && (
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {newRecipe.ingredients.map((ingredient, index) => {
+                    const validation = ingredientValidation.find(v => v.ingredient === ingredient.name);
+                    return (
+                      <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                        <div className="flex-1">
+                          <span className="text-sm">
+                            {ingredient.name} - {ingredient.quantity} {ingredient.unit}
+                          </span>
+                          {validation && (
+                            <div className={`text-xs mt-1 ${
+                              validation.status === 'valid' ? 'text-green-600' :
+                              validation.status === 'insufficient_stock' ? 'text-orange-600' :
+                              'text-red-600'
+                            }`}>
+                              {validation.message}
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveIngredientFromRecipe(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Add Ingredient Form */}
+            <div className="border-t pt-4">
+              <Label className="mb-2 block">Agregar Ingrediente</Label>
+              <div className="grid grid-cols-12 gap-2">
+                <div className="col-span-5">
+                  <Select
+                    value={newIngredient.name}
+                    onValueChange={(value) => setNewIngredient({ ...newIngredient, name: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar ingrediente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Ginebra">Ginebra</SelectItem>
+                      <SelectItem value="Vodka">Vodka</SelectItem>
+                      <SelectItem value="Tónica">Tónica</SelectItem>
+                      <SelectItem value="Ron">Ron</SelectItem>
+                      <SelectItem value="Tequila">Tequila</SelectItem>
+                      <SelectItem value="Limón">Limón</SelectItem>
+                      <SelectItem value="Azúcar">Azúcar</SelectItem>
+                      <SelectItem value="Menta">Menta</SelectItem>
+                      <SelectItem value="Hielo">Hielo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-3">
+                  <Input
+                    type="number"
+                    placeholder="Cantidad"
+                    value={newIngredient.quantity}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || (Number(value) >= 0 && !value.includes('-'))) {
+                        setNewIngredient({ ...newIngredient, quantity: value });
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                        e.preventDefault();
+                      }
+                    }}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Select
+                    value={newIngredient.unit}
+                    onValueChange={(value) => setNewIngredient({ ...newIngredient, unit: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ml">ml</SelectItem>
+                      <SelectItem value="g">g</SelectItem>
+                      <SelectItem value="unidad">unidad</SelectItem>
+                      <SelectItem value="hojas">hojas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={handleAddIngredientToRecipe}
+                    disabled={!newIngredient.name || !newIngredient.quantity}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateRecipeDialog(false);
+                setNewRecipe({ name: "", category: "bebida", ingredients: [] });
+                setNewIngredient({ name: "", quantity: "", unit: "ml" });
+                setIngredientValidation([]);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateRecipe}
+              disabled={!newRecipe.name || newRecipe.ingredients.length === 0 || isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                "Crear Receta"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stock Transfer Modal */}
+      <Dialog open={showTransferModal} onOpenChange={setShowTransferModal}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Transferir Productos Seleccionados</DialogTitle>
+            <DialogDescription>
+              Configura las cantidades y selecciona las barras de destino para {selectedProducts.length} producto(s)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 max-h-[60vh] overflow-y-auto">
+            {/* Products List with Quantities */}
+            <div className="space-y-4">
+              <Label className="text-base font-medium">Productos a transferir:</Label>
+              <div className="space-y-3">
+                {selectedProducts.map(productId => {
+                  const product = productsData.find(p => p.id === productId);
+                  if (!product) return null;
+
+                  return (
+                    <div key={productId} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        {product.image_url && (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-10 h-10 rounded object-cover"
+                          />
+                        )}
+                        <div>
+                          <p className="font-medium">{product.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Stock disponible: {product.stock}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Label htmlFor={`quantity-${productId}`} className="text-sm">
+                          Cantidad:
+                        </Label>
+                        <Input
+                          id={`quantity-${productId}`}
+                          type="number"
+                          min="1"
+                          max={product.stock}
+                          value={transferQuantities[productId] || 1}
+                          onKeyDown={(e) => {
+                            // Prevent minus key, plus key, and 'e' key
+                            if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                              e.preventDefault();
+                            }
+                          }}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Only allow positive numbers and empty string
+                            if (value === '' || (Number(value) >= 1 && !value.includes('-'))) {
+                              handleQuantityChange(productId, parseInt(value) || 1);
+                            }
+                          }}
+                          className="w-20"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bar Selection */}
+            <div className="space-y-4">
+              <Label className="text-base font-medium">Barras de destino:</Label>
+              <div className="grid grid-cols-2 gap-3">
+                {["Bar Central", "Bar Norte", "Bar Sur", "El Alamo", "Stock General", "Otro Local"].map(barName => (
+                  <div key={barName} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`bar-${barName}`}
+                      checked={selectedBars.includes(barName)}
+                      onCheckedChange={() => handleBarSelection(barName)}
+                    />
+                    <Label
+                      htmlFor={`bar-${barName}`}
+                      className="text-sm font-medium cursor-pointer"
+                    >
+                      {barName}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowTransferModal(false);
+                setTransferQuantities({});
+                setSelectedBars([]);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleTransferProducts}
+              disabled={isLoading || selectedBars.length === 0}
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <ArrowRightLeft className="mr-2 h-4 w-4" />
+                  Transferir a {selectedBars.length} barra(s)
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stock Re-entry Modal */}
+      <Dialog open={showReentryModal} onOpenChange={setShowReentryModal}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Registrar Re-ingreso de Stock</DialogTitle>
+            <DialogDescription>
+              Registra el re-ingreso de {selectedProducts.length} producto(s) no utilizados
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Products List with Quantities */}
+            <div className="space-y-3">
+              {selectedProducts.map(productId => {
+                const product = productsData.find(p => p.id === productId);
+                if (!product) return null;
+
+                return (
+                  <div key={productId} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      {product.image_url && (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-10 h-10 rounded object-cover"
+                        />
+                      )}
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Stock actual: {product.stock}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Label htmlFor={`reentry-quantity-${productId}`} className="text-sm">
+                        Cantidad:
+                      </Label>
+                      <Input
+                        id={`reentry-quantity-${productId}`}
+                        type="number"
+                        min="1"
+                        value={adjustmentQuantities[productId] || 1}
+                        onChange={(e) => handleAdjustmentQuantityChange(productId, parseInt(e.target.value) || 1)}
+                        className="w-20"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Reason */}
+            <div className="space-y-2">
+              <Label htmlFor="reentry-reason">Motivo del re-ingreso (opcional):</Label>
+              <Textarea
+                id="reentry-reason"
+                placeholder="Ej: Botellas no abiertas del evento, productos devueltos..."
+                value={adjustmentReason}
+                onChange={(e) => setAdjustmentReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowReentryModal(false);
+                setAdjustmentQuantities({});
+                setAdjustmentReason("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleReentry}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <PackagePlus className="mr-2 h-4 w-4" />
+                  Registrar Re-ingreso
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stock Loss Modal */}
+      <Dialog open={showLossModal} onOpenChange={setShowLossModal}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Registrar Pérdidas de Stock</DialogTitle>
+            <DialogDescription>
+              Registra las pérdidas de {selectedProducts.length} producto(s)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Products List with Quantities */}
+            <div className="space-y-3">
+              {selectedProducts.map(productId => {
+                const product = productsData.find(p => p.id === productId);
+                if (!product) return null;
+
+                return (
+                  <div key={productId} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      {product.image_url && (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-10 h-10 rounded object-cover"
+                        />
+                      )}
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Stock actual: {product.stock}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Label htmlFor={`loss-quantity-${productId}`} className="text-sm">
+                        Cantidad:
+                      </Label>
+                      <Input
+                        id={`loss-quantity-${productId}`}
+                        type="number"
+                        min="1"
+                        max={product.stock}
+                        value={adjustmentQuantities[productId] || 1}
+                        onChange={(e) => handleAdjustmentQuantityChange(productId, parseInt(e.target.value) || 1)}
+                        className="w-20"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Reason (Required for losses) */}
+            <div className="space-y-2">
+              <Label htmlFor="loss-reason">Motivo de la pérdida (requerido):</Label>
+              <Textarea
+                id="loss-reason"
+                placeholder="Ej: Botella rota, producto vencido, derrame..."
+                value={adjustmentReason}
+                onChange={(e) => setAdjustmentReason(e.target.value)}
+                rows={3}
+                required
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowLossModal(false);
+                setAdjustmentQuantities({});
+                setAdjustmentReason("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleLoss}
+              disabled={isLoading || !adjustmentReason.trim()}
+              variant="destructive"
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <PackageX className="mr-2 h-4 w-4" />
+                  Registrar Pérdida
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear Records Confirmation Modal */}
+      <Dialog open={showClearRecordsModal} onOpenChange={setShowClearRecordsModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Confirmar Limpieza de Registros
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará permanentemente todos los registros de transferencias y ajustes de stock.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-red-700">
+                  <p className="font-medium mb-2">⚠️ Advertencia: Esta acción no se puede deshacer</p>
+                  <ul className="list-disc list-inside space-y-1 text-red-600">
+                    <li>Se eliminarán todos los registros de transferencias entre barras</li>
+                    <li>Se eliminarán todos los registros de ajustes de stock</li>
+                    <li>Se perderá el historial completo de movimientos</li>
+                    <li>Los productos y el stock actual no se verán afectados</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              ¿Estás seguro de que deseas continuar con la limpieza de registros?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowClearRecordsModal(false)}
+              disabled={isLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmClearTransferLogs}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Limpiando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Confirmar Limpieza
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

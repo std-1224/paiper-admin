@@ -63,11 +63,15 @@ import {
   AlertTriangle,
   XCircle,
   BarChart3,
+  Loader2,
 } from "lucide-react";
 import { ProductDetailModal } from "@/components/products/ProductDetailModal";
 import { useAppContext } from "@/context/AppContext";
 import { InventoryData, Product } from "@/types/types";
 import { Switch } from "@/components/ui/switch";
+import ImageUpload from "../(components)/image-upload";
+import { Textarea } from "@/components/ui/textarea";
+import { categoryList } from "@/lib/utils";
 
 // Mock data for stock
 const stockData = [
@@ -158,6 +162,19 @@ const Stock = () => {
   const [selectedStock, setSelectedStock] = useState<number | undefined>(
     undefined
   );
+  // Form states
+  const [newProduct, setNewProduct] = useState<Partial<Product>>({
+    name: "",
+    description: "",
+    category: "",
+    stock: 0,
+    image_url: "",
+    purchase_price: 0,
+    sale_price: 0,
+    has_recipe: false,
+  });
+
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [stockAdjustmentOpen, setStockAdjustmentOpen] = useState(false);
   const [productToAdjust, setProductToAdjust] = useState("");
@@ -166,6 +183,11 @@ const Stock = () => {
   const [selectedUnredeemedItems, setSelectedUnredeemedItems] = useState<
     number[]
   >([]);
+  const [showCreateRecipeDialog, setShowCreateRecipeDialog] = useState(false);
+  const { recipesData } = useAppContext();
+  const [error, setError] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const { uploadImageToSupabase } = useAppContext();
   const [showUnredeemed, setShowUnredeemed] = useState(false);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -274,6 +296,54 @@ const Stock = () => {
     setDeleteConfirmOpen(true);
   };
 
+  const handleImageUpload = async () => {
+    if (!imageFile) return;
+
+    try {
+      const fileName = `image-${Date.now()}.${imageFile.name.split(".").pop()}`;
+      const uploadedUrl = await uploadImageToSupabase(imageFile, fileName);
+      return uploadedUrl;
+    } catch (error) {
+      console.error("Error uploading image:", error);
+    }
+  };
+
+  const handleAddProduct = async () => {
+    try {
+      setIsLoading(true);
+      const uploadedUrl = await handleImageUpload();
+      const response = await fetch(`/api/products`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newProduct,
+          image_url: uploadedUrl,
+          updated_at: new Date().toISOString(),
+          has_recipe: newProduct.has_recipe || false,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to add product");
+
+      setShowAddProductModal(false);
+      setNewProduct({
+        name: "",
+        description: "",
+        category: "",
+        stock: 0,
+        image_url: "",
+        purchase_price: 0,
+        sale_price: 0,
+        has_recipe: false,
+      });
+      setImageFile(null);
+      fetchProducts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error adding product");
+    } finally {
+      setIsLoading(false);
+    }
+  };
   // Handle product deletion
   const handleDeleteProduct = async () => {
     if (!productToDelete?.id) return;
@@ -385,8 +455,7 @@ const Stock = () => {
 
     // Show success message with all selected bars
     toast.success(
-      `${data.quantity} unidades de ${data.product} transferidas de ${
-        data.fromBar
+      `${data.quantity} unidades de ${data.product} transferidas de ${data.fromBar
       } a ${selectedBars.join(", ")}`
     );
     // Aquí iría la lógica para crear la transferencia
@@ -708,6 +777,20 @@ const Stock = () => {
                 <Filter className="h-4 w-4" />
                 Más filtros
               </Button>
+              <Button onClick={() => setShowAddProductModal(true)}>
+                <Plus size={16} className="mr-2" />
+                Añadir producto
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setStockAdjustmentOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <PackagePlus className="h-4 w-4" />
+                Ajustar Stock
+              </Button>
+
             </div>
 
             {hasSelectedStockItems && (
@@ -721,6 +804,23 @@ const Stock = () => {
                   onClick={handleMultipleTransfer}
                 >
                   <ArrowRightLeft className="h-4 w-4 mr-1" /> Transferir
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  onClick={() => {
+                    // For bulk adjustment, we'll open the adjustment modal for the first selected item
+                    // In a real implementation, you might want a separate bulk adjustment modal
+                    const firstSelectedProduct = productsData.find(p =>
+                      selectedStockItems.includes(p.id?.toString() || "")
+                    );
+                    if (firstSelectedProduct) {
+                      handleAdjustStock(firstSelectedProduct);
+                    }
+                  }}
+                >
+                  <PackagePlus className="h-4 w-4 mr-1" /> Ajustar Stock
                 </Button>
                 <Button variant="destructive" size="sm">
                   <Trash className="h-4 w-4 mr-1" /> Eliminar
@@ -850,6 +950,15 @@ const Stock = () => {
                           >
                             <ArrowRightLeft className="mr-2 h-4 w-4" />
                             Asignar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                            onClick={() => handleAdjustStock(item)}
+                          >
+                            <PackagePlus className="mr-2 h-4 w-4" />
+                            Ajustar
                           </Button>
                           <Button
                             variant="outline"
@@ -1150,7 +1259,7 @@ const Stock = () => {
         initialProductId={selectedProduct?.id}
         initialQuantity={selectedProduct?.stock}
         onSubmitReingress={handleStockReingress}
-        onSubmitLoss={handleStockLoss}
+        onSubmitLoss={handleStockLoss}  
       />
 
       {/* Product Detail Modal */}
@@ -1207,6 +1316,167 @@ const Stock = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Add Product Modal */}
+      <Dialog open={showAddProductModal} onOpenChange={setShowAddProductModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Agregar Nuevo Producto</DialogTitle>
+            <DialogDescription>
+              Complete los detalles del producto para agregarlo al inventario.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 h-[calc(100vh-10rem)] overflow-y-auto">
+            {
+              <ImageUpload
+                handleSetImageFile={setImageFile}
+                imageUrl={newProduct.image_url}
+              />
+            }
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nombre</Label>
+                <Input
+                  id="name"
+                  value={newProduct.name}
+                  onChange={(e) =>
+                    setNewProduct({ ...newProduct, name: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="category">Categoría</Label>
+                <Select
+                  value={newProduct.category}
+                  onValueChange={(value) =>
+                    setNewProduct({ ...newProduct, category: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categoryList.map((category) => (
+                      <SelectItem key={category.value} value={category.value}>
+                        {category.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Recipe Selection Field */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="recipe">Receta (Opcional)</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCreateRecipeDialog(true)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Crear Receta
+                </Button>
+              </div>
+              <Select
+                value={newProduct.has_recipe ? "has-recipe" : "no-recipe"}
+                onValueChange={(value) =>
+                  setNewProduct({
+                    ...newProduct,
+                    has_recipe: value === "has-recipe"
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="¿Tiene receta?" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no-recipe">Sin receta</SelectItem>
+                  <SelectItem value="has-recipe">Tiene receta</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Si marcas que tiene receta, el stock de los ingredientes se descontará automáticamente cuando se haga un pedido. Configura la receta en la sección "Configuración de Recetas".
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Descripción</Label>
+              <Textarea
+                id="description"
+                value={newProduct.description}
+                onChange={(e) =>
+                  setNewProduct({ ...newProduct, description: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="purchase_price">Precio de Compra</Label>
+                <Input
+                  id="purchase_price"
+                  type="number"
+                  value={newProduct.purchase_price === 0 ? "" : newProduct.purchase_price}
+                  placeholder="0.00"
+                  onChange={(e) =>
+                    setNewProduct({
+                      ...newProduct,
+                      purchase_price: e.target.value === "" ? 0 : Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sale_price">Precio de Venta</Label>
+                <Input
+                  id="sale_price"
+                  type="number"
+                  value={newProduct.sale_price === 0 ? "" : newProduct.sale_price}
+                  placeholder="0.00"
+                  onChange={(e) =>
+                    setNewProduct({
+                      ...newProduct,
+                      sale_price: e.target.value === "" ? 0 : Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="stock">Stock</Label>
+              <Input
+                id="stock"
+                type="number"
+                value={newProduct.stock === 0 ? "" : newProduct.stock}
+                placeholder="0"
+                onChange={(e) =>
+                  setNewProduct({
+                    ...newProduct,
+                    stock: e.target.value === "" ? 0 : Number(e.target.value),
+                  })
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowAddProductModal(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={() => handleAddProduct()} disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                "Agregar Producto"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </>
   );
 };

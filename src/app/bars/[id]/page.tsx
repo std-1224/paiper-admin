@@ -37,12 +37,13 @@ import {
   ChevronRight,
   Box,
   Logs,
+  Trash2,
+  Eye,
 } from "lucide-react";
 import { StockAdd } from "@/components/stock/StockAdd";
 import { InventoryData, Product } from "@/types/types";
 import { useAppContext } from "@/context/AppContext";
-import { UserAssign } from "@/components/bars/UserAssign";
-import { User } from "@/types/types";
+
 import { format } from "date-fns";
 import { PAYMENT_BADGE_CLASSES } from "@/app/(components)/order-card";
 import { get } from "http";
@@ -116,17 +117,16 @@ const BarDetail = () => {
 
   const [stockAddOpen, setStockAddOpen] = useState(false);
 
-  const [userAssignOpen, setUserAssignOpen] = useState(false);
-  const [userToAssign, setUserToAssign] = useState<User | null>(null);
+
 
   const {
     fetchStocksOfBar,
     stocksData,
-    fetchStaff,
-    staffData,
     ordersData,
     barsData,
     fetchBars,
+    qrCodesData,
+    fetchQRCodes,
   } = useAppContext();
 
   const bar =
@@ -134,12 +134,12 @@ const BarDetail = () => {
 
   useEffect(() => {
     fetchBars();
+    fetchQRCodes();
   }, []);
 
   useEffect(() => {
     if (barId) {
       fetchStocksOfBar(barId);
-      fetchStaff(barId);
     }
   }, [barId]);
 
@@ -150,6 +150,31 @@ const BarDetail = () => {
 
   const handleAddStock = () => {
     setStockAddOpen(true);
+  };
+
+  const handleDeleteQr = async (qrId: string | undefined) => {
+    if (!qrId) return;
+
+    try {
+      const res = await fetch("/api/qr-codes", {
+        method: "DELETE",
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: qrId }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete QR code');
+      }
+
+      await fetchQRCodes();
+      // You could add a toast notification here if needed
+    } catch (error) {
+      console.error("Error deleting QR code:", error);
+      // You could add error toast notification here if needed
+    }
   };
 
   // Inside your component
@@ -323,6 +348,10 @@ const BarDetail = () => {
                 <Logs className="h-4 w-4 mr-2" />
                 Orders
               </TabsTrigger>
+              <TabsTrigger value="qrcodes">
+                <QrCode className="h-4 w-4 mr-2" />
+                QR Codes
+              </TabsTrigger>
               <TabsTrigger value="stock">
                 <Box className="h-4 w-4 mr-2" />
                 Inventario
@@ -334,10 +363,6 @@ const BarDetail = () => {
               <TabsTrigger value="adjustments">
                 <PackagePlus className="h-4 w-4 mr-2" />
                 Ajustes de Stock
-              </TabsTrigger>
-              <TabsTrigger value="staff">
-                <Users className="h-4 w-4 mr-2" />
-                Personal
               </TabsTrigger>
             </TabsList>
 
@@ -497,6 +522,81 @@ const BarDetail = () => {
                 </TableBody>
               </Table>
             </TabsContent>
+
+            {/* QR Codes tab */}
+            <TabsContent value="qrcodes">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">
+                    Códigos QR de {bar?.name}
+                  </h3>
+                  <Button size="sm" onClick={() => window.location.href = '/qr-tracking'}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Ver Todos los QRs
+                  </Button>
+                </div>
+
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Ubicación</TableHead>
+                      <TableHead>Propósito</TableHead>
+                      <TableHead>Último Uso</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {qrCodesData
+                      .filter((qr: any) => qr.bar_id === barId || qr.barId === barId)
+                      .map((qr: any) => (
+                        <TableRow key={qr.id}>
+                          <TableCell className="font-medium">{qr.name}</TableCell>
+                          <TableCell>{qr.location}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {qr.purpose === 'orders' ? 'Pedidos' :
+                               qr.purpose === 'menu' ? 'Menú' :
+                               qr.purpose === 'promos' ? 'Promociones' :
+                               qr.purpose === 'events' ? 'Eventos' : qr.purpose}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {qr.last_used ? format(new Date(qr.last_used), "dd/MM/yyyy") : 'Nunca'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.location.href = `/qr-tracking?qr=${qr.id}`}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteQr(qr.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Eliminar
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+
+                {qrCodesData.filter((qr: any) => qr.bar_id === barId || qr.barId === barId).length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No hay códigos QR asociados a esta barra
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
             {/* Stock tab */}
             <TabsContent value="stock">
               <div className="flex justify-end mb-4">
@@ -568,49 +668,7 @@ const BarDetail = () => {
               <StockAdjustmentHistory selectedBar={barId} />
             </TabsContent>
 
-            {/* Staff tab */}
-            <TabsContent value="staff">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium">
-                    Personal Asignado a {bar?.name}
-                  </h3>
-                  <Button size="sm" onClick={() => setUserAssignOpen(true)}>
-                    <Users className="mr-2 h-4 w-4" />
-                    Asignar Personal
-                  </Button>
-                </div>
 
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Cargo</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {staffData.map((staff) => (
-                      <TableRow key={staff.id}>
-                        <TableCell className="font-medium">
-                          {staff.user.name || staff.user.email}
-                        </TableCell>
-                        <TableCell>{staff.role}</TableCell>
-                        <TableCell>
-                          <Badge>{staff.status}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="outline" size="sm">
-                            Ver Perfil
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
@@ -631,13 +689,7 @@ const BarDetail = () => {
         initialProduct={productToAdd}
       />
 
-      {/* Modal to assign user */}
-      <UserAssign
-        open={userAssignOpen}
-        onOpenChange={setUserAssignOpen}
-        initialUser={userToAssign}
-        initialAssignedBar={barId}
-      />
+
     </>
   );
 };

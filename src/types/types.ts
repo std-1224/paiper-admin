@@ -249,6 +249,7 @@ export interface Product {
 	created_at: string;
 	updated_at: string;
 	has_recipe?: boolean;
+	ingredients?: string; // JSON string containing recipe ingredients
 	is_active?: boolean;
 	is_pr?: boolean;
 	is_courtsey?: boolean;

@@ -24,7 +24,16 @@ export const POST = async (req: Request) => {
         const body = await req.json();
         const { data, error } = await supabaseServerClient
             .from('products')
-            .insert([{ name: body.name, description: body.description, category: body.category, stock: body.stock, image_url: body.image_url, purchase_price: body.purchase_price, sale_price: body.sale_price }])
+            .insert([{
+                name: body.name,
+                description: body.description,
+                category: body.category,
+                stock: body.stock,
+                image_url: body.image_url,
+                purchase_price: body.purchase_price,
+                sale_price: body.sale_price,
+                has_recipe: body.has_recipe || false
+            }])
         if (error) {
             throw error;
         }

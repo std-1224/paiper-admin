@@ -29,9 +29,10 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowRightLeft, AlertCircle } from "lucide-react";
+import { ArrowRightLeft, AlertCircle, Info } from "lucide-react";
 import { MultiSelectBarsField } from "@/components/bars/MultiSelectBarsField";
 import { useAppContext } from "@/context/AppContext";
+import { StockControlInfo } from "@/components/stock/StockControlInfo";
 
 // Mock data for bar stock items - would be replaced with real data from API
 const barStockItems = [
@@ -53,6 +54,7 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
     [key: number]: number;
   }>({});
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   const [selectedDestinationBars, setSelectedDestinationBars] = useState<
     string[]
   >([]);
@@ -219,11 +221,15 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
       fromBars = [selectedBar];
     }
 
+    const destinationId = selectedDestinationBars[0];
+    const isTransferToGeneralStock = destinationId === "general-stock";
+
     const body = {
       inventory_id: Object.keys(selectedItems),
       from_id: fromBars,
-      to_id: selectedDestinationBars[0],
+      to_id: isTransferToGeneralStock ? null : destinationId,
       quantity: Object.values(transferQuantities),
+      transfer_to_general_stock: isTransferToGeneralStock,
     };
 
     console.log("body", body);
@@ -243,8 +249,9 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
       }
 
       // Process transfer
+      const destination = isTransferToGeneralStock ? "stock general" : `${selectedDestinationBars.length} barra(s)`;
       toast.success(
-        `Se ha transferido stock exitosamente a ${selectedDestinationBars.length} barras`
+        `Se ha transferido stock exitosamente a ${destination}`
       );
 
       // Reset state
@@ -274,14 +281,24 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
         <div>
           <h2 className="text-lg font-medium">
             Transferencias de Stock{" "}
-            {selectedBar !== -1 ? `- ${selectedBar}` : ""}
+            {selectedBar !== -1 ? `- Bar ${selectedBar}` : "- Todas las barras"}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Gestiona transferencias entre barras
+            Gestiona transferencias entre barras y hacia stock general
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+            onClick={() => setShowInfoModal(true)}
+          >
+            <Info className="h-4 w-4" />
+            Cómo funciona
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -317,13 +334,17 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
 
               <div className="py-4">
                 <div className="mb-4">
-                  <label className="text-sm font-medium">Barras destino</label>
+                  <label className="text-sm font-medium">Destino de transferencia</label>
                   <MultiSelectBarsField
                     onSelectionChange={handleDestinationBarsChange}
-                    placeholder="Seleccionar barras destino"
+                    placeholder="Seleccionar destino (barras o stock general)"
                     singleSelection={true}
                     initialSelection={[]}
+                    includeGeneralStock={true}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Puedes transferir a otras barras o devolver al stock general
+                  </p>
                 </div>
 
                 <div className="border rounded-md">
@@ -418,9 +439,19 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
                       max={Number(item.quantity)}
                       value={transferQuantities[Number(item.id)] || ""}
                       disabled={!selectedItems[Number(item.id)]}
-                      onChange={(e) =>
-                        handleQuantityChange(Number(item.id), e.target.value)
-                      }
+                      onKeyDown={(e) => {
+                        // Prevent minus key, plus key, and 'e' key
+                        if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                          e.preventDefault();
+                        }
+                      }}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Only allow positive numbers and empty string
+                        if (value === '' || (Number(value) >= 1 && !value.includes('-'))) {
+                          handleQuantityChange(Number(item.id), value);
+                        }
+                      }}
                     />
                   </TableCell>
                 </TableRow>
@@ -441,6 +472,19 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
           <StockTransfersList selectedBar={selectedBar} />
         </CardContent>
       </Card>
+
+      {/* Stock Control Information Modal */}
+      <Dialog open={showInfoModal} onOpenChange={setShowInfoModal}>
+        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Control de Stock y Transferencias</DialogTitle>
+            <DialogDescription>
+              Información detallada sobre cómo funciona el sistema de control de inventario
+            </DialogDescription>
+          </DialogHeader>
+          <StockControlInfo />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

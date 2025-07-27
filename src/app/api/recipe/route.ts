@@ -21,23 +21,37 @@ export const GET = async () => {
 
 export const POST = async (req: Request) => {
     try {
-        // Parse the request body
         const body = await req.json();
         const { name, ingredients, amount, category } = body;
+        
         if (!name || !ingredients) {
             return NextResponse.json({ error: 'Name and ingredients are required' }, { status: 400 });
         }
-        const { data, error } = await supabaseServerClient
-            .from('products')
-            .insert({ name, ingredients, stock: amount, category, has_recipe: true });
 
-        if (error) {
-            throw error;
+        // Validate that all ingredients exist in products/inventory
+        const ingredientValidation = await validateIngredients(ingredients);
+        if (!ingredientValidation.isValid) {
+            return NextResponse.json({ 
+                error: 'Invalid ingredients', 
+                details: ingredientValidation.errors 
+            }, { status: 400 });
         }
 
+        const { data, error } = await supabaseServerClient
+            .from('products')
+            .insert({ 
+                name, 
+                ingredients: JSON.stringify(ingredients), // Store with product IDs
+                stock: amount, 
+                category, 
+                has_recipe: true 
+            })
+            .select();
+
+        if (error) throw error;
         return NextResponse.json(data, { status: 200 });
     } catch (error: any) {
-        console.error('Error creating user:', error.message);
+        console.error('Error creating recipe:', error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 };
@@ -93,3 +107,25 @@ export const DELETE = async (req: Request) => {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 };
+
+// Helper function to validate ingredients exist in stock
+async function validateIngredients(ingredients: any[]) {
+    const errors = [];
+    
+    for (const ingredient of ingredients) {
+        const { data: product } = await supabaseServerClient
+            .from("products")
+            .select("id, name, stock")
+            .ilike("name", `%${ingredient.name}%`)
+            .single();
+            
+        if (!product) {
+            errors.push(`Ingredient "${ingredient.name}" not found in stock`);
+        }
+    }
+    
+    return {
+        isValid: errors.length === 0,
+        errors
+    };
+}

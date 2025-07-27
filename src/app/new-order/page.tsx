@@ -192,7 +192,13 @@ export default function NewOrder() {
               </div>
             </div>
           )}
-          {step === 2 && <Menu onAddToCart={handleAddToCart} />}
+          {step === 2 && (
+            <Menu
+              onAddToCart={handleAddToCart}
+              userTableId={selectedUser?.table_id || null}
+              isTableOrder={isFromTable}
+            />
+          )}
           {step === 3 && (
             <div className="	">
               <Checkout

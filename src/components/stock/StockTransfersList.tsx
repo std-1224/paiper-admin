@@ -86,14 +86,16 @@ export const StockTransfersList = ({
       const data = await response.json();
       const transfers = data.map((transfer: any) => ({
         id: transfer.id,
-        product: transfer?.inventory?.products?.name,
-        quantity: transfer.amount,
-        fromBar: transfer?.from_bar_details?.name,
+        product: transfer?.inventory?.products?.name || 'Producto desconocido',
+        quantity: transfer.amount || 0,
+        fromBar: transfer?.from_bar_details?.name || 'Origen desconocido',
         fromBarId: transfer?.from_bar,
-        toBar: transfer?.to_bar_details?.name,
+        toBar: transfer?.to_bar_details?.name || 'Destino desconocido',
         toBarId: transfer.to_bar,
-        transferType: transfer.transfer_type,
-        status: transfer.status,
+        transferType: transfer.transfer_type || 'Permanente',
+        status: transfer.status || 'Completado',
+        date: transfer.created_at ? new Date(transfer.created_at).toLocaleDateString() : 'Fecha desconocida',
+        time: transfer.created_at ? new Date(transfer.created_at).toLocaleTimeString() : '',
       }));
       setTransfersData(transfers);
     } catch (error: any) {
@@ -162,8 +164,8 @@ export const StockTransfersList = ({
                 <TableHead>Cantidad</TableHead>
                 <TableHead>Origen</TableHead>
                 <TableHead>Destino</TableHead>
+                <TableHead>Fecha</TableHead>
                 <TableHead>Tipo</TableHead>
-                <TableHead>Estado Producto</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
@@ -178,6 +180,12 @@ export const StockTransfersList = ({
                   <TableCell>{transfer.fromBar}</TableCell>
                   <TableCell>{transfer.toBar}</TableCell>
                   <TableCell>
+                    <div className="text-sm">
+                      <div className="font-medium">{transfer.date}</div>
+                      <div className="text-muted-foreground">{transfer.time}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <Badge
                       variant="outline"
                       className={
@@ -189,7 +197,6 @@ export const StockTransfersList = ({
                       {transfer.transferType}
                     </Badge>
                   </TableCell>
-                  <TableCell>{transfer.productState}</TableCell>
                   <TableCell>
                     <Badge
                       variant="outline"

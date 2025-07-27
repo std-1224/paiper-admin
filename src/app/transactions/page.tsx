@@ -47,30 +47,30 @@ export default function Transactions() {
   }, []);
 
   // Transform orders data into order transactions
-  const orderTransactions: Transaction[] = ordersData?.map(order => ({
-    id: order.id,
-    user: order.user_name || "Unknown",
-    userId: order.user_id || "",
-    order: order.id.toString(),
-    paymentMethod: order.payment_method || "",
-    date: order.created_at,
-    amount: order.total_amount?.toString() || "0",
-    status: order.status,
-    type: 'order' as const,
-  })) || [];
+ const orderTransactions: Transaction[] = ordersData?.map(order => ({
+      id: order.id,
+      user: order.user_name || "Unknown",
+      userId: order.user_id || "",
+      order: order.id.toString(),
+      paymentMethod: order.payment_method || "",
+      date: order.created_at,
+      amount: order.total_amount?.toString() || "0",
+      status: order.status,
+      type: 'order' as const,
+    })) || [];
 
   // Transform balance transactions
   const balanceTransactionsList: Transaction[] = balanceTransactions?.map(transaction => ({
-    id: transaction.id,
-    user: transaction.user?.name || transaction.user?.email || "Unknown",
-    userId: transaction.user_id || "",
-    order: "Balance Load",
-    paymentMethod: transaction.type === 'cash' ? 'cash' : transaction.type === 'charge' ? 'mercadopago' : transaction.type,
-    date: transaction.created_at,
-    amount: transaction.amount?.toString() || "0",
-    status: transaction.status,
-    type: 'balance_load' as const,
-  })) || [];
+      id: transaction.id,
+      user: transaction.user?.name || transaction.user?.email || "Unknown",
+      userId: transaction.user_id || "",
+      order: "Balance Load",
+      paymentMethod: transaction.type === 'cash' ? 'cash' : transaction.type === 'charge' ? 'mercadopago' : transaction.type,
+      date: transaction.created_at,
+      amount: transaction.amount?.toString() || "0",
+      status: transaction.status,
+      type: 'balance_load' as const,
+    })) || [];
 
   // Combine all transactions
   const transactions: Transaction[] = [...orderTransactions, ...balanceTransactionsList];
@@ -84,7 +84,6 @@ export default function Transactions() {
       setSortDirection('asc');
     }
   };
-
 
   // Get sorted and filtered transactions
   const getSortedTransactions = () => {

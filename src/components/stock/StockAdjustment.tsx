@@ -54,8 +54,6 @@ export interface StockReingress {
   reason: string;
   customReason?: string;
   isOpened: boolean;
-  associatedCost: number;
-  economicValue: number; // Added field for economic value tracking
   observations?: string;
   destinationBars?: string[]; // Added field for destination bars
 }
@@ -67,7 +65,6 @@ export interface StockLoss {
   reason: string;
   customReason?: string;
   previouslyRegistered: boolean;
-  economicValue: number; // Added field for economic value tracking
   observations?: string;
 }
 
@@ -110,8 +107,6 @@ export function StockAdjustment({
       reason: "",
       customReason: "",
       isOpened: false,
-      associatedCost: 0,
-      economicValue: 0,
       observations: "",
       destinationBars: [initialStock?.barId?.toString()],
     },
@@ -124,7 +119,6 @@ export function StockAdjustment({
       reason: "",
       customReason: "",
       previouslyRegistered: true,
-      economicValue: 0,
       observations: "",
     },
   });
@@ -137,8 +131,6 @@ export function StockAdjustment({
         reason: "",
         customReason: "",
         isOpened: false,
-        associatedCost: 0,
-        economicValue: 0,
         observations: "",
         destinationBars: [],
       });
@@ -148,7 +140,6 @@ export function StockAdjustment({
         reason: "",
         customReason: "",
         previouslyRegistered: true,
-        economicValue: 0,
         observations: "",
       });
     }
@@ -162,8 +153,6 @@ export function StockAdjustment({
         reason: "",
         customReason: "",
         isOpened: false,
-        associatedCost: 0,
-        economicValue: 0,
         observations: "",
         destinationBars: [initialStock.barId.toString()],
       });
@@ -173,51 +162,24 @@ export function StockAdjustment({
         reason: "",
         customReason: "",
         previouslyRegistered: true,
-        economicValue: 0,
         observations: "",
       });
       setSelectedBars([initialStock.barId.toString()]);
     }
   }, [initialStock, reingress, loss]);
 
-  // Update economic value when product or quantity changes for reingress
-  useEffect(() => {
-    if (selectedProductReingress && reingress.watch("quantity")) {
-      const quantity = reingress.watch("quantity");
-      const valuePerUnit = selectedProductReingress.price || 0;
-      const totalValue = quantity * valuePerUnit;
-      reingress.setValue("economicValue", totalValue);
-    }
-  }, [selectedProductReingress, reingress.watch("quantity")]);
 
-  // Update economic value when product or quantity changes for loss
-  useEffect(() => {
-    if (selectedProductLoss && loss.watch("quantity")) {
-      const quantity = loss.watch("quantity");
-      const valuePerUnit = selectedProductLoss.price || 0;
-      const totalValue = quantity * valuePerUnit;
-      loss.setValue("economicValue", totalValue);
-    }
-  }, [selectedProductLoss, loss.watch("quantity")]);
 
   const handleProductSelectReingress = (product: any) => {
     setSelectedProductReingress(product);
     reingress.setValue("product", product.id);
     reingress.setValue("productId", product.id);
-
-    // Recalculate economic value
-    const quantity = reingress.watch("quantity");
-    reingress.setValue("economicValue", quantity * product.price);
   };
 
   const handleProductSelectLoss = (product: any) => {
     setSelectedProductLoss(product);
     loss.setValue("product", product.name);
     loss.setValue("productId", product.id);
-
-    // Recalculate economic value
-    const quantity = loss.watch("quantity");
-    loss.setValue("economicValue", quantity * product.price);
   };
 
   const handleBarsSelection = (bars: string[]) => {
@@ -392,53 +354,7 @@ export function StockAdjustment({
                   )}
                 />
 
-                <FormField
-                  control={reingress.control}
-                  name="associatedCost"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Costo asociado ($)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(parseFloat(e.target.value) || 0);
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Costo adicional por el reingreso (si aplica)
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
 
-                <FormField
-                  control={reingress.control}
-                  name="economicValue"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Valor económico ($)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(parseFloat(e.target.value) || 0);
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Valor económico total del reingreso
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
 
                 <FormItem>
                   <FormLabel>Barras de destino</FormLabel>
@@ -593,30 +509,7 @@ export function StockAdjustment({
                   )}
                 />
 
-                <FormField
-                  control={loss.control}
-                  name="economicValue"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Valor económico ($)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={initialStock?.quantity}
-                          step="0.01"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(parseFloat(e.target.value) || 0);
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Valor económico total de la pérdida
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
+
 
                 <FormField
                   control={loss.control}
