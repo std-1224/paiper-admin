@@ -826,9 +826,10 @@ const Stock = () => {
       }
 
       const destinationBarId = Number(data.destination.split("_*_")[0]);
+      const destinationBarName = data.destination.split("_*_")[1];
       
-      // Use the adjust API for re-entry to assign stock to a bar
-      const response = await fetch("/api/adjust", {
+      // First, use the adjust API for re-entry to assign stock to a bar
+      const adjustResponse = await fetch("/api/adjust", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -837,19 +838,49 @@ const Stock = () => {
           product: selectedProduct.id,
           quantity: data.quantity,
           type: "re-entry",
-          reason: `Asignación a barra: ${data.destination.split("_*_")[1]}`,
+          reason: `Asignación a barra: ${destinationBarName}`,
           destinationBars: [destinationBarId],
           observations: data.notes || ""
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (!adjustResponse.ok) {
+        const errorData = await adjustResponse.json();
         throw new Error(errorData.error || "Error al asignar stock");
       }
 
+      // Now create a transfer record to show in the transfer history
+      // We need to find the inventory item that was just created/updated
+      await fetchStocksOfBar();
+      
+      // Find the destination inventory item
+      const destinationInventory = stocksData.find((stock: any) => 
+        stock.productId === selectedProduct.id && 
+        stock.barId === destinationBarId
+      );
+
+      if (destinationInventory) {
+        // Create a transfer record showing the assignment
+        const transferResponse = await fetch("/api/transfer", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            inventory_id: [destinationInventory.id],
+            from_id: [null], // From general stock (null)
+            to_id: [destinationBarId],
+            quantity: [data.quantity]
+          }),
+        });
+
+        if (!transferResponse.ok) {
+          console.warn("Failed to create transfer record, but stock assignment was successful");
+        }
+      }
+
       toast.success(
-        `${data.quantity} unidades de ${selectedProduct.name} asignadas a ${data.destination.split("_*_")[1]}`
+        `${data.quantity} unidades de ${selectedProduct.name} asignadas a ${destinationBarName}`
       );
       
       // Refresh data
