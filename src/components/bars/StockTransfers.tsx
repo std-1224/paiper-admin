@@ -55,11 +55,12 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
   }>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedDestinationBars, setSelectedDestinationBars] = useState<
     string[]
   >([]);
 
-  const { stocksData } = useAppContext();
+  const { stocksData, fetchStocksOfBar } = useAppContext();
 
   console.log("selectedBar ------>", selectedBar);
 
@@ -206,7 +207,7 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
     }
 
     if (selectedDestinationBars.length === 0) {
-      toast.error("Selecciona al menos una barra destino");
+      toast.error("Selecciona al menos un destino (barra o stock general)");
       return;
     }
 
@@ -221,13 +222,15 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
       fromBars = [selectedBar];
     }
 
-    const destinationId = selectedDestinationBars[0];
-    const isTransferToGeneralStock = destinationId === "general-stock";
+    const isTransferToGeneralStock = selectedDestinationBars.includes("general-stock");
+    const destinationBars = isTransferToGeneralStock
+      ? ["general-stock"]
+      : selectedDestinationBars.filter(bar => bar !== "general-stock");
 
     const body = {
       inventory_id: Object.keys(selectedItems),
       from_id: fromBars,
-      to_id: isTransferToGeneralStock ? null : destinationId,
+      to_id: destinationBars,
       quantity: Object.values(transferQuantities),
       transfer_to_general_stock: isTransferToGeneralStock,
     };
@@ -249,10 +252,20 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
       }
 
       // Process transfer
-      const destination = isTransferToGeneralStock ? "stock general" : `${selectedDestinationBars.length} barra(s)`;
+      const destination = isTransferToGeneralStock
+        ? "stock general"
+        : destinationBars.length === 1
+          ? "la barra seleccionada"
+          : `${destinationBars.length} barras`;
       toast.success(
         `Se ha transferido stock exitosamente a ${destination}`
       );
+
+      // Refresh inventory data
+      await fetchStocksOfBar(selectedBar === -1 ? undefined : selectedBar);
+
+      // Trigger transfer history refresh
+      setRefreshTrigger(prev => prev + 1);
 
       // Reset state
       setSelectedItems({});
@@ -327,8 +340,8 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
               <DialogHeader>
                 <DialogTitle>Transferir productos</DialogTitle>
                 <DialogDescription>
-                  Selecciona las barras destino para transferir los productos
-                  seleccionados
+                  Selecciona uno o múltiples destinos para transferir los productos
+                  seleccionados (barras específicas o stock general)
                 </DialogDescription>
               </DialogHeader>
 
@@ -338,12 +351,13 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
                   <MultiSelectBarsField
                     onSelectionChange={handleDestinationBarsChange}
                     placeholder="Seleccionar destino (barras o stock general)"
-                    singleSelection={true}
+                    singleSelection={false}
                     initialSelection={[]}
                     includeGeneralStock={true}
+                    excludeBarIds={selectedBar !== -1 ? [selectedBar.toString()] : []}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Puedes transferir a otras barras o devolver al stock general
+                    Puedes seleccionar múltiples barras destino o transferir al stock general
                   </p>
                 </div>
 
@@ -469,7 +483,7 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <StockTransfersList selectedBar={selectedBar} />
+          <StockTransfersList selectedBar={selectedBar} refreshTrigger={refreshTrigger} />
         </CardContent>
       </Card>
 

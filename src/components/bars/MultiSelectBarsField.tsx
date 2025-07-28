@@ -39,6 +39,7 @@ interface MultiSelectBarsFieldProps {
   singleSelection?: boolean;
   disabled?: boolean;
   includeGeneralStock?: boolean;
+  excludeBarIds?: string[];
 }
 
 export function MultiSelectBarsField({
@@ -49,6 +50,7 @@ export function MultiSelectBarsField({
   singleSelection = false,
   disabled = false,
   includeGeneralStock = false,
+  excludeBarIds = [],
 }: MultiSelectBarsFieldProps) {
   const [open, setOpen] = useState(false);
   const [selectedValues, setSelectedValues] =
@@ -58,9 +60,9 @@ export function MultiSelectBarsField({
     if (initialSelection.length > 0) setSelectedValues(initialSelection);
   }, [initialSelection]);
 
-  // Create combined list of bars and general stock option
+  // Create combined list of bars and general stock option, excluding specified bars
   const allOptions = [
-    ...barsData,
+    ...barsData.filter(bar => !excludeBarIds.includes(bar.id || "")),
     ...(includeGeneralStock ? [{ id: "general-stock", name: "Stock General" }] : [])
   ];
 
@@ -72,14 +74,32 @@ export function MultiSelectBarsField({
     if (singleSelection) {
       setSelectedValues([barId]);
       onSelectionChange([barId]);
+      setOpen(false); // Close dropdown after single selection
     } else {
       setSelectedValues((current) => {
-        const newSelection = current.includes(barId)
-          ? current.filter((id) => id !== barId)
-          : [...current, barId];
+        let newSelection;
+
+        if (current.includes(barId)) {
+          // Remove the selected item
+          newSelection = current.filter((id) => id !== barId);
+        } else {
+          // Add the selected item
+          newSelection = [...current, barId];
+
+          // If selecting general stock, remove all other bars (they're mutually exclusive)
+          if (barId === "general-stock") {
+            newSelection = ["general-stock"];
+          }
+          // If selecting a specific bar while general stock is selected, remove general stock
+          else if (current.includes("general-stock")) {
+            newSelection = newSelection.filter(id => id !== "general-stock");
+          }
+        }
+
         onSelectionChange(newSelection);
         return newSelection;
       });
+      // Don't close dropdown for multi-select to allow multiple selections
     }
   };
 
