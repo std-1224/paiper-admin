@@ -807,29 +807,64 @@ const Stock = () => {
     setSelectedStockItems([]);
   };
   const onSubmitAssign = async (data: any) => {
-    const response = await fetch("/api/inventory", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        productId: selectedProduct?.id,
-        quantity: data.quantity,
-        destinationBars: [Number(data.destination.split("_*_")[0])],
-      }),
-    });
+    try {
+      setIsLoading(true);
+      
+      if (!selectedProduct?.id) {
+        toast.error("No se ha seleccionado un producto");
+        return;
+      }
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to create bar");
+      if (!data.quantity || data.quantity <= 0) {
+        toast.error("La cantidad debe ser mayor a 0");
+        return;
+      }
+
+      if (!data.destination) {
+        toast.error("Debes seleccionar una barra de destino");
+        return;
+      }
+
+      const destinationBarId = Number(data.destination.split("_*_")[0]);
+      
+      // Use the adjust API for re-entry to assign stock to a bar
+      const response = await fetch("/api/adjust", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          product: selectedProduct.id,
+          quantity: data.quantity,
+          type: "re-entry",
+          reason: `Asignación a barra: ${data.destination.split("_*_")[1]}`,
+          destinationBars: [destinationBarId],
+          observations: data.notes || ""
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al asignar stock");
+      }
+
+      toast.success(
+        `${data.quantity} unidades de ${selectedProduct.name} asignadas a ${data.destination.split("_*_")[1]}`
+      );
+      
+      // Refresh data
+      await fetchStocksOfBar();
+      await fetchProducts();
+      
+      setAssignStockDialogOpen(false);
+      assignForm.reset();
+      setSelectedProduct(null);
+    } catch (error) {
+      console.error("Error assigning stock:", error);
+      toast.error(error instanceof Error ? error.message : "Error al asignar stock");
+    } finally {
+      setIsLoading(false);
     }
-    toast.success(
-      `${data.quantity} unidades de ${selectedProduct?.name} reingresadas al stock`
-    );
-    fetchStocksOfBar();
-    setAssignStockDialogOpen(false);
-    assignForm.reset();
-    // Aquí iría la lógica para actualizar el stock
   };
   const onSubmitTransfer = (data: any) => {
     console.log("Transferencia creada:", data);
@@ -1478,7 +1513,19 @@ const Stock = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit">Asignar Stock</Button>
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Asignando...
+                  </>
+                ) : (
+                  "Asignar Stock"
+                )}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
