@@ -105,7 +105,16 @@ export default function StockManagement() {
     quantity: "",
     unit: "ml",
   });
+
+  // Recipe selection states for product modal
+  const [selectedRecipeId, setSelectedRecipeId] = useState<string>("");
+  const [recipeIngredients, setRecipeIngredients] = useState<{ name: string; quantity: string; unit: string; requiredQuantity: number; availableStock: number; productId?: string }[]>([]);
+  const [stockValidationErrors, setStockValidationErrors] = useState<string[]>([]);
   const [ingredientValidation, setIngredientValidation] = useState<any[]>([]);
+
+  // Recipe selection states for edit modal
+  const [selectedEditRecipeId, setSelectedEditRecipeId] = useState<string>("");
+  const [showCreateRecipeDialogEdit, setShowCreateRecipeDialogEdit] = useState(false);
 
   // Stock transfer states
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -315,6 +324,13 @@ export default function StockManagement() {
   useEffect(() => {
     fetchRecipes();
   }, []);
+
+  // Validate stock whenever recipe ingredients change
+  useEffect(() => {
+    if (recipeIngredients.length > 0) {
+      validateIngredientStock();
+    }
+  }, [recipeIngredients]);
 
   // Clear transfer logs function
   const handleClearTransferLogs = () => {
@@ -703,11 +719,170 @@ export default function StockManagement() {
     }
   };
 
+  // Recipe selection functions
+  const handleRecipeSelection = async (recipeId: string) => {
+    setSelectedRecipeId(recipeId);
+
+    if (!recipeId || recipeId === "no-recipe") {
+      setRecipeIngredients([]);
+      setStockValidationErrors([]);
+      setNewProduct({ ...newProduct, has_recipe: false });
+      return;
+    }
+
+    // Find the selected recipe
+    const selectedRecipe = recipesData.find(recipe => recipe.id.toString() === recipeId);
+    if (!selectedRecipe || !selectedRecipe.ingredients) {
+      return;
+    }
+
+    // Parse recipe ingredients
+    let ingredients;
+    try {
+      ingredients = typeof selectedRecipe.ingredients === 'string'
+        ? JSON.parse(selectedRecipe.ingredients)
+        : selectedRecipe.ingredients;
+    } catch (error) {
+      console.error("Error parsing recipe ingredients:", error);
+      return;
+    }
+
+    console.log("ingredients: ", ingredients);
+
+    // Get stock information for each ingredient
+    const ingredientsWithStock = await Promise.all(
+      ingredients.map(async (ingredient: any) => {
+        // Find matching products by name
+        const matchingProducts = productsData.filter(product =>
+          product.name.toLowerCase().includes(ingredient.name.toLowerCase())
+        );
+
+        const availableStock = matchingProducts.reduce((total, product) => total + product.stock, 0);
+
+        return {
+          ...ingredient,
+          requiredQuantity: 1, // Default quantity, user can modify
+          availableStock,
+          productId: matchingProducts[0]?.id || null,
+        };
+      })
+    );
+
+    setRecipeIngredients(ingredientsWithStock);
+    setNewProduct({ ...newProduct, has_recipe: true });
+  };
+
+  const updateIngredientQuantity = (index: number, quantity: number) => {
+    const updatedIngredients = [...recipeIngredients];
+    updatedIngredients[index].requiredQuantity = quantity;
+    setRecipeIngredients(updatedIngredients);
+
+    // Validate stock
+    validateIngredientStock();
+  };
+
+  const validateIngredientStock = () => {
+    const errors: string[] = [];
+
+    recipeIngredients.forEach((ingredient) => {
+      const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
+      if (totalRequired > ingredient.availableStock) {
+        errors.push(`${ingredient.name}: Necesitas ${totalRequired}${ingredient.unit}, pero solo hay ${ingredient.availableStock}${ingredient.unit} disponible`);
+      }
+    });
+
+    setStockValidationErrors(errors);
+  };
+
   // Helper functions
   const calculateStatus = (stock: number): "sufficient" | "low" | "out" => {
     if (stock === 0) return "out";
     if (stock < 5) return "low";
     return "sufficient";
+  };
+
+  // Edit modal recipe selection function
+  const handleEditRecipeSelection = async (recipeId: string) => {
+    setSelectedEditRecipeId(recipeId);
+
+    if (!recipeId || recipeId === "no-recipe") {
+      setEditingProduct({
+        ...editingProduct!,
+        has_recipe: false,
+        ingredients: undefined
+      });
+      return;
+    }
+
+    const selectedRecipe = recipesData.find(recipe => recipe.id.toString() === recipeId);
+    if (!selectedRecipe) return;
+
+    // Set the product to have a recipe and update ingredients
+    setEditingProduct({
+      ...editingProduct!,
+      has_recipe: true,
+      ingredients: JSON.stringify(selectedRecipe.ingredients || [])
+    });
+  };
+
+  // Create recipe function for edit modal
+  const handleCreateRecipeEdit = async () => {
+    try {
+      setIsLoading(true);
+
+      // Validate ingredients before creating recipe
+      const validationResults = await validateRecipeIngredients(newRecipe.ingredients);
+      const hasErrors = validationResults.some(result => result.status !== 'valid');
+
+      if (hasErrors) {
+        const errorMessages = validationResults
+          .filter(result => result.status !== 'valid')
+          .map(result => result.message)
+          .join('\n');
+
+        toast.error(`Errores de validación:\n${errorMessages}`);
+        return;
+      }
+
+      const response = await fetch(`/api/recipes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newRecipe.name,
+          ingredients: JSON.stringify(newRecipe.ingredients),
+          amount: 1,
+          category: newRecipe.category,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to create recipe");
+
+      const createdRecipe = await response.json();
+      await fetchRecipes(); // Refresh recipes list
+
+      // Auto-select the newly created recipe in edit modal
+      setSelectedEditRecipeId(createdRecipe.id.toString());
+      setEditingProduct({
+        ...editingProduct!,
+        has_recipe: true,
+        ingredients: JSON.stringify(newRecipe.ingredients)
+      });
+
+      // Reset recipe form
+      setNewRecipe({
+        name: "",
+        category: "bebida",
+        ingredients: [],
+      });
+      setShowCreateRecipeDialogEdit(false);
+
+      toast.success("Receta creada exitosamente y vinculada al producto");
+    } catch (error) {
+      console.error("Error creating recipe:", error);
+      toast.error("Error al crear la receta");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Calculate derived data
@@ -832,6 +1007,37 @@ export default function StockManagement() {
   const handleAddProduct = async () => {
     try {
       setIsLoading(true);
+
+      // Validate stock if recipe is selected
+      if (newProduct.has_recipe && stockValidationErrors.length > 0) {
+        alert("No se puede agregar el producto. Hay errores de stock:\n" + stockValidationErrors.join("\n"));
+        setIsLoading(false);
+        return;
+      }
+
+      // Deduct ingredients from stock if recipe is selected
+      if (newProduct.has_recipe && recipeIngredients.length > 0) {
+        for (const ingredient of recipeIngredients) {
+          const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
+
+          if (ingredient.productId) {
+            // Update the specific product stock
+            const updateResponse = await fetch(`/api/products`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                id: ingredient.productId,
+                stock: ingredient.availableStock - totalRequired,
+              }),
+            });
+
+            if (!updateResponse.ok) {
+              throw new Error(`Failed to update stock for ${ingredient.name}`);
+            }
+          }
+        }
+      }
+
       const uploadedUrl = await handleImageUpload();
       const response = await fetch(`/api/products`, {
         method: "POST",
@@ -858,7 +1064,14 @@ export default function StockManagement() {
         has_recipe: false,
       });
       setImageFile(null);
+
+      // Reset recipe states
+      setSelectedRecipeId("");
+      setRecipeIngredients([]);
+      setStockValidationErrors([]);
+
       fetchProducts();
+      alert("Producto agregado exitosamente y stock de ingredientes actualizado");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error adding product");
     } finally {
@@ -1344,7 +1557,30 @@ export default function StockManagement() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setEditingProduct(product)}
+                            onClick={() => {
+                              setEditingProduct(product);
+                              // Initialize recipe selection if product has a recipe
+                              if (product.has_recipe && product.ingredients) {
+                                // Try to find matching recipe based on ingredients
+                                const matchingRecipe = recipesData.find(recipe => {
+                                  try {
+                                    const productIngredients = typeof product.ingredients === 'string'
+                                      ? JSON.parse(product.ingredients)
+                                      : product.ingredients;
+                                    const recipeIngredients = recipe.ingredients;
+
+                                    // Simple comparison - could be enhanced
+                                    return JSON.stringify(productIngredients) === JSON.stringify(recipeIngredients);
+                                  } catch {
+                                    return false;
+                                  }
+                                });
+
+                                setSelectedEditRecipeId(matchingRecipe ? matchingRecipe.id.toString() : "");
+                              } else {
+                                setSelectedEditRecipeId("");
+                              }
+                            }}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -1565,9 +1801,9 @@ export default function StockManagement() {
             </div>
 
             {/* Recipe Selection Field */}
-            <div className="space-y-2">
+            <div className="space-y-4 border rounded-lg p-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor="recipe">Receta (Opcional)</Label>
+                <Label className="text-base font-semibold">Receta (Opcional)</Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -1578,17 +1814,13 @@ export default function StockManagement() {
                   Crear Receta
                 </Button>
               </div>
+
               <Select
-                value={newProduct.has_recipe ? "has-recipe" : "no-recipe"}
-                onValueChange={(value) =>
-                  setNewProduct({
-                    ...newProduct,
-                    has_recipe: value === "has-recipe"
-                  })
-                }
+                value={selectedRecipeId}
+                onValueChange={handleRecipeSelection}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar receta existente (opcional)" />
+                  <SelectValue placeholder="Seleccionar receta existente" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="no-recipe">Sin receta</SelectItem>
@@ -1599,8 +1831,92 @@ export default function StockManagement() {
                   ))}
                 </SelectContent>
               </Select>
+
+              {/* Recipe Ingredients Display */}
+              {recipeIngredients.length > 0 && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Ingredientes de la receta:</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Especifica cuántas unidades del producto vas a crear. Los ingredientes se descontarán automáticamente.
+                  </p>
+
+                  {recipeIngredients.map((ingredient, index) => {
+                    const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
+                    const hasEnoughStock = ingredient.availableStock >= totalRequired;
+
+                    return (
+                      <div key={index} className="grid grid-cols-3 gap-4 p-3 bg-white border rounded-lg">
+                        <div>
+                          <Label className="text-xs text-gray-600">Ingredient</Label>
+                          <p className="text-sm font-medium">{ingredient.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {ingredient.quantity} {ingredient.unit} per unit
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-600">Amount to create</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={ingredient.requiredQuantity}
+                            onChange={(e) => updateIngredientQuantity(index, parseInt(e.target.value) || 1)}
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-600">Stock available</Label>
+                          <div className="flex items-center space-x-2">
+                            <p className={`text-sm font-medium ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
+                              {ingredient.availableStock} {ingredient.unit}
+                            </p>
+                            {hasEnoughStock ? (
+                              <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            ) : (
+                              <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            Required: {totalRequired.toFixed(1)} {ingredient.unit}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Stock Validation Errors */}
+                  {stockValidationErrors.length > 0 && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <Label className="text-sm font-medium text-red-800">Stock insufficient</Label>
+                      </div>
+                      <ul className="mt-2 text-sm text-red-700 space-y-1">
+                        {stockValidationErrors.map((error, index) => (
+                          <li key={index} className="flex items-start space-x-2">
+                            <span className="text-red-500 mt-0.5">•</span>
+                            <span>{error}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <p className="text-sm text-muted-foreground">
-                Si seleccionas una receta, el stock de los ingredientes se descontará automáticamente cuando se haga un pedido.
+                Al agregar este producto, los ingredientes se descontarán automáticamente del stock.
               </p>
             </div>
 
@@ -1744,6 +2060,120 @@ export default function StockManagement() {
                 }
               />
             </div>
+
+            {/* Recipe Selection Field for Edit */}
+            <div className="space-y-4 border rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold">Receta (Opcional)</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCreateRecipeDialogEdit(true)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Crear Receta
+                </Button>
+              </div>
+
+              <Select
+                value={editingProduct?.has_recipe ? selectedEditRecipeId : "no-recipe"}
+                onValueChange={handleEditRecipeSelection}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar receta existente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no-recipe">Sin receta</SelectItem>
+                  {recipesData.map((recipe) => (
+                    <SelectItem key={recipe.id} value={recipe.id.toString()}>
+                      {recipe.name} ({recipe.category})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <p className="text-sm text-muted-foreground">
+                Si seleccionas una receta, el stock de los ingredientes se descontará automáticamente cuando se haga un pedido.
+              </p>
+            </div>
+
+            {/* Recipe Ingredients Display for Edit */}
+            {editingProduct?.has_recipe && (
+              <div className="space-y-2">
+                <Label>Ingredientes de la Receta</Label>
+                <div className="space-y-3 max-h-48 overflow-y-auto border rounded-md p-3">
+                  {(() => {
+                    try {
+                      // Handle different ingredient data formats
+                      let ingredients = [];
+
+                      if (editingProduct.ingredients) {
+                        if (typeof editingProduct.ingredients === 'string') {
+                          ingredients = JSON.parse(editingProduct.ingredients);
+                        } else if (Array.isArray(editingProduct.ingredients)) {
+                          ingredients = editingProduct.ingredients;
+                        }
+                      }
+
+                      // If no ingredients found, show message
+                      if (!ingredients || ingredients.length === 0) {
+                        return (
+                          <div className="text-sm text-muted-foreground">
+                            Este producto tiene receta pero no se encontraron ingredientes.
+                          </div>
+                        );
+                      }
+
+                      return ingredients.map((ingredient: any, index: number) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-4">
+                            <span className="text-sm font-medium">{ingredient.name}</span>
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              type="number"
+                              value={ingredient.quantity}
+                              onChange={(e) => {
+                                const updatedIngredients = [...ingredients];
+                                updatedIngredients[index] = {
+                                  ...updatedIngredients[index],
+                                  quantity: e.target.value
+                                };
+                                setEditingProduct({
+                                  ...editingProduct,
+                                  ingredients: JSON.stringify(updatedIngredients)
+                                });
+                              }}
+                              className="h-8"
+                              min="0"
+                              step="0.01"
+                              placeholder="Cantidad"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-sm text-muted-foreground">{ingredient.unit}</span>
+                          </div>
+                          <div className="col-span-3">
+                            <span className="text-xs text-green-600">✓ Válido</span>
+                          </div>
+                        </div>
+                      ));
+                    } catch (error) {
+                      return (
+                        <div className="text-sm text-red-600">
+                          Error al cargar ingredientes
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Puedes modificar las cantidades de los ingredientes.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-purchase_price">Precio de Compra</Label>
@@ -2257,6 +2687,157 @@ export default function StockManagement() {
             </Button>
             <Button
               onClick={handleCreateRecipe}
+              disabled={!newRecipe.name || newRecipe.ingredients.length === 0 || isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                "Crear Receta"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Recipe Dialog for Edit Modal */}
+      <Dialog open={showCreateRecipeDialogEdit} onOpenChange={setShowCreateRecipeDialogEdit}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Crear Nueva Receta</DialogTitle>
+            <DialogDescription>
+              Crea una receta que se vinculará al producto que estás editando
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="recipe-name-edit">Nombre de la Receta</Label>
+                <Input
+                  id="recipe-name-edit"
+                  placeholder="Ej: Mojito, Margarita..."
+                  value={newRecipe.name}
+                  onChange={(e) =>
+                    setNewRecipe({ ...newRecipe, name: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="recipe-category-edit">Categoría</Label>
+                <Select
+                  value={newRecipe.category}
+                  onValueChange={(value) =>
+                    setNewRecipe({ ...newRecipe, category: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bebida">Bebida</SelectItem>
+                    <SelectItem value="comida">Comida</SelectItem>
+                    <SelectItem value="postre">Postre</SelectItem>
+                    <SelectItem value="entrada">Entrada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Add Ingredient Section */}
+            <div className="space-y-3 border rounded-lg p-4">
+              <Label className="text-sm font-medium">Agregar Ingrediente</Label>
+              <div className="grid grid-cols-12 gap-2">
+                <div className="col-span-5">
+                  <Input
+                    placeholder="Nombre del ingrediente"
+                    value={newIngredient.name}
+                    onChange={(e) =>
+                      setNewIngredient({ ...newIngredient, name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="col-span-3">
+                  <Input
+                    type="number"
+                    placeholder="Cantidad"
+                    value={newIngredient.quantity}
+                    onChange={(e) =>
+                      setNewIngredient({ ...newIngredient, quantity: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Select
+                    value={newIngredient.unit}
+                    onValueChange={(value) =>
+                      setNewIngredient({ ...newIngredient, unit: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ml">ml</SelectItem>
+                      <SelectItem value="g">g</SelectItem>
+                      <SelectItem value="unidad">unidad</SelectItem>
+                      <SelectItem value="hojas">hojas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={handleAddIngredientToRecipe}
+                    disabled={!newIngredient.name || !newIngredient.quantity}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Ingredients List */}
+            {newRecipe.ingredients.length > 0 && (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Ingredientes de la Receta</Label>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {newRecipe.ingredients.map((ingredient, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <span className="font-medium">{ingredient.name}</span>
+                        <span className="text-sm text-gray-600">
+                          {ingredient.quantity} {ingredient.unit}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveIngredientFromRecipe(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateRecipeDialogEdit(false);
+                setNewRecipe({ name: "", category: "bebida", ingredients: [] });
+                setNewIngredient({ name: "", quantity: "", unit: "ml" });
+                setIngredientValidation([]);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateRecipeEdit}
               disabled={!newRecipe.name || newRecipe.ingredients.length === 0 || isLoading}
             >
               {isLoading ? (

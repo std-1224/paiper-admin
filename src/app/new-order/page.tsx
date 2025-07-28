@@ -195,7 +195,8 @@ export default function NewOrder() {
           {step === 2 && (
             <Menu
               onAddToCart={handleAddToCart}
-              userTableId={selectedUser?.table_id || null}
+              userTableId={tableNumber}
+              // userTableId={selectedUser?.table_id || null}
               isTableOrder={isFromTable}
             />
           )}

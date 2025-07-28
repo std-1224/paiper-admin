@@ -32,7 +32,8 @@ export const POST = async (req: Request) => {
                 image_url: body.image_url,
                 purchase_price: body.purchase_price,
                 sale_price: body.sale_price,
-                has_recipe: body.has_recipe || false
+                has_recipe: body.has_recipe || false,
+                ingredients: body.ingredients || null
             }])
         if (error) {
             throw error;
