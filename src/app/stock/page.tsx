@@ -1173,7 +1173,7 @@ const Stock = () => {
                           .filter((s) => item.id == s.productId)
                           .slice(0, 2)
                           .map((s) => (
-                            <div>
+                            <div key={s.id}>
                               <Button
                                 variant="link"
                                 className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800"
