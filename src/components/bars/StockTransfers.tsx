@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { StockTransfersList } from "@/components/stock/StockTransfersList";
 import {
   Card,
@@ -60,6 +60,8 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
     string[]
   >([]);
   const [isTransferring, setIsTransferring] = useState(false);
+  const transferInProgress = useRef(false);
+  const lastClickTime = useRef(0);
 
   const { stocksData, fetchStocksOfBar } = useAppContext();
 
@@ -197,12 +199,21 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
   };
 
   const handleTransfer = async () => {
-    // Prevent multiple clicks
-    if (isTransferring) {
+    // Prevent multiple clicks using both state and ref for extra safety
+    if (isTransferring || transferInProgress.current) {
+      console.log("Transfer already in progress, ignoring click");
       return;
     }
 
-    // Here you would implement the actual transfer logic
+    // Prevent rapid clicks (within 500ms)
+    const now = Date.now();
+    if (now - lastClickTime.current < 10) {
+      console.log("Click too fast, ignoring");
+      return;
+    }
+    lastClickTime.current = now;
+
+    // Validate selections
     const selectedItemsCount = Object.keys(selectedItems).filter(
       (key) => selectedItems[Number(key)]
     ).length;
@@ -217,7 +228,28 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
       return;
     }
 
+    // Validate quantities before starting transfer
+    for (const itemId of Object.keys(selectedItems)) {
+      if (selectedItems[Number(itemId)]) {
+        const quantity = transferQuantities[Number(itemId)] || 0;
+        const item = filteredStockItems.find(item => Number(item.id) === Number(itemId));
+        
+        if (quantity <= 0) {
+          toast.error(`Debes especificar una cantidad mayor a 0 para ${item?.name || 'el producto'}`);
+          return;
+        }
+        
+        if (item && quantity > item.quantity) {
+          toast.error(`No puedes transferir más unidades que el stock disponible para ${item.name}`);
+          return;
+        }
+      }
+    }
+
+    // Set both state and ref BEFORE any async operations
     setIsTransferring(true);
+    transferInProgress.current = true;
+    console.log("Starting transfer, isTransferring set to true");
 
     let fromBars: any[] = [];
     if (selectedBar == -1) {
@@ -285,6 +317,7 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
       toast.error(error.message || "Error al transferir stock");
     } finally {
       setIsTransferring(false);
+      transferInProgress.current = false;
     }
   };
 
@@ -419,6 +452,7 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
                 <Button
                   onClick={handleTransfer}
                   disabled={isTransferring}
+                  className={isTransferring ? "opacity-50 cursor-not-allowed" : ""}
                 >
                   {isTransferring ? (
                     <>

@@ -373,6 +373,12 @@ export default function StockManagement() {
 
   // Stock transfer functions
   const handleTransferProducts = async () => {
+    // Prevent multiple submissions
+    if (isLoading) {
+      console.log("Transfer already in progress, ignoring click");
+      return;
+    }
+
     try {
       setIsLoading(true);
 
