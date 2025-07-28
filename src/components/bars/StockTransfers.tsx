@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowRightLeft, AlertCircle, Info } from "lucide-react";
+import { ArrowRightLeft, AlertCircle, Info, Loader2 } from "lucide-react";
 import { MultiSelectBarsField } from "@/components/bars/MultiSelectBarsField";
 import { useAppContext } from "@/context/AppContext";
 import { StockControlInfo } from "@/components/stock/StockControlInfo";
@@ -59,6 +59,7 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
   const [selectedDestinationBars, setSelectedDestinationBars] = useState<
     string[]
   >([]);
+  const [isTransferring, setIsTransferring] = useState(false);
 
   const { stocksData, fetchStocksOfBar } = useAppContext();
 
@@ -196,6 +197,11 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
   };
 
   const handleTransfer = async () => {
+    // Prevent multiple clicks
+    if (isTransferring) {
+      return;
+    }
+
     // Here you would implement the actual transfer logic
     const selectedItemsCount = Object.keys(selectedItems).filter(
       (key) => selectedItems[Number(key)]
@@ -210,6 +216,8 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
       toast.error("Selecciona al menos un destino (barra o stock general)");
       return;
     }
+
+    setIsTransferring(true);
 
     let fromBars: any[] = [];
     if (selectedBar == -1) {
@@ -275,6 +283,8 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
     } catch (error: any) {
       console.error("Error al transferir stock:", error);
       toast.error(error.message || "Error al transferir stock");
+    } finally {
+      setIsTransferring(false);
     }
   };
 
@@ -399,11 +409,25 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setDialogOpen(false)}
+                  disabled={isTransferring}
+                >
                   Cancelar
                 </Button>
-                <Button onClick={handleTransfer}>
-                  Confirmar transferencia
+                <Button
+                  onClick={handleTransfer}
+                  disabled={isTransferring}
+                >
+                  {isTransferring ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Transfiriendo...
+                    </>
+                  ) : (
+                    "Confirmar transferencia"
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
