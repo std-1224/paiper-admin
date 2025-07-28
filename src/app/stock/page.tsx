@@ -491,6 +491,132 @@ const Stock = () => {
     });
   };
 
+  // Add ingredient to existing selected recipe
+  const handleAddIngredientToExistingRecipe = async () => {
+    console.log("🔧 Adding ingredient to existing recipe...");
+    console.log("Selected Recipe ID:", selectedRecipeId);
+    console.log("New Ingredient:", newIngredient);
+
+    if (!selectedRecipeId || !newIngredient.name || !newIngredient.quantity) {
+      console.log("❌ Missing required fields");
+      toast.error("Por favor completa todos los campos requeridos");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Get the current recipe
+      const currentRecipe = recipesData.find(recipe => recipe.id.toString() === selectedRecipeId);
+      console.log("Current Recipe Found:", currentRecipe);
+
+      if (!currentRecipe) {
+        console.log("❌ Recipe not found");
+        toast.error("No se pudo encontrar la receta seleccionada");
+        return;
+      }
+
+      // Parse current ingredients
+      let currentIngredients;
+      try {
+        currentIngredients = typeof currentRecipe.ingredients === 'string'
+          ? JSON.parse(currentRecipe.ingredients)
+          : currentRecipe.ingredients || [];
+        console.log("Current Ingredients:", currentIngredients);
+      } catch (error) {
+        console.error("Error parsing current recipe ingredients:", error);
+        currentIngredients = [];
+      }
+
+      // Add new ingredient
+      const updatedIngredients = [
+        ...currentIngredients,
+        {
+          name: newIngredient.name,
+          quantity: parseFloat(newIngredient.quantity),
+          unit: newIngredient.unit
+        }
+      ];
+      console.log("Updated Ingredients:", updatedIngredients);
+
+      // Update the recipe in the database
+      const updatePayload = {
+        id: selectedRecipeId,
+        name: currentRecipe.name,
+        ingredients: JSON.stringify(updatedIngredients),
+        amount: currentRecipe.stock,
+        category: currentRecipe.category
+      };
+      console.log("Update Payload:", updatePayload);
+
+      const response = await fetch(`/api/recipe`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatePayload),
+      });
+
+      console.log("API Response Status:", response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API Error:", errorData);
+        throw new Error(errorData.error || "Failed to update recipe");
+      }
+
+      const responseData = await response.json();
+      console.log("API Response Data:", responseData);
+
+      // Update local recipe ingredients display immediately
+      console.log("🔄 Updating local recipe ingredients display...");
+
+      // Process the updated ingredients using the same logic as handleRecipeSelection
+      const updatedRecipeIngredients = await Promise.all(
+        updatedIngredients.map(async (ingredient: any) => {
+          // Find matching products by name (same logic as handleRecipeSelection)
+          const matchingProducts = productsData.filter(product =>
+            product.name.toLowerCase().includes(ingredient.name.toLowerCase())
+          );
+
+          const availableStock = matchingProducts.reduce((total, product) => total + product.stock, 0);
+
+          return {
+            name: ingredient.name,
+            quantity: ingredient.quantity.toString(),
+            unit: ingredient.unit,
+            requiredQuantity: 1, // Default quantity, user can modify
+            availableStock,
+            productId: matchingProducts[0]?.id || undefined,
+          };
+        })
+      );
+
+      // Update the recipe ingredients state immediately
+      console.log("🔍 Current recipe ingredients before update:", recipeIngredients);
+      console.log("🔍 New recipe ingredients to set:", updatedRecipeIngredients);
+      setRecipeIngredients(updatedRecipeIngredients);
+      console.log("✅ Local recipe ingredients updated immediately:", updatedRecipeIngredients);
+
+      // Also refresh recipes data in background for consistency
+      console.log("🔄 Refreshing recipes data in background...");
+      fetchRecipes();
+
+      // Reset ingredient form
+      setNewIngredient({
+        name: "",
+        quantity: "",
+        unit: "ml",
+      });
+
+      console.log("✅ Ingredient added successfully!");
+      toast.success(`Ingrediente "${newIngredient.name}" agregado a la receta exitosamente`);
+    } catch (error) {
+      console.error("❌ Error adding ingredient to recipe:", error);
+      toast.error("Error al agregar el ingrediente a la receta: " + (error as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const validateRecipeIngredients = async (ingredients: { name: string; quantity: string; unit: string }[]) => {
     const validationResults = [];
 
@@ -1716,6 +1842,64 @@ const Stock = () => {
                     </div>
                   );
                 })}
+
+                {/* Add New Ingredient to Existing Recipe */}
+                <div className="border-t pt-4 mt-4">
+                  <Label className="text-sm font-medium mb-3 block">Agregar nuevo ingrediente a esta receta:</Label>
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="col-span-5">
+                      <Input
+                        placeholder="Nombre del ingrediente"
+                        value={newIngredient.name}
+                        onChange={(e) =>
+                          setNewIngredient({ ...newIngredient, name: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        placeholder="Cantidad"
+                        value={newIngredient.quantity}
+                        onChange={(e) =>
+                          setNewIngredient({ ...newIngredient, quantity: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Select
+                        value={newIngredient.unit}
+                        onValueChange={(value) =>
+                          setNewIngredient({ ...newIngredient, unit: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ml">ml</SelectItem>
+                          <SelectItem value="g">g</SelectItem>
+                          <SelectItem value="unidad">unidad</SelectItem>
+                          <SelectItem value="hojas">hojas</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-full"
+                        onClick={handleAddIngredientToExistingRecipe}
+                        disabled={!newIngredient.name || !newIngredient.quantity}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Este ingrediente se agregará a la receta seleccionada y se guardará permanentemente.
+                  </p>
+                </div>
 
                 {/* Stock validation errors */}
                 {stockValidationErrors.length > 0 && (

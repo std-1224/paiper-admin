@@ -622,6 +622,110 @@ export default function StockManagement() {
     }
   };
 
+  // Add ingredient to existing selected recipe
+  const handleAddIngredientToExistingRecipe = async () => {
+    if (!selectedRecipeId || !newIngredient.name || !newIngredient.quantity) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Get the current recipe
+      const currentRecipe = recipesData.find(recipe => recipe.id.toString() === selectedRecipeId);
+      if (!currentRecipe) {
+        toast.error("Could not find the selected recipe");
+        return;
+      }
+
+      // Parse current ingredients
+      let currentIngredients;
+      try {
+        currentIngredients = typeof currentRecipe.ingredients === 'string'
+          ? JSON.parse(currentRecipe.ingredients)
+          : currentRecipe.ingredients || [];
+      } catch (error) {
+        console.error("Error parsing current recipe ingredients:", error);
+        currentIngredients = [];
+      }
+
+      // Add new ingredient
+      const updatedIngredients = [
+        ...currentIngredients,
+        {
+          name: newIngredient.name,
+          quantity: newIngredient.quantity,
+          unit: newIngredient.unit
+        }
+      ];
+
+      // Update the recipe in the database
+      const updatePayload = {
+        id: selectedRecipeId,
+        name: currentRecipe.name,
+        ingredients: JSON.stringify(updatedIngredients),
+        amount: currentRecipe.stock,
+        category: currentRecipe.category
+      };
+
+      const response = await fetch(`/api/recipe`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatePayload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update recipe");
+      }
+
+      // Update local recipe ingredients display immediately
+      console.log("🔄 Updating local recipe ingredients display...");
+
+      // Process the updated ingredients using the same logic as handleRecipeSelection
+      const updatedRecipeIngredients = await Promise.all(
+        updatedIngredients.map(async (ingredient: any) => {
+          // Find matching products by name (same logic as handleRecipeSelection)
+          const matchingProducts = productsData.filter(product =>
+            product.name.toLowerCase().includes(ingredient.name.toLowerCase())
+          );
+
+          const availableStock = matchingProducts.reduce((total, product) => total + product.stock, 0);
+
+          return {
+            name: ingredient.name,
+            quantity: ingredient.quantity.toString(),
+            unit: ingredient.unit,
+            requiredQuantity: 1, // Default quantity, user can modify
+            availableStock,
+            productId: matchingProducts[0]?.id || undefined,
+          };
+        })
+      );
+
+      // Update the recipe ingredients state immediately
+      setRecipeIngredients(updatedRecipeIngredients);
+      console.log("✅ Local recipe ingredients updated immediately:", updatedRecipeIngredients);
+
+      // Also refresh recipes data in background for consistency
+      console.log("🔄 Refreshing recipes data in background...");
+      fetchRecipes();
+
+      // Reset ingredient form
+      setNewIngredient({
+        name: "",
+        quantity: "",
+        unit: "ml",
+      });
+
+      toast.success(`Ingredient "${newIngredient.name}" added to recipe successfully`);
+    } catch (error) {
+      console.error("Error adding ingredient to recipe:", error);
+      toast.error("Error adding ingredient to recipe");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Recipe validation function
   const validateRecipeIngredients = async (ingredients: { name: string; quantity: string; unit: string }[]) => {
     const validationResults = [];
@@ -1890,6 +1994,64 @@ export default function StockManagement() {
                       </div>
                     );
                   })}
+
+                  {/* Add New Ingredient to Existing Recipe */}
+                  <div className="border-t pt-4 mt-4">
+                    <Label className="text-sm font-medium mb-3 block">Add new ingredient to this recipe:</Label>
+                    <div className="grid grid-cols-12 gap-2">
+                      <div className="col-span-5">
+                        <Input
+                          placeholder="Ingredient name"
+                          value={newIngredient.name}
+                          onChange={(e) =>
+                            setNewIngredient({ ...newIngredient, name: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Input
+                          type="number"
+                          placeholder="Quantity"
+                          value={newIngredient.quantity}
+                          onChange={(e) =>
+                            setNewIngredient({ ...newIngredient, quantity: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Select
+                          value={newIngredient.unit}
+                          onValueChange={(value) =>
+                            setNewIngredient({ ...newIngredient, unit: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ml">ml</SelectItem>
+                            <SelectItem value="g">g</SelectItem>
+                            <SelectItem value="unidad">unidad</SelectItem>
+                            <SelectItem value="hojas">hojas</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="w-full"
+                          onClick={handleAddIngredientToExistingRecipe}
+                          disabled={!newIngredient.name || !newIngredient.quantity}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      This ingredient will be added to the selected recipe and saved permanently.
+                    </p>
+                  </div>
 
                   {/* Stock Validation Errors */}
                   {stockValidationErrors.length > 0 && (

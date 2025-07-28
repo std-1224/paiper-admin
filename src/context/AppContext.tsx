@@ -351,13 +351,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const fetchRecipes = async () => {
-    const res = await fetch("/api/recipe");
-    const data = await res.json();
-    data.map((recipe: Recipe) => {
-      // @ts-ignore
-      recipe.ingredients = JSON.parse(recipe.ingredients);
-    });
-    setRecipesData(data);
+    try {
+      console.log("🔄 Fetching recipes from API...");
+      const res = await fetch("/api/recipe");
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch recipes: ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log("📋 Raw recipes data:", data);
+
+      data.map((recipe: Recipe) => {
+        // @ts-ignore
+        if (typeof recipe.ingredients === 'string') {
+          recipe.ingredients = JSON.parse(recipe.ingredients);
+        }
+      });
+
+      console.log("📋 Processed recipes data:", data);
+      setRecipesData(data);
+    } catch (error) {
+      console.error("❌ Error fetching recipes:", error);
+      setRecipesData([]);
+    }
   };
 
   useEffect(() => {
