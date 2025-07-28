@@ -128,72 +128,122 @@ export const POST = async (req: Request) => {
                             .eq("id", currentInventory.product_id);
                     }
                 }
-            } else {
-                // Direct re-entry to general stock
-                const { error: insertError } = await supabaseServerClient
-                    .from("inventory")
-                    .insert({
-                        product_id: body.product,
-                        bar_id: body.destinationBars?.[0] || null,
-                        quantity: body.quantity,
-                    });
+            } else if (body.product) {
+                // Re-entry from general stock to specific bar
+                // First, check if we have enough stock in the general product
+                const { data: product } = await supabaseServerClient
+                    .from("products")
+                    .select("stock")
+                    .eq("id", body.product)
+                    .single();
 
-                if (insertError) throw insertError;
-
-                // Also update general product stock if no specific bar
-                if (!body.destinationBars || body.destinationBars.length === 0) {
-                    const { data: product } = await supabaseServerClient
-                        .from("products")
-                        .select("stock")
-                        .eq("id", body.product)
-                        .single();
-
-                    if (product) {
-                        await supabaseServerClient
-                            .from("products")
-                            .update({
-                                stock: product.stock + body.quantity,
-                            })
-                            .eq("id", body.product);
-                    }
+                if (!product) {
+                    throw new Error("Product not found");
                 }
-            }
-        } else if (type === "loss") {
-            // Handle stock loss
-            const currentInventory = inventoryData?.data?.[0];
-            if (!currentInventory) {
-                throw new Error("Inventory item not found");
-            }
 
-            // Validate we have enough quantity to register as loss
-            if (currentInventory.quantity < body.quantity) {
-                throw new Error("Cannot register loss for more than available quantity");
-            }
+                if (product.stock < body.quantity) {
+                    throw new Error("Cannot re-enter more than available quantity in general stock");
+                }
 
-            // Reduce quantity from inventory
-            const { error: updateError } = await supabaseServerClient
-                .from("inventory")
-                .update({
-                    quantity: currentInventory.quantity - body.quantity,
-                })
-                .eq("id", body.inventory_id);
-
-            if (updateError) throw updateError;
-
-            // Also reduce from general product stock to maintain consistency
-            const { data: product } = await supabaseServerClient
-                .from("products")
-                .select("stock")
-                .eq("id", currentInventory.product_id)
-                .single();
-
-            if (product && product.stock >= body.quantity) {
+                // Deduct from general product stock
                 await supabaseServerClient
                     .from("products")
                     .update({
                         stock: product.stock - body.quantity,
                     })
-                    .eq("id", currentInventory.product_id);
+                    .eq("id", body.product);
+
+                // Add to destination bar
+                if (body.destinationBars && body.destinationBars.length > 0) {
+                    // Re-enter to specific bar
+                    const { data: destinationInventory } = await supabaseServerClient
+                        .from("inventory")
+                        .select("*")
+                        .eq("product_id", body.product)
+                        .eq("bar_id", body.destinationBars[0])
+                        .single();
+
+                    if (destinationInventory) {
+                        // Update existing inventory
+                        await supabaseServerClient
+                            .from("inventory")
+                            .update({
+                                quantity: destinationInventory.quantity + body.quantity,
+                            })
+                            .eq("id", destinationInventory.id);
+                    } else {
+                        // Create new inventory entry
+                        await supabaseServerClient
+                            .from("inventory")
+                            .insert({
+                                product_id: body.product,
+                                bar_id: body.destinationBars[0],
+                                quantity: body.quantity,
+                            });
+                    }
+                }
+            }
+        } else if (type === "loss") {
+            // Handle stock loss
+            if (body.inventory_id) {
+                const currentInventory = inventoryData?.data?.[0];
+                if (!currentInventory) {
+                    throw new Error("Inventory item not found");
+                }
+
+                // Validate we have enough quantity to register as loss
+                if (currentInventory.quantity < body.quantity) {
+                    throw new Error("Cannot register loss for more than available quantity");
+                }
+
+                // Reduce quantity from inventory
+                const { error: updateError } = await supabaseServerClient
+                    .from("inventory")
+                    .update({
+                        quantity: currentInventory.quantity - body.quantity,
+                    })
+                    .eq("id", body.inventory_id);
+
+                if (updateError) throw updateError;
+
+                // Also reduce from general product stock to maintain consistency
+                const { data: product } = await supabaseServerClient
+                    .from("products")
+                    .select("stock")
+                    .eq("id", currentInventory.product_id)
+                    .single();
+
+                if (product && product.stock >= body.quantity) {
+                    await supabaseServerClient
+                        .from("products")
+                        .update({
+                            stock: product.stock - body.quantity,
+                        })
+                        .eq("id", currentInventory.product_id);
+                }
+            } else if (body.product) {
+                // Direct loss from general stock
+                const { data: product } = await supabaseServerClient
+                    .from("products")
+                    .select("stock")
+                    .eq("id", body.product)
+                    .single();
+
+                if (!product) {
+                    throw new Error("Product not found");
+                }
+
+                if (product.stock < body.quantity) {
+                    throw new Error("Cannot register loss for more than available quantity");
+                }
+
+                // Reduce from general product stock
+                await supabaseServerClient
+                    .from("products")
+                    .update({
+                        stock: product.stock - body.quantity,
+                    })
+                    .eq("id", body.product);
             }
         }
 
@@ -201,13 +251,13 @@ export const POST = async (req: Request) => {
             .from("adjust")
             .insert([
                 {
-                    inventory_id: body.inventory_id,
+                    inventory_id: body.inventory_id || null,
                     amount: body.quantity,
                     description: body?.observations,
                     type: body.type,
                     reason: body.reason,
                     is_opened: body.isOpened,
-                    destination_bar: type === "re-entry" ? body.destinationBars[0] : inventoryData?.data?.[0].bar_id,
+                    destination_bar: type === "re-entry" ? (body.destinationBars?.[0] || null) : (inventoryData?.data?.[0]?.bar_id || null),
                 },
             ]);
         if (error) {

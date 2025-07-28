@@ -486,23 +486,28 @@ export default function StockManagement() {
       // Make API call to register the re-entries
       try {
         for (const reentry of reentryData) {
-          // Here you would implement the actual re-entry API call
-          console.log("Registering reentry:", reentry);
+          const response = await fetch("/api/adjust", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              product: reentry.productId,
+              quantity: reentry.quantity,
+              type: 're-entry',
+              reason: reentry.reason,
+              destinationBars: selectedBars.length > 0 ? selectedBars : []
+            })
+          });
 
-          // Example API call structure:
-          // await fetch("/api/adjust", {
-          //   method: "POST",
-          //   headers: { "Content-Type": "application/json" },
-          //   body: JSON.stringify({
-          //     productId: reentry.productId,
-          //     amount: reentry.quantity,
-          //     type: 'reentry',
-          //     reason: reentry.reason
-          //   })
-          // });
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Error al procesar re-ingreso");
+          }
         }
 
         toast.success(`Re-ingreso registrado para ${selectedProducts.length} producto(s)`);
+        
+        // Refresh data
+        await fetchProducts();
       } catch (apiError) {
         console.error("API reentry error:", apiError);
         toast.error("Error al procesar algunos re-ingresos");
@@ -553,23 +558,27 @@ export default function StockManagement() {
       // Make API call to register the losses
       try {
         for (const loss of lossData) {
-          // Here you would implement the actual loss API call
-          console.log("Registering loss:", loss);
+          const response = await fetch("/api/adjust", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              product: loss.productId,
+              quantity: loss.quantity,
+              type: 'loss',
+              reason: loss.reason
+            })
+          });
 
-          // Example API call structure:
-          // await fetch("/api/adjust", {
-          //   method: "POST",
-          //   headers: { "Content-Type": "application/json" },
-          //   body: JSON.stringify({
-          //     productId: loss.productId,
-          //     amount: loss.quantity,
-          //     type: 'loss',
-          //     reason: loss.reason
-          //   })
-          // });
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Error al procesar pérdida");
+          }
         }
 
         toast.success(`Pérdida registrada para ${selectedProducts.length} producto(s)`);
+        
+        // Refresh data
+        await fetchProducts();
       } catch (apiError) {
         console.error("API loss error:", apiError);
         toast.error("Error al procesar algunas pérdidas");

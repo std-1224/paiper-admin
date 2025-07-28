@@ -30,7 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
-import { ArrowDownUp, PackagePlus, PackageX } from "lucide-react";
+import { ArrowDownUp, PackagePlus, PackageX, Loader2 } from "lucide-react";
 import { ProductSearchField } from "@/components/products/ProductSearchField";
 import { MultiSelectBarsField } from "@/components/bars/MultiSelectBarsField";
 import { useAppContext } from "@/context/AppContext";
@@ -86,6 +86,7 @@ export function StockAdjustment({
   );
   const [selectedBars, setSelectedBars] = useState<string[]>([]);
   const [initialStock, setInitialStock] = useState<InventoryData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { stocksData, fetchProducts } = useAppContext();
   useEffect(() => {
     fetchProducts();
@@ -98,7 +99,7 @@ export function StockAdjustment({
         }
       });
     }
-  }, [initialStockId]);
+  }, [initialStockId, stocksData]);
 
   const reingress = useForm<StockReingress>({
     defaultValues: {
@@ -178,7 +179,7 @@ export function StockAdjustment({
 
   const handleProductSelectLoss = (product: any) => {
     setSelectedProductLoss(product);
-    loss.setValue("product", product.name);
+    loss.setValue("product", product.id);
     loss.setValue("productId", product.id);
   };
 
@@ -188,27 +189,126 @@ export function StockAdjustment({
   };
 
   const handleSubmitReingress = async (data: StockReingress) => {
-    console.log("Reingress data:", data);
-    onSubmitReingress?.(data);
+    // Prevent multiple submissions
+    if (isLoading) {
+      return;
+    }
 
-    toast.success(
-      `${data.quantity} unidades de ${data.product} reingresadas al stock`
-    );
-    onOpenChange(false);
-    reingress.reset();
-    setSelectedProductReingress(null);
-    setSelectedBars([]);
+    // Validate required fields
+    if (!data.productId && !data.product) {
+      toast.error("Debes seleccionar un producto");
+      return;
+    }
+
+    if (!data.quantity || data.quantity <= 0) {
+      toast.error("La cantidad debe ser mayor a 0");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      console.log("Reingress data:", data);
+      
+      const response = await fetch("/api/adjust", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          product: data.productId || data.product,
+          quantity: data.quantity,
+          type: "re-entry",
+          reason: data.reason || "Re-ingreso de stock",
+          destinationBars: data.destinationBars || [],
+          observations: data.observations || ""
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al procesar re-ingreso");
+      }
+
+      toast.success(
+        `${data.quantity} unidades de ${data.product} reingresadas al stock`
+      );
+      
+      // Refresh data to reflect changes
+      await fetchProducts();
+      
+      onOpenChange(false);
+      reingress.reset();
+      setSelectedProductReingress(null);
+      setSelectedBars([]);
+    } catch (error) {
+      console.error("Error processing re-entry:", error);
+      toast.error(error instanceof Error ? error.message : "Error al procesar re-ingreso");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSubmitLoss = (data: StockLoss) => {
-    console.log("Loss data:", data);
-    onSubmitLoss?.(data);
-    toast.success(
-      `${data.quantity} unidades de ${data.product} registradas como pérdida`
-    );
-    onOpenChange(false);
-    loss.reset();
-    setSelectedProductLoss(null);
+  const handleSubmitLoss = async (data: StockLoss) => {
+    // Prevent multiple submissions
+    if (isLoading) {
+      return;
+    }
+
+    // Validate required fields
+    if (!data.productId && !data.product) {
+      toast.error("Debes seleccionar un producto");
+      return;
+    }
+
+    if (!data.quantity || data.quantity <= 0) {
+      toast.error("La cantidad debe ser mayor a 0");
+      return;
+    }
+
+    if (!data.reason || data.reason.trim() === "") {
+      toast.error("Debes especificar un motivo para la pérdida");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      console.log("Loss data:", data);
+      
+      const response = await fetch("/api/adjust", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          product: data.productId || data.product,
+          quantity: data.quantity,
+          type: "loss",
+          reason: data.reason || "Pérdida de stock",
+          observations: data.observations || ""
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al procesar pérdida");
+      }
+
+      toast.success(
+        `${data.quantity} unidades de ${data.product} registradas como pérdida`
+      );
+      
+      // Refresh data to reflect changes
+      await fetchProducts();
+      
+      onOpenChange(false);
+      loss.reset();
+      setSelectedProductLoss(null);
+    } catch (error) {
+      console.error("Error processing loss:", error);
+      toast.error(error instanceof Error ? error.message : "Error al procesar pérdida");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -253,7 +353,7 @@ export function StockAdjustment({
                       <FormControl>
                         <ProductSearchField
                           onSelect={handleProductSelectReingress}
-                          selectedProductId={field.value}
+                          selectedProductId={field.value ? String(field.value) : undefined}
                           placeholder="Buscar producto..."
                           disabled={initialStockId ? true : false}
                         />
@@ -386,7 +486,19 @@ export function StockAdjustment({
                 />
 
                 <DialogFooter>
-                  <Button type="submit">Registrar Reingreso</Button>
+                  <Button 
+                    type="submit" 
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Procesando...
+                      </>
+                    ) : (
+                      "Registrar Reingreso"
+                    )}
+                  </Button>
                 </DialogFooter>
               </form>
             </Form>
@@ -408,7 +520,7 @@ export function StockAdjustment({
                       <FormControl>
                         <ProductSearchField
                           onSelect={handleProductSelectLoss}
-                          selectedProductId={field.value}
+                          selectedProductId={field.value ? String(field.value) : undefined}
                           placeholder="Buscar producto..."
                         />
                       </FormControl>
@@ -528,8 +640,19 @@ export function StockAdjustment({
                 />
 
                 <DialogFooter>
-                  <Button type="submit" variant="destructive">
-                    Registrar Pérdida
+                  <Button 
+                    type="submit" 
+                    variant="destructive"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Procesando...
+                      </>
+                    ) : (
+                      "Registrar Pérdida"
+                    )}
                   </Button>
                 </DialogFooter>
               </form>
