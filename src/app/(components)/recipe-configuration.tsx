@@ -573,7 +573,7 @@ export default function RecipeConfiguration() {
                             .filter((product) => product.has_recipe === true && product.ingredients)
                             .forEach((product) => {
                               const ingredientRequirements = calculateIngredientRequirements(product, 1);
-                              ingredientRequirements.forEach((req) => {
+                              ingredientRequirements.forEach((req: { name: string; totalRequired: number; unit: string; originalQuantity: string }) => {
                                 const key = req.name.toLowerCase();
                                 if (!allIngredientRequirements[key]) {
                                   allIngredientRequirements[key] = {
