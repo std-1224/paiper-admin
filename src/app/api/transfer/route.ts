@@ -97,8 +97,8 @@ export const POST = async (req: Request) => {
                 const { data: destInventory, error: destFetchError } = await supabaseServerClient
                     .from("inventory")
                     .select("*")
-                    .eq("barId", destinationBar)
-                    .eq("productId", currentInventory.productId)
+                    .eq("bar_id", destinationBar)
+                    .eq("product_id", currentInventory.product_id)
                     .single();
 
                 if (destFetchError && destFetchError.code !== 'PGRST116') {
@@ -121,8 +121,8 @@ export const POST = async (req: Request) => {
                     const { error: destCreateError } = await supabaseServerClient
                         .from("inventory")
                         .insert({
-                            barId: destinationBar,
-                            productId: currentInventory.productId,
+                            bar_id: destinationBar,
+                            product_id: currentInventory.product_id,
                             quantity: quantity,
                             status: "En Stock"
                         });
