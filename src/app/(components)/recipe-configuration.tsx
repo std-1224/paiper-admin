@@ -639,7 +639,7 @@ export default function RecipeConfiguration() {
                             .forEach((product) => {
                               const ingredientRequirements = calculateIngredientRequirements(product, 1);
                               ingredientRequirements.forEach((req: { name: string; totalRequired: number; unit: string; originalQuantity: string }) => {
-                                const key = req.name.toLowerCase();
+                                const key = req.name?.toLowerCase();
                                 if (!allIngredientRequirements[key]) {
                                   allIngredientRequirements[key] = {
                                     totalAmount: 0,
