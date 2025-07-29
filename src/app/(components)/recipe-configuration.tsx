@@ -40,7 +40,7 @@ export default function RecipeConfiguration() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddRecipeModal, setShowAddRecipeModal] = useState(false);
   const [newIngredients, setNewIngredients] = useState<
-    { name: string; quantity: string; unit: string }[]
+    { name: string; quantity: string; unit: string; productId?: string }[]
   >([]);
   const [recipeName, setRecipeName] = useState("");
   const [selectedIngredient, setSelectedIngredient] = useState("none");
@@ -114,16 +114,33 @@ export default function RecipeConfiguration() {
     .map(([name, count]) => ({ name, count }));
 
   const addNewIngredient = () => {
-    // Determine which ingredient name to use
+    // Determine which ingredient name to use and find matching product
     let ingredientName = "";
+    let productId = undefined;
+    let matchingProduct = null;
+
     if (selectedIngredient === "none") {
       ingredientName = customIngredient;
+      // Try to find matching product for custom ingredient
+      matchingProduct = productsData.find(product =>
+        product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
+        ingredientName.toLowerCase().includes(product.name.toLowerCase())
+      );
     } else if (selectedIngredient) {
       ingredientName = selectedIngredient;
+      // Try to find matching product in stock
+      matchingProduct = productsData.find(product =>
+        product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
+        ingredientName.toLowerCase().includes(product.name.toLowerCase())
+      );
     } else {
       ingredientName = customIngredient;
     }
-    
+
+    if (matchingProduct) {
+      productId = matchingProduct.id;
+    }
+
     // Validate that ingredient name and quantity are provided
     if (!ingredientName.trim()) {
       alert("Por favor ingresa el nombre del ingrediente");
@@ -134,9 +151,29 @@ export default function RecipeConfiguration() {
       return;
     }
 
+    // Validate stock availability for this ingredient
+    const requiredQuantity = parseFloat(quantity);
+    if (isNaN(requiredQuantity) || requiredQuantity <= 0) {
+      alert("Por favor ingresa una cantidad válida");
+      return;
+    }
+
+    if (matchingProduct) {
+      if (matchingProduct.stock < requiredQuantity) {
+        alert(`Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${unit}\nDisponible: ${matchingProduct.stock}`);
+        return;
+      }
+    } else {
+      // Warn if no matching product found
+      const confirmAdd = confirm(`No se encontró un producto en stock que coincida con "${ingredientName}".\n¿Deseas agregar este ingrediente de todas formas?`);
+      if (!confirmAdd) {
+        return;
+      }
+    }
+
     setNewIngredients([
       ...newIngredients,
-      { name: ingredientName.trim(), quantity: quantity, unit: unit },
+      { name: ingredientName.trim(), quantity: quantity, unit: unit, productId: productId },
     ]);
     setSelectedIngredient("none");
     setCustomIngredient("");
@@ -148,22 +185,31 @@ export default function RecipeConfiguration() {
     setLoading(true);
     // Convert amount to number, default to 0 if empty or invalid
     const numericAmount = amount === "" ? 0 : Number(amount);
-    const res = await fetch("/api/recipe", {
-      method: "POST",
-      body: JSON.stringify({
-        name: recipeName,
-        ingredients: JSON.stringify(newIngredients),
-        amount: numericAmount,
-        category: category,
-      }),
-    });
 
-    if (!res.ok) {
-      throw new Error("Failed to add recipe");
+    try {
+      const res = await fetch("/api/recipe", {
+        method: "POST",
+        body: JSON.stringify({
+          name: recipeName,
+          ingredients: newIngredients, // Send ingredients directly, not as JSON string
+          amount: numericAmount,
+          category: category,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to add recipe");
+      }
+
+      handleInitRecipe();
+      fetchRecipes();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      alert(`Error creating recipe: ${errorMessage}`);
+    } finally {
+      setLoading(false);
     }
-    handleInitRecipe();
-    fetchRecipes();
-    setLoading(false);
   };
 
   const handleInitRecipe = () => {
@@ -231,23 +277,32 @@ export default function RecipeConfiguration() {
     setLoading(true);
     // Convert amount to number, default to 0 if empty or invalid
     const numericAmount = amount === "" ? 0 : Number(amount);
-    const res = await fetch("/api/recipe", {
-      method: "PUT",
-      body: JSON.stringify({
-        id: selectedRecipe,
-        name: recipeName,
-        ingredients: JSON.stringify(newIngredients),
-        amount: numericAmount,
-        category: category,
-      }),
-    });
 
-    if (!res.ok) {
-      throw new Error("Failed to update recipe");
+    try {
+      const res = await fetch("/api/recipe", {
+        method: "PUT",
+        body: JSON.stringify({
+          id: selectedRecipe,
+          name: recipeName,
+          ingredients: newIngredients, // Send ingredients directly, not as JSON string
+          amount: numericAmount,
+          category: category,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to update recipe");
+      }
+
+      handleInitRecipe();
+      fetchRecipes();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      alert(`Error updating recipe: ${errorMessage}`);
+    } finally {
+      setLoading(false);
     }
-    handleInitRecipe();
-    fetchRecipes();
-    setLoading(false);
   };
 
   const handleEditRecipe = (id: number) => {
@@ -553,14 +608,24 @@ export default function RecipeConfiguration() {
                       <SelectContent>
                         <SelectItem value="none">Seleccionar ingrediente existente</SelectItem>
 
-                        {/* Regular ingredients (has_recipe: false) */}
+                        {/* Available products in stock */}
                         {productsData
                           .filter((product) =>
                             product.category === "ingrediente" && product.has_recipe === false
                           )
+                          .sort((a, b) => b.stock - a.stock) // Sort by stock level (highest first)
                           .map((product) => (
                             <SelectItem key={product.id} value={product.name}>
-                              {product.name} (Stock: {product.stock})
+                              <div className="flex justify-between items-center w-full">
+                                <span>{product.name}</span>
+                                <span className={`text-xs px-1 py-0.5 rounded ${
+                                  product.stock > 10 ? 'bg-green-100 text-green-800' :
+                                  product.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {product.stock}
+                                </span>
+                              </div>
                             </SelectItem>
                           ))}
 

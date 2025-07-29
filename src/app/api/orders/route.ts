@@ -31,21 +31,40 @@ async function deductRecipeIngredients(productId: string, quantity: number, barI
     // Deduct each ingredient from inventory/stock
     for (const ingredient of recipeIngredients) {
       const ingredientQuantity = parseFloat(ingredient.quantity) * quantity;
+      let ingredientProductId = null;
+      let ingredientProduct = null;
 
-      // Find the product by name (using name matching)
-      const { data: ingredientProducts, error: searchError } = await supabaseServerClient
-        .from("products")
-        .select("id, name, stock")
-        .ilike("name", `%${ingredient.name}%`);
+      // First, try to use the linked productId if available
+      if (ingredient.productId) {
+        const { data: linkedProduct, error: linkedError } = await supabaseServerClient
+          .from("products")
+          .select("id, name, stock")
+          .eq("id", ingredient.productId)
+          .single();
 
-      if (searchError || !ingredientProducts || ingredientProducts.length === 0) {
-        console.warn(`Ingredient product not found: ${ingredient.name}`);
-        continue; // Skip this ingredient and continue with others
+        if (!linkedError && linkedProduct) {
+          ingredientProduct = linkedProduct;
+          ingredientProductId = linkedProduct.id;
+        }
       }
 
-      // Use the first matching product
-      const ingredientProduct = ingredientProducts[0];
-      const ingredientProductId = ingredientProduct.id;
+      // If no linked product found, fall back to name matching
+      if (!ingredientProduct) {
+        const { data: ingredientProducts, error: searchError } = await supabaseServerClient
+          .from("products")
+          .select("id, name, stock")
+          .ilike("name", `%${ingredient.name}%`)
+          .eq("has_recipe", false); // Only match non-recipe products
+
+        if (searchError || !ingredientProducts || ingredientProducts.length === 0) {
+          console.warn(`Ingredient product not found: ${ingredient.name}`);
+          continue; // Skip this ingredient and continue with others
+        }
+
+        // Use the first matching product
+        ingredientProduct = ingredientProducts[0];
+        ingredientProductId = ingredientProduct.id;
+      }
 
       // Try to find ingredient in inventory first (bar-specific stock)
       if (barId) {
@@ -78,7 +97,8 @@ async function deductRecipeIngredients(productId: string, quantity: number, barI
           .eq("id", ingredientProductId);
       } else {
         console.warn(`Insufficient stock for ingredient: ${ingredient.name}. Available: ${ingredientProduct.stock}, Required: ${ingredientQuantity}`);
-        // Continue with other ingredients even if one fails
+        // Throw error to prevent order completion if critical ingredient is missing
+        throw new Error(`Insufficient stock for ingredient: ${ingredient.name}. Available: ${ingredientProduct.stock}, Required: ${ingredientQuantity}`);
       }
     }
 
