@@ -62,71 +62,36 @@ export const POST = async (req: Request) => {
 
         if (type === "re-entry") {
             if (body.inventory_id) {
-                // Re-entry from existing inventory item
+                // Re-entry to existing inventory item (ADD stock to the bar)
                 const currentInventory = inventoryData?.data?.[0];
                 if (!currentInventory) {
                     throw new Error("Inventory item not found");
                 }
 
-                // Validate we have enough quantity to re-enter
-                if (currentInventory.quantity < body.quantity) {
-                    throw new Error("Cannot re-enter more than available quantity");
-                }
-
-                // Reduce quantity from source inventory
+                // Add quantity to the inventory item
                 const { error: updateError } = await supabaseServerClient
                     .from("inventory")
                     .update({
-                        quantity: currentInventory.quantity - body.quantity,
+                        quantity: currentInventory.quantity + body.quantity,
                     })
                     .eq("id", body.inventory_id);
 
                 if (updateError) throw updateError;
 
-                // Add to destination bar or general stock
-                if (body.destinationBars && body.destinationBars.length > 0) {
-                    // Re-enter to specific bar
-                    const { data: destinationInventory } = await supabaseServerClient
-                        .from("inventory")
-                        .select("*")
-                        .eq("product_id", currentInventory.product_id)
-                        .eq("bar_id", body.destinationBars[0])
-                        .single();
+                // Also add to general product stock to maintain consistency
+                const { data: product } = await supabaseServerClient
+                    .from("products")
+                    .select("stock")
+                    .eq("id", currentInventory.product_id)
+                    .single();
 
-                    if (destinationInventory) {
-                        // Update existing inventory
-                        await supabaseServerClient
-                            .from("inventory")
-                            .update({
-                                quantity: destinationInventory.quantity + body.quantity,
-                            })
-                            .eq("id", destinationInventory.id);
-                    } else {
-                        // Create new inventory entry
-                        await supabaseServerClient
-                            .from("inventory")
-                            .insert({
-                                product_id: currentInventory.product_id,
-                                bar_id: body.destinationBars[0],
-                                quantity: body.quantity,
-                            });
-                    }
-                } else {
-                    // Re-enter to general stock
-                    const { data: product } = await supabaseServerClient
+                if (product) {
+                    await supabaseServerClient
                         .from("products")
-                        .select("stock")
-                        .eq("id", currentInventory.product_id)
-                        .single();
-
-                    if (product) {
-                        await supabaseServerClient
-                            .from("products")
-                            .update({
-                                stock: product.stock + body.quantity,
-                            })
-                            .eq("id", currentInventory.product_id);
-                    }
+                        .update({
+                            stock: product.stock + body.quantity,
+                        })
+                        .eq("id", currentInventory.product_id);
                 }
             } else if (body.product) {
                 // Re-entry from general stock to specific bar

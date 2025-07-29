@@ -208,34 +208,43 @@ export function StockAdjustment({
     try {
       setIsLoading(true);
       console.log("Reingress data:", data);
-      
-      const response = await fetch("/api/adjust", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          product: data.productId || data.product,
-          quantity: data.quantity,
-          type: "re-entry",
-          reason: data.reason || "Re-ingreso de stock",
-          destinationBars: data.destinationBars || [],
-          observations: data.observations || ""
-        }),
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al procesar re-ingreso");
+      // If a callback is provided (from bar detail page), use it instead of direct API call
+      if (onSubmitReingress) {
+        await onSubmitReingress(data);
+        toast.success(
+          `${data.quantity} unidades reingresadas al stock`
+        );
+      } else {
+        // Default behavior for general stock management
+        const response = await fetch("/api/adjust", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            product: data.productId || data.product,
+            quantity: data.quantity,
+            type: "re-entry",
+            reason: data.reason || "Re-ingreso de stock",
+            destinationBars: data.destinationBars || [],
+            observations: data.observations || ""
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Error al procesar re-ingreso");
+        }
+
+        toast.success(
+          `${data.quantity} unidades de ${data.product} reingresadas al stock`
+        );
+
+        // Refresh data to reflect changes
+        await fetchProducts();
       }
 
-      toast.success(
-        `${data.quantity} unidades de ${data.product} reingresadas al stock`
-      );
-      
-      // Refresh data to reflect changes
-      await fetchProducts();
-      
       onOpenChange(false);
       reingress.reset();
       setSelectedProductReingress(null);
@@ -273,33 +282,42 @@ export function StockAdjustment({
     try {
       setIsLoading(true);
       console.log("Loss data:", data);
-      
-      const response = await fetch("/api/adjust", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          product: data.productId || data.product,
-          quantity: data.quantity,
-          type: "loss",
-          reason: data.reason || "Pérdida de stock",
-          observations: data.observations || ""
-        }),
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al procesar pérdida");
+      // If a callback is provided (from bar detail page), use it instead of direct API call
+      if (onSubmitLoss) {
+        await onSubmitLoss(data);
+        toast.success(
+          `${data.quantity} unidades registradas como pérdida`
+        );
+      } else {
+        // Default behavior for general stock management
+        const response = await fetch("/api/adjust", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            product: data.productId || data.product,
+            quantity: data.quantity,
+            type: "loss",
+            reason: data.reason || "Pérdida de stock",
+            observations: data.observations || ""
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Error al procesar pérdida");
+        }
+
+        toast.success(
+          `${data.quantity} unidades de ${data.product} registradas como pérdida`
+        );
+
+        // Refresh data to reflect changes
+        await fetchProducts();
       }
 
-      toast.success(
-        `${data.quantity} unidades de ${data.product} registradas como pérdida`
-      );
-      
-      // Refresh data to reflect changes
-      await fetchProducts();
-      
       onOpenChange(false);
       loss.reset();
       setSelectedProductLoss(null);

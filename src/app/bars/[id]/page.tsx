@@ -60,51 +60,7 @@ const sampleBar = {
   status: "active",
 };
 
-// Mock data for stock items
-const barStockItems = [
-  {
-    id: 1,
-    product: "Vodka Absolut 750ml",
-    category: "Alcoholico",
-    quantity: 12,
-    status: "En Stock",
-  },
-  {
-    id: 2,
-    product: "Cerveza",
-    category: "Alcoholico",
-    quantity: 48,
-    status: "En Stock",
-  },
-  {
-    id: 3,
-    product: "Agua Mineral 500ml",
-    category: "No Alcoholico",
-    quantity: 36,
-    status: "En Stock",
-  },
-  {
-    id: 4,
-    product: "Red Bull 250ml",
-    category: "Energéticas",
-    quantity: 24,
-    status: "En Stock",
-  },
-  {
-    id: 5,
-    product: "Gin Beefeater 750ml",
-    category: "Alcoholico",
-    quantity: 8,
-    status: "En Stock",
-  },
-  {
-    id: 6,
-    product: "Whicky Johnnie Walker",
-    category: "Alcoholico",
-    quantity: 6,
-    status: "En Stock",
-  },
-];
+
 
 const BarDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -205,6 +161,11 @@ const BarDetail = () => {
       const errorData = await response.json();
       throw new Error(errorData.error || "Failed to create bar");
     }
+
+    // Refresh the inventory data after successful adjustment
+    if (barId) {
+      await fetchStocksOfBar(barId);
+    }
   };
 
   const handleStockLoss = async (data: any) => {
@@ -225,6 +186,11 @@ const BarDetail = () => {
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || "Failed to create bar");
+    }
+
+    // Refresh the inventory data after successful adjustment
+    if (barId) {
+      await fetchStocksOfBar(barId);
     }
   };
 
@@ -629,10 +595,9 @@ const BarDetail = () => {
                       <TableCell>
                         <Badge
                           variant="outline"
-                          className="bg-green-50 text-green-700 border-green-200"
+                          className={item.quantity > 0 ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}
                         >
-                          {/* {item.status} */}
-                          {barStockItems[0].status}
+                          {item.quantity > 0 ? "En Stock" : "Sin Stock"}
                         </Badge>
                       </TableCell>
                       <TableCell>
