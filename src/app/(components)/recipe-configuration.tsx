@@ -28,11 +28,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import Loading from "./loading";
 import { Recipe } from "@/types/types";
 import { useAppContext } from "@/context/AppContext";
 import { categoryList } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function RecipeConfiguration() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -47,9 +49,19 @@ export default function RecipeConfiguration() {
   const [unit, setUnit] = useState("ml");
   const [selectedRecipe, setSelectedRecipe] = useState<number | null>(null);
   const [amount, setAmount] = useState<string>("");
-  const { fetchRecipes, recipesData } = useAppContext();
+  const { fetchRecipes, recipesData, productsData, fetchProducts } = useAppContext();
   const [category, setCategory] = useState("bebida");
   const [loading, setLoading] = useState(false);
+
+  // New ingredient modal state
+  const [showAddIngredientModal, setShowAddIngredientModal] = useState(false);
+  const [newIngredientName, setNewIngredientName] = useState("");
+  const [newIngredientUnit, setNewIngredientUnit] = useState("");
+  const [newIngredientConversionFactor, setNewIngredientConversionFactor] = useState("");
+  const [newIngredientDefaultStock, setNewIngredientDefaultStock] = useState("");
+  const [newIngredientMinimumAlert, setNewIngredientMinimumAlert] = useState("");
+  const [newIngredientActive, setNewIngredientActive] = useState(true);
+  const [addingIngredient, setAddingIngredient] = useState(false);
 
   const filteredRecipes = recipesData.filter((recipe) =>
     recipe.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -57,7 +69,26 @@ export default function RecipeConfiguration() {
 
   useEffect(() => {
     fetchRecipes();
+    fetchProducts();
   }, []);
+
+  // Function to calculate ingredient requirements for products with recipes
+  const calculateIngredientRequirements = (product: any, requestedQuantity: number = 1) => {
+    if (!product.has_recipe || !product.ingredients) return [];
+
+    try {
+      const recipeIngredients = JSON.parse(product.ingredients);
+      return recipeIngredients.map((ingredient: any) => ({
+        name: ingredient.name,
+        totalRequired: parseFloat(ingredient.quantity) * requestedQuantity,
+        unit: ingredient.unit,
+        originalQuantity: ingredient.quantity
+      }));
+    } catch (error) {
+      console.error('Error parsing recipe ingredients:', error);
+      return [];
+    }
+  };
   // Calculate most used products
   const mostUsedProducts = [
     { name: "Mojito", count: 1 },
@@ -146,6 +177,56 @@ export default function RecipeConfiguration() {
     setCustomIngredient("");
   };
 
+  const addNewIngredientToStock = async () => {
+    if (!newIngredientName.trim()) {
+      toast.error("El nombre del ingrediente es requerido");
+      return;
+    }
+
+    setAddingIngredient(true);
+    try {
+      const response = await fetch("/api/products", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newIngredientName,
+          description: `Unit: ${newIngredientUnit}, Conversion: ${newIngredientConversionFactor}g per unit`,
+          category: "ingrediente",
+          stock: parseInt(newIngredientDefaultStock) || 0,
+          purchase_price: 0,
+          sale_price: 0,
+          has_recipe: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al crear ingrediente");
+      }
+
+      toast.success(`Ingrediente "${newIngredientName}" agregado al stock`);
+
+      // Reset form
+      setNewIngredientName("");
+      setNewIngredientUnit("");
+      setNewIngredientConversionFactor("");
+      setNewIngredientDefaultStock("");
+      setNewIngredientMinimumAlert("");
+      setNewIngredientActive(true);
+      setShowAddIngredientModal(false);
+
+      // Refresh products data
+      await fetchProducts();
+    } catch (error) {
+      console.error("Error adding ingredient:", error);
+      toast.error(error instanceof Error ? error.message : "Error al agregar ingrediente");
+    } finally {
+      setAddingIngredient(false);
+    }
+  };
+
   const updateRecipe = async () => {
     setLoading(true);
     // Convert amount to number, default to 0 if empty or invalid
@@ -186,10 +267,20 @@ export default function RecipeConfiguration() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Configuración de Recetas</h1>
-        <Button className="gap-2" onClick={() => setShowAddRecipeModal(true)}>
-          <Cocktail size={16} />
-          Añadir nueva receta
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setShowAddIngredientModal(true)}
+          >
+            <Plus size={16} />
+            Agregar Ingrediente
+          </Button>
+          <Button className="gap-2" onClick={() => setShowAddRecipeModal(true)}>
+            <Cocktail size={16} />
+            Añadir nueva receta
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -460,15 +551,52 @@ export default function RecipeConfiguration() {
                         <SelectValue placeholder="Seleccionar ingrediente" />
                       </SelectTrigger>
                       <SelectContent>
-					  <SelectItem value="none">none</SelectItem>
-                        <SelectItem value="Ginebra">Ginebra</SelectItem>
-                        <SelectItem value="vodka">Vodka</SelectItem>
-                        <SelectItem value="tónica">Tónica</SelectItem>
-                        <SelectItem value="ron">Ron</SelectItem>
-                        <SelectItem value="tequila">Tequila</SelectItem>
-                        <SelectItem value="limon">Limón</SelectItem>
-                        <SelectItem value="azucar">Azúcar</SelectItem>
-                        <SelectItem value="menta">Menta</SelectItem>
+                        <SelectItem value="none">Seleccionar ingrediente existente</SelectItem>
+
+                        {/* Regular ingredients (has_recipe: false) */}
+                        {productsData
+                          .filter((product) =>
+                            product.category === "ingrediente" && product.has_recipe === false
+                          )
+                          .map((product) => (
+                            <SelectItem key={product.id} value={product.name}>
+                              {product.name} (Stock: {product.stock})
+                            </SelectItem>
+                          ))}
+
+                        {/* Products with recipes - show calculated ingredient requirements (grouped) */}
+                        {(() => {
+                          // Collect all ingredient requirements from all recipes
+                          const allIngredientRequirements: { [key: string]: { totalAmount: number; unit: string; sources: string[] } } = {};
+
+                          productsData
+                            .filter((product) => product.has_recipe === true && product.ingredients)
+                            .forEach((product) => {
+                              const ingredientRequirements = calculateIngredientRequirements(product, 1);
+                              ingredientRequirements.forEach((req) => {
+                                const key = req.name.toLowerCase();
+                                if (!allIngredientRequirements[key]) {
+                                  allIngredientRequirements[key] = {
+                                    totalAmount: 0,
+                                    unit: req.unit,
+                                    sources: []
+                                  };
+                                }
+                                allIngredientRequirements[key].totalAmount += req.totalRequired;
+                                allIngredientRequirements[key].sources.push(product.name);
+                              });
+                            });
+
+                          // Convert to array and render
+                          return Object.entries(allIngredientRequirements).map(([ingredientName, data]) => (
+                            <SelectItem
+                              key={`recipe-ingredient-${ingredientName}`}
+                              value={`${ingredientName} (from recipes)`}
+                            >
+                              {ingredientName} - {data.totalAmount} {data.unit} (from {data.sources.length} recipe{data.sources.length > 1 ? 's' : ''})
+                            </SelectItem>
+                          ));
+                        })()}
                       </SelectContent>
                     </Select>
                     <div className="text-center text-sm text-muted-foreground">o</div>
@@ -576,6 +704,131 @@ export default function RecipeConfiguration() {
               ) : (
                 "Crear Receta"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Ingredient Modal */}
+      <Dialog open={showAddIngredientModal} onOpenChange={setShowAddIngredientModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Add New Ingredient</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="ingredientName" className="text-sm font-medium">
+                Ingredient Name <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="ingredientName"
+                placeholder="Enter the name of the ingredient"
+                value={newIngredientName}
+                onChange={(e) => setNewIngredientName(e.target.value)}
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ingredientUnit" className="text-sm font-medium">
+                Unit of Measurement <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={newIngredientUnit}
+                onValueChange={(value) => setNewIngredientUnit(value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select the unit of measurement" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="g">Grams (g)</SelectItem>
+                  <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                  <SelectItem value="L">Liters (L)</SelectItem>
+                  <SelectItem value="mL">Milliliters (mL)</SelectItem>
+                  <SelectItem value="units">Units</SelectItem>
+                  <SelectItem value="parts">Parts</SelectItem>
+                  <SelectItem value="cups">Cups</SelectItem>
+                  <SelectItem value="tablespoons">Tablespoons</SelectItem>
+                  <SelectItem value="teaspoons">Teaspoons</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="conversionFactor" className="text-sm font-medium">
+                Conversion Factor (grams per unit) <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="conversionFactor"
+                placeholder="Eg: 1000 (for 1kg = 1000g)"
+                value={newIngredientConversionFactor}
+                onChange={(e) => setNewIngredientConversionFactor(e.target.value)}
+                type="number"
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500">
+                Specify how many grams equal a complete unit of measurement
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="defaultStock" className="text-sm font-medium">
+                Default Stock Quantity
+              </Label>
+              <Input
+                id="defaultStock"
+                placeholder="Enter the default amount"
+                value={newIngredientDefaultStock}
+                onChange={(e) => setNewIngredientDefaultStock(e.target.value)}
+                type="number"
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="minimumAlert" className="text-sm font-medium">
+                Minimum Stock Alert
+              </Label>
+              <Input
+                id="minimumAlert"
+                placeholder="Enter the minimum alert amount"
+                value={newIngredientMinimumAlert}
+                onChange={(e) => setNewIngredientMinimumAlert(e.target.value)}
+                type="number"
+                className="w-full"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Active Ingredient</Label>
+                <p className="text-xs text-gray-500">
+                  Activate to mark this ingredient as active in your inventory
+                </p>
+              </div>
+              <Switch
+                checked={newIngredientActive}
+                onCheckedChange={setNewIngredientActive}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowAddIngredientModal(false)}
+              disabled={addingIngredient}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={addNewIngredientToStock}
+              disabled={addingIngredient || !newIngredientName.trim() || !newIngredientUnit.trim() || !newIngredientConversionFactor.trim()}
+              className="flex-1 bg-black text-white hover:bg-gray-800"
+            >
+              {addingIngredient ? "Saving..." : "Save Ingredient"}
             </Button>
           </DialogFooter>
         </DialogContent>
