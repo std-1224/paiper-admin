@@ -549,9 +549,9 @@ export default function RecipeConfiguration() {
                     className="w-full"
                     onClick={addNewIngredient}
                     disabled={
-                      !quantity.trim() || 
-                      (selectedIngredient === "none" && !customIngredient.trim()) ||
-                      (selectedIngredient && selectedIngredient !== "none" && !selectedIngredient.trim())
+                      quantity.trim() === "" ||
+                      (selectedIngredient === "none" && customIngredient.trim() === "") ||
+                      (selectedIngredient !== "none" && selectedIngredient.trim() === "")
                     }
                   >
                     <Plus className="h-4 w-4" />
