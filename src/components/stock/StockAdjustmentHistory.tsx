@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, forwardRef, useImperativeHandle } from "react";
 import {
   Card,
   CardContent,
@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { PackagePlus, PackageX, Filter } from "lucide-react";
+import { PackagePlus, PackageX, Filter, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 
 interface StockAdjustmentHistoryProps {
@@ -33,13 +33,18 @@ interface StockAdjustmentHistoryProps {
   selectedBar?: number;
 }
 
-export function StockAdjustmentHistory({
-  className,
-  selectedBar = -1,
-}: StockAdjustmentHistoryProps) {
+export interface StockAdjustmentHistoryRef {
+  refreshHistory: () => void;
+}
+
+export const StockAdjustmentHistory = forwardRef<
+  StockAdjustmentHistoryRef,
+  StockAdjustmentHistoryProps
+>(({ className, selectedBar = -1 }, ref) => {
   const [activeTab, setActiveTab] = useState("reingress");
   const [filterBar, setFilterBar] = useState(selectedBar);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   interface AdjustmentData {
     id: string;
@@ -79,39 +84,53 @@ export function StockAdjustmentHistory({
   });
 
   const fetchAdjustHistory = async () => {
-    const response = await fetch("/api/adjust", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    try {
+      setIsRefreshing(true);
+      const response = await fetch("/api/adjust", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to create bar");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || "Failed to fetch adjustment history"
+        );
+      }
+      const data = await response.json();
+      const adjustList = data.map((item: any) => ({
+        id: item.id,
+        date: format(new Date(item.created_at), "dd/MM/yyyy HH:mm"),
+        product: item?.inventory?.products?.name || "Unknown",
+        quantity: item.amount,
+        reason: item.reason,
+        bar: item?.inventory?.bars?.name || "Unknown",
+        bar_id: item?.inventory?.bar_id,
+        status: item.status || "pending",
+        cost: item.economic_value,
+        isOpened: item.is_opened,
+        type: item.type,
+      }));
+
+      const entryList = adjustList.filter(
+        (item: any) => item.type === "re-entry"
+      );
+      const lossList = adjustList.filter((item: any) => item.type === "loss");
+      setReingresData(entryList);
+      setLossesData(lossList);
+    } catch (error) {
+      console.error("Error fetching adjustment history:", error);
+    } finally {
+      setIsRefreshing(false);
     }
-    const data = await response.json();
-    const adjustList = data.map((item: any) => ({
-      id: item.id,
-      date: format(new Date(item.created_at), "dd/MM/yyyy HH:mm"),
-      product: item?.inventory?.products?.name || "Unknown",
-      quantity: item.amount,
-      reason: item.reason,
-      bar: item?.inventory?.bars?.name || "Unknown",
-      bar_id: item?.inventory?.bar_id,
-      status: item.status || "pending",
-      cost: item.economic_value,
-      isOpened: item.is_opened,
-      type: item.type,
-    }));
-
-    const entryList = adjustList.filter(
-      (item: any) => item.type === "re-entry"
-    );
-    const lossList = adjustList.filter((item: any) => item.type === "loss");
-    setReingresData(entryList);
-    setLossesData(lossList);
   };
+
+  // Expose refresh function to parent components
+  useImperativeHandle(ref, () => ({
+    refreshHistory: fetchAdjustHistory,
+  }));
 
   useEffect(() => {
     fetchAdjustHistory();
@@ -120,10 +139,25 @@ export function StockAdjustmentHistory({
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle>Historial de Ajustes de Stock</CardTitle>
-        <CardDescription>
-          Registro de reingresos y pérdidas de inventario
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Historial de Ajustes de Stock</CardTitle>
+            <CardDescription>
+              Registro de reingresos y pérdidas de inventario
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchAdjustHistory}
+            disabled={isRefreshing}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            Actualizar
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -289,4 +323,4 @@ export function StockAdjustmentHistory({
       </CardContent>
     </Card>
   );
-}
+});

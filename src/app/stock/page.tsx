@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -43,7 +43,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { StockTransfers } from "@/components/bars/StockTransfers";
 import { StockAdjustment } from "@/components/stock/StockAdjustment";
-import { StockAdjustmentHistory } from "@/components/stock/StockAdjustmentHistory";
+import { StockAdjustmentHistory, StockAdjustmentHistoryRef } from "@/components/stock/StockAdjustmentHistory";
 import { MultipleTransfer } from "@/components/stock/MultipleTransfer";
 import RecipeConfiguration from "../(components)/recipe-configuration";
 import {
@@ -156,6 +156,7 @@ const unredeemedStockData = [
 const bars = ["Todos", "Bar Central", "Bar Norte", "Bar Sur", "El Alamo"];
 const Stock = () => {
   const router = useRouter();
+  const adjustmentHistoryRef = useRef<StockAdjustmentHistoryRef>(null);
   const [selectedBar, setSelectedBar] = useState("Todos");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("stock");
@@ -1237,6 +1238,9 @@ const Stock = () => {
       fetchProducts(),
       fetchStocksOfBar()
     ]);
+
+    // Refresh adjustment history
+    adjustmentHistoryRef.current?.refreshHistory();
   };
   const handleStockLoss = async (data: any) => {
     console.log("Pérdida registrada:", data);
@@ -1264,6 +1268,9 @@ const Stock = () => {
       fetchProducts(),
       fetchStocksOfBar()
     ]);
+
+    // Refresh adjustment history
+    adjustmentHistoryRef.current?.refreshHistory();
   };
 
   const handleToggleActive = async (
@@ -1786,7 +1793,7 @@ const Stock = () => {
 
             {/* Ajustes de Stock */}
             <TabsContent value="adjustments">
-              <StockAdjustmentHistory />
+              <StockAdjustmentHistory ref={adjustmentHistoryRef} />
             </TabsContent>
           </Tabs>
         </CardContent>

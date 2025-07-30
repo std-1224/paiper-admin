@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 // import { useParams, Link } from "react-router-dom";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StockTransfers } from "@/components/bars/StockTransfers";
 import { StockAdjustment } from "@/components/stock/StockAdjustment";
-import { StockAdjustmentHistory } from "@/components/stock/StockAdjustmentHistory";
+import { StockAdjustmentHistory, StockAdjustmentHistoryRef } from "@/components/stock/StockAdjustmentHistory";
 import {
   ArrowLeft,
   BarChart,
@@ -65,6 +65,7 @@ const sampleBar = {
 const BarDetail = () => {
   const { id } = useParams<{ id: string }>();
   const barId = parseInt(id || "1");
+  const adjustmentHistoryRef = useRef<StockAdjustmentHistoryRef>(null);
 
   const [activeTab, setActiveTab] = useState("overview");
   const [stockAdjustmentOpen, setStockAdjustmentOpen] = useState(false);
@@ -166,6 +167,9 @@ const BarDetail = () => {
     if (barId) {
       await fetchStocksOfBar(barId);
     }
+
+    // Refresh adjustment history
+    adjustmentHistoryRef.current?.refreshHistory();
   };
 
   const handleStockLoss = async (data: any) => {
@@ -192,6 +196,9 @@ const BarDetail = () => {
     if (barId) {
       await fetchStocksOfBar(barId);
     }
+
+    // Refresh adjustment history
+    adjustmentHistoryRef.current?.refreshHistory();
   };
 
   const getProducts = (items: any[]) => {
@@ -630,7 +637,7 @@ const BarDetail = () => {
 
             {/* Adjustments tab */}
             <TabsContent value="adjustments">
-              <StockAdjustmentHistory selectedBar={barId} />
+              <StockAdjustmentHistory ref={adjustmentHistoryRef} selectedBar={barId} />
             </TabsContent>
 
 
