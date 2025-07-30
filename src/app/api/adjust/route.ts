@@ -94,8 +94,7 @@ export const POST = async (req: Request) => {
                         .eq("id", currentInventory.product_id);
                 }
             } else if (body.product) {
-                // Re-entry from general stock to specific bar
-                // First, check if we have enough stock in the general product
+                // Get current product stock
                 const { data: product } = await supabaseServerClient
                     .from("products")
                     .select("stock")
@@ -106,46 +105,58 @@ export const POST = async (req: Request) => {
                     throw new Error("Product not found");
                 }
 
-                if (product.stock < body.quantity) {
-                    throw new Error("Cannot re-enter more than available quantity in general stock");
-                }
-
-                // Deduct from general product stock
-                await supabaseServerClient
-                    .from("products")
-                    .update({
-                        stock: product.stock - body.quantity,
-                    })
-                    .eq("id", body.product);
-
-                // Add to destination bar
+                // Check if this is a stock assignment (has destination bars) or pure re-entry
                 if (body.destinationBars && body.destinationBars.length > 0) {
-                    // Re-enter to specific bar
-                    const { data: destinationInventory } = await supabaseServerClient
-                        .from("inventory")
-                        .select("*")
-                        .eq("product_id", body.product)
-                        .eq("bar_id", body.destinationBars[0])
-                        .single();
-
-                    if (destinationInventory) {
-                        // Update existing inventory
-                        await supabaseServerClient
-                            .from("inventory")
-                            .update({
-                                quantity: destinationInventory.quantity + body.quantity,
-                            })
-                            .eq("id", destinationInventory.id);
-                    } else {
-                        // Create new inventory entry
-                        await supabaseServerClient
-                            .from("inventory")
-                            .insert({
-                                product_id: body.product,
-                                bar_id: body.destinationBars[0],
-                                quantity: body.quantity,
-                            });
+                    // Stock Assignment: Move from general stock to specific bars
+                    // Check if we have enough stock in general
+                    if (product.stock < body.quantity) {
+                        throw new Error("Cannot assign more than available quantity in general stock");
                     }
+
+                    // Deduct from general product stock
+                    await supabaseServerClient
+                        .from("products")
+                        .update({
+                            stock: product.stock - body.quantity,
+                        })
+                        .eq("id", body.product);
+
+                    // Add to destination bars
+                    for (const barId of body.destinationBars) {
+                        const { data: destinationInventory } = await supabaseServerClient
+                            .from("inventory")
+                            .select("*")
+                            .eq("product_id", body.product)
+                            .eq("bar_id", barId)
+                            .single();
+
+                        if (destinationInventory) {
+                            // Update existing inventory
+                            await supabaseServerClient
+                                .from("inventory")
+                                .update({
+                                    quantity: destinationInventory.quantity + body.quantity,
+                                })
+                                .eq("id", destinationInventory.id);
+                        } else {
+                            // Create new inventory entry
+                            await supabaseServerClient
+                                .from("inventory")
+                                .insert({
+                                    product_id: body.product,
+                                    bar_id: barId,
+                                    quantity: body.quantity,
+                                });
+                        }
+                    }
+                } else {
+                    // Pure Re-entry: Add stock back to the system
+                    await supabaseServerClient
+                        .from("products")
+                        .update({
+                            stock: product.stock + body.quantity,
+                        })
+                        .eq("id", body.product);
                 }
             }
         } else if (type === "loss") {

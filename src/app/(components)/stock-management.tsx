@@ -79,10 +79,12 @@ export default function StockManagement() {
   // Modal states
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showProductDetailModal, setShowProductDetailModal] = useState(false);
-  const [showTransactionHistoryModal, setShowTransactionHistoryModal] = useState(false);
+  const [showTransactionHistoryModal, setShowTransactionHistoryModal] =
+    useState(false);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [selectedProductForHistory, setSelectedProductForHistory] = useState<Product | null>(null);
+  const [selectedProductForHistory, setSelectedProductForHistory] =
+    useState<Product | null>(null);
   const [isTokenPRModalOpen, setIsTokenPRModalOpen] = useState(false);
   const [isCourtesyModalOpen, setIsCourtesyModalOpen] = useState(false);
   const [importingProducts, setImportingProducts] = useState(false);
@@ -108,14 +110,27 @@ export default function StockManagement() {
 
   // Recipe selection states for product modal
   const [selectedRecipeId, setSelectedRecipeId] = useState<string>("");
-  const [recipeIngredients, setRecipeIngredients] = useState<{ name: string; quantity: string; unit: string; requiredQuantity: number; availableStock: number; stock: number }[]>([]);
-  const [ingredientRequiredQuantity, setIngredientRequiredQuantity] = useState<number>(1);
+  const [recipeIngredients, setRecipeIngredients] = useState<
+    {
+      name: string;
+      quantity: string;
+      unit: string;
+      requiredQuantity: number;
+      availableStock: number;
+      stock: number;
+    }[]
+  >([]);
+  const [ingredientRequiredQuantity, setIngredientRequiredQuantity] =
+    useState<number>(1);
   // const [stockValidationErrors, setStockValidationErrors] = useState<string[]>([]);
   const [ingredientValidation, setIngredientValidation] = useState<any[]>([]);
 
   // Custom ingredient states for adding individual ingredients
-  const [useCustomIngredients, setUseCustomIngredients] = useState<boolean>(false);
-  const [customIngredients, setCustomIngredients] = useState<{ name: string; quantity: string; unit: string; productId?: string }[]>([]);
+  const [useCustomIngredients, setUseCustomIngredients] =
+    useState<boolean>(false);
+  const [customIngredients, setCustomIngredients] = useState<
+    { name: string; quantity: string; unit: string; productId?: string }[]
+  >([]);
   const [selectedIngredient, setSelectedIngredient] = useState<string>("none");
   const [customIngredientName, setCustomIngredientName] = useState<string>("");
   const [ingredientQuantity, setIngredientQuantity] = useState<string>("");
@@ -123,17 +138,22 @@ export default function StockManagement() {
 
   // Recipe selection states for edit modal
   const [selectedEditRecipeId, setSelectedEditRecipeId] = useState<string>("");
-  const [showCreateRecipeDialogEdit, setShowCreateRecipeDialogEdit] = useState(false);
+  const [showCreateRecipeDialogEdit, setShowCreateRecipeDialogEdit] =
+    useState(false);
 
   // Stock transfer states
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [transferQuantities, setTransferQuantities] = useState<{ [key: string]: number }>({});
+  const [transferQuantities, setTransferQuantities] = useState<{
+    [key: string]: number;
+  }>({});
   const [selectedBars, setSelectedBars] = useState<string[]>([]);
 
   // Stock adjustment states
   const [showReentryModal, setShowReentryModal] = useState(false);
   const [showLossModal, setShowLossModal] = useState(false);
-  const [adjustmentQuantities, setAdjustmentQuantities] = useState<{ [key: string]: number }>({});
+  const [adjustmentQuantities, setAdjustmentQuantities] = useState<{
+    [key: string]: number;
+  }>({});
   const [adjustmentReason, setAdjustmentReason] = useState("");
 
   // Clear records modal state
@@ -187,13 +207,15 @@ export default function StockManagement() {
 
     // Validate file type
     const allowedTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'text/csv'
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+      "text/csv",
     ];
 
     if (!allowedTypes.includes(file.type)) {
-      toast.error("Tipo de archivo no válido. Use archivos Excel (.xlsx, .xls) o CSV.");
+      toast.error(
+        "Tipo de archivo no válido. Use archivos Excel (.xlsx, .xls) o CSV."
+      );
       return;
     }
 
@@ -230,7 +252,11 @@ export default function StockManagement() {
           const rowNumber = index + 2; // +2 because Excel rows start at 1 and we skip header
 
           // Validate required fields
-          if (!item.name || typeof item.name !== 'string' || item.name.trim() === '') {
+          if (
+            !item.name ||
+            typeof item.name !== "string" ||
+            item.name.trim() === ""
+          ) {
             validationErrors.push(`Fila ${rowNumber}: Nombre es requerido`);
             return;
           }
@@ -241,15 +267,21 @@ export default function StockManagement() {
           const stock = parseInt(item.stock) || 0;
 
           if (purchasePrice < 0) {
-            validationErrors.push(`Fila ${rowNumber}: Precio de compra no puede ser negativo`);
+            validationErrors.push(
+              `Fila ${rowNumber}: Precio de compra no puede ser negativo`
+            );
           }
 
           if (salePrice < 0) {
-            validationErrors.push(`Fila ${rowNumber}: Precio de venta no puede ser negativo`);
+            validationErrors.push(
+              `Fila ${rowNumber}: Precio de venta no puede ser negativo`
+            );
           }
 
           if (stock < 0) {
-            validationErrors.push(`Fila ${rowNumber}: Stock no puede ser negativo`);
+            validationErrors.push(
+              `Fila ${rowNumber}: Stock no puede ser negativo`
+            );
           }
 
           // Format the product data
@@ -267,7 +299,7 @@ export default function StockManagement() {
             has_recipe: Boolean(item.has_recipe),
             is_active: item.is_active !== false, // Default to true unless explicitly false
             is_pr: Boolean(item.is_pr),
-            is_courtsey: Boolean(item.is_courtsey)
+            is_courtsey: Boolean(item.is_courtsey),
           };
 
           formattedData.push(formattedProduct);
@@ -275,8 +307,11 @@ export default function StockManagement() {
 
         // Show validation errors if any
         if (validationErrors.length > 0) {
-          const errorMessage = validationErrors.slice(0, 5).join('\n') +
-            (validationErrors.length > 5 ? `\n... y ${validationErrors.length - 5} errores más` : '');
+          const errorMessage =
+            validationErrors.slice(0, 5).join("\n") +
+            (validationErrors.length > 5
+              ? `\n... y ${validationErrors.length - 5} errores más`
+              : "");
           toast.error(`Errores de validación:\n${errorMessage}`);
           return;
         }
@@ -288,11 +323,14 @@ export default function StockManagement() {
 
         setImportedProducts(formattedData);
         setImportingProducts(true);
-        toast.success(`${formattedData.length} productos listos para importar. Revise la vista previa antes de confirmar.`);
-
+        toast.success(
+          `${formattedData.length} productos listos para importar. Revise la vista previa antes de confirmar.`
+        );
       } catch (error) {
         console.error("Error processing file:", error);
-        toast.error("Error al procesar el archivo. Verifique que sea un archivo Excel válido.");
+        toast.error(
+          "Error al procesar el archivo. Verifique que sea un archivo Excel válido."
+        );
       }
     };
 
@@ -328,7 +366,8 @@ export default function StockManagement() {
     has_recipe: false,
   });
 
-  const { productsData, fetchProducts, recipesData, fetchRecipes } = useAppContext();
+  const { productsData, fetchProducts, recipesData, fetchRecipes } =
+    useAppContext();
 
   // Helper function to extract unit from description
   const extractUnitFromDescription = (description: string): string => {
@@ -369,7 +408,6 @@ export default function StockManagement() {
 
   // Confirm clear transfer logs function
   const confirmClearTransferLogs = async () => {
-
     try {
       setIsLoading(true);
 
@@ -388,7 +426,9 @@ export default function StockManagement() {
       });
 
       if (transferResponse.ok && adjustmentResponse.ok) {
-        toast.success("Registros de transferencias y ajustes limpiados exitosamente");
+        toast.success(
+          "Registros de transferencias y ajustes limpiados exitosamente"
+        );
         setShowClearRecordsModal(false);
       } else {
         throw new Error("Error al limpiar algunos registros");
@@ -423,15 +463,15 @@ export default function StockManagement() {
       }
 
       // Prepare transfer data
-      const transferData = selectedProducts.map(productId => {
-        const product = productsData.find(p => p.id === productId);
+      const transferData = selectedProducts.map((productId) => {
+        const product = productsData.find((p) => p.id === productId);
         const quantity = transferQuantities[productId] || 1;
 
         return {
           productId: productId,
-          productName: product?.name || 'Unknown',
+          productName: product?.name || "Unknown",
           quantity: quantity,
-          destinationBars: selectedBars
+          destinationBars: selectedBars,
         };
       });
 
@@ -454,7 +494,9 @@ export default function StockManagement() {
           // });
         }
 
-        toast.success(`${selectedProducts.length} productos transferidos exitosamente a ${selectedBars.length} barra(s)`);
+        toast.success(
+          `${selectedProducts.length} productos transferidos exitosamente a ${selectedBars.length} barra(s)`
+        );
       } catch (apiError) {
         console.error("API transfer error:", apiError);
         toast.error("Error al procesar algunas transferencias");
@@ -465,7 +507,6 @@ export default function StockManagement() {
       setTransferQuantities({});
       setSelectedBars([]);
       setShowTransferModal(false);
-
     } catch (error) {
       console.error("Error transferring products:", error);
       toast.error("Error al transferir productos");
@@ -475,16 +516,16 @@ export default function StockManagement() {
   };
 
   const handleQuantityChange = (productId: string, quantity: number) => {
-    setTransferQuantities(prev => ({
+    setTransferQuantities((prev) => ({
       ...prev,
-      [productId]: Math.max(1, quantity)
+      [productId]: Math.max(1, quantity),
     }));
   };
 
   const handleBarSelection = (barName: string) => {
-    setSelectedBars(prev =>
+    setSelectedBars((prev) =>
       prev.includes(barName)
-        ? prev.filter(b => b !== barName)
+        ? prev.filter((b) => b !== barName)
         : [...prev, barName]
     );
   };
@@ -500,16 +541,16 @@ export default function StockManagement() {
       }
 
       // Prepare reentry data
-      const reentryData = selectedProducts.map(productId => {
-        const product = productsData.find(p => p.id === productId);
+      const reentryData = selectedProducts.map((productId) => {
+        const product = productsData.find((p) => p.id === productId);
         const quantity = adjustmentQuantities[productId] || 1;
 
         return {
           productId: productId,
-          productName: product?.name || 'Unknown',
+          productName: product?.name || "Unknown",
           quantity: quantity,
-          reason: adjustmentReason || 'Re-ingreso de stock',
-          type: 'reentry'
+          reason: adjustmentReason || "Re-ingreso de stock",
+          type: "reentry",
         };
       });
 
@@ -522,10 +563,10 @@ export default function StockManagement() {
             body: JSON.stringify({
               product: reentry.productId,
               quantity: reentry.quantity,
-              type: 're-entry',
+              type: "re-entry",
               reason: reentry.reason,
-              destinationBars: selectedBars.length > 0 ? selectedBars : []
-            })
+              destinationBars: selectedBars.length > 0 ? selectedBars : [],
+            }),
           });
 
           if (!response.ok) {
@@ -534,7 +575,9 @@ export default function StockManagement() {
           }
         }
 
-        toast.success(`Re-ingreso registrado para ${selectedProducts.length} producto(s)`);
+        toast.success(
+          `Re-ingreso registrado para ${selectedProducts.length} producto(s)`
+        );
 
         // Refresh data
         await fetchProducts();
@@ -548,7 +591,6 @@ export default function StockManagement() {
       setAdjustmentQuantities({});
       setAdjustmentReason("");
       setShowReentryModal(false);
-
     } catch (error) {
       console.error("Error registering reentry:", error);
       toast.error("Error al registrar re-ingreso");
@@ -572,16 +614,16 @@ export default function StockManagement() {
       }
 
       // Prepare loss data
-      const lossData = selectedProducts.map(productId => {
-        const product = productsData.find(p => p.id === productId);
+      const lossData = selectedProducts.map((productId) => {
+        const product = productsData.find((p) => p.id === productId);
         const quantity = adjustmentQuantities[productId] || 1;
 
         return {
           productId: productId,
-          productName: product?.name || 'Unknown',
+          productName: product?.name || "Unknown",
           quantity: quantity,
           reason: adjustmentReason,
-          type: 'loss'
+          type: "loss",
         };
       });
 
@@ -594,9 +636,9 @@ export default function StockManagement() {
             body: JSON.stringify({
               product: loss.productId,
               quantity: loss.quantity,
-              type: 'loss',
-              reason: loss.reason
-            })
+              type: "loss",
+              reason: loss.reason,
+            }),
           });
 
           if (!response.ok) {
@@ -605,7 +647,9 @@ export default function StockManagement() {
           }
         }
 
-        toast.success(`Pérdida registrada para ${selectedProducts.length} producto(s)`);
+        toast.success(
+          `Pérdida registrada para ${selectedProducts.length} producto(s)`
+        );
 
         // Refresh data
         await fetchProducts();
@@ -619,7 +663,6 @@ export default function StockManagement() {
       setAdjustmentQuantities({});
       setAdjustmentReason("");
       setShowLossModal(false);
-
     } catch (error) {
       console.error("Error registering loss:", error);
       toast.error("Error al registrar pérdida");
@@ -628,17 +671,23 @@ export default function StockManagement() {
     }
   };
 
-  const handleAdjustmentQuantityChange = (productId: string, quantity: number) => {
-    setAdjustmentQuantities(prev => ({
+  const handleAdjustmentQuantityChange = (
+    productId: string,
+    quantity: number
+  ) => {
+    setAdjustmentQuantities((prev) => ({
       ...prev,
-      [productId]: Math.max(1, quantity)
+      [productId]: Math.max(1, quantity),
     }));
   };
 
   // Recipe creation functions
   const handleAddIngredientToRecipe = async () => {
     if (newIngredient.name && newIngredient.quantity) {
-      const updatedIngredients = [...newRecipe.ingredients, { ...newIngredient }];
+      const updatedIngredients = [
+        ...newRecipe.ingredients,
+        { ...newIngredient },
+      ];
       setNewRecipe({
         ...newRecipe,
         ingredients: updatedIngredients,
@@ -652,7 +701,9 @@ export default function StockManagement() {
   };
 
   const handleRemoveIngredientFromRecipe = async (index: number) => {
-    const updatedIngredients = newRecipe.ingredients.filter((_, i) => i !== index);
+    const updatedIngredients = newRecipe.ingredients.filter(
+      (_, i) => i !== index
+    );
     setNewRecipe({
       ...newRecipe,
       ingredients: updatedIngredients,
@@ -677,7 +728,9 @@ export default function StockManagement() {
       setIsLoading(true);
 
       // Get the current recipe
-      const currentRecipe = recipesData.find(recipe => recipe.id.toString() === selectedRecipeId);
+      const currentRecipe = recipesData.find(
+        (recipe) => recipe.id.toString() === selectedRecipeId
+      );
       if (!currentRecipe) {
         toast.error("Could not find the selected recipe");
         return;
@@ -686,9 +739,10 @@ export default function StockManagement() {
       // Parse current ingredients
       let currentIngredients;
       try {
-        currentIngredients = typeof currentRecipe.ingredients === 'string'
-          ? JSON.parse(currentRecipe.ingredients)
-          : currentRecipe.ingredients || [];
+        currentIngredients =
+          typeof currentRecipe.ingredients === "string"
+            ? JSON.parse(currentRecipe.ingredients)
+            : currentRecipe.ingredients || [];
       } catch (error) {
         console.error("Error parsing current recipe ingredients:", error);
         currentIngredients = [];
@@ -700,8 +754,8 @@ export default function StockManagement() {
         {
           name: newIngredient.name,
           quantity: newIngredient.quantity,
-          unit: newIngredient.unit
-        }
+          unit: newIngredient.unit,
+        },
       ];
 
       // Update the recipe in the database
@@ -710,7 +764,7 @@ export default function StockManagement() {
         name: currentRecipe.name,
         ingredients: JSON.stringify(updatedIngredients),
         amount: currentRecipe.stock,
-        category: currentRecipe.category
+        category: currentRecipe.category,
       };
 
       const response = await fetch(`/api/recipe`, {
@@ -742,7 +796,10 @@ export default function StockManagement() {
 
       // Update the recipe ingredients state immediately
       setRecipeIngredients(updatedRecipeIngredients);
-      console.log("✅ Local recipe ingredients updated immediately:", updatedRecipeIngredients);
+      console.log(
+        "✅ Local recipe ingredients updated immediately:",
+        updatedRecipeIngredients
+      );
 
       // Also refresh recipes data in background for consistency
       console.log("🔄 Refreshing recipes data in background...");
@@ -755,7 +812,9 @@ export default function StockManagement() {
         unit: "ml",
       });
 
-      toast.success(`Ingredient "${newIngredient.name}" added to recipe successfully`);
+      toast.success(
+        `Ingredient "${newIngredient.name}" added to recipe successfully`
+      );
     } catch (error) {
       console.error("Error adding ingredient to recipe:", error);
       toast.error("Error adding ingredient to recipe");
@@ -765,16 +824,18 @@ export default function StockManagement() {
   };
 
   // Recipe validation function - simplified for recipe-centric approach
-  const validateRecipeIngredients = async (ingredients: { name: string; quantity: string; unit: string }[]) => {
+  const validateRecipeIngredients = async (
+    ingredients: { name: string; quantity: string; unit: string }[]
+  ) => {
     const validationResults = [];
 
     for (const ingredient of ingredients) {
       // Basic validation - just check if required fields are present
       if (!ingredient.name || !ingredient.quantity || !ingredient.unit) {
         validationResults.push({
-          ingredient: ingredient.name || 'Sin nombre',
-          status: 'invalid',
-          message: `Ingrediente "${ingredient.name || 'Sin nombre'}" tiene datos incompletos`,
+          ingredient: ingredient.name || "Sin nombre",
+          status: "invalid",
+          message: `Ingrediente "${ingredient.name || "Sin nombre"}" tiene datos incompletos`,
         });
       } else {
         // Check if quantity is a valid number
@@ -782,13 +843,13 @@ export default function StockManagement() {
         if (isNaN(quantity) || quantity <= 0) {
           validationResults.push({
             ingredient: ingredient.name,
-            status: 'invalid',
+            status: "invalid",
             message: `Cantidad inválida para "${ingredient.name}". Debe ser un número mayor a 0`,
           });
         } else {
           validationResults.push({
             ingredient: ingredient.name,
-            status: 'valid',
+            status: "valid",
             message: `✓ "${ingredient.name}" es válido`,
           });
         }
@@ -803,14 +864,18 @@ export default function StockManagement() {
       setIsLoading(true);
 
       // Validate ingredients before creating recipe
-      const validationResults = await validateRecipeIngredients(newRecipe.ingredients);
-      const hasErrors = validationResults.some(result => result.status !== 'valid');
+      const validationResults = await validateRecipeIngredients(
+        newRecipe.ingredients
+      );
+      const hasErrors = validationResults.some(
+        (result) => result.status !== "valid"
+      );
 
       if (hasErrors) {
         const errorMessages = validationResults
-          .filter(result => result.status !== 'valid')
-          .map(result => result.message)
-          .join('\n');
+          .filter((result) => result.status !== "valid")
+          .map((result) => result.message)
+          .join("\n");
 
         toast.error(`Errores de validación:\n${errorMessages}`);
         return;
@@ -868,8 +933,9 @@ export default function StockManagement() {
     }
 
     // Check if the selected item is an ingredient first (from productsData)
-    const selectedIngredient = productsData.find(product =>
-      product.type === 'ingredient' && product.id.toString() === recipeId
+    const selectedIngredient = productsData.find(
+      (product) =>
+        product.type === "ingredient" && product.id.toString() === recipeId
     );
 
     if (selectedIngredient) {
@@ -882,8 +948,8 @@ export default function StockManagement() {
     }
 
     // Find the selected recipe (only actual recipes, not ingredients)
-    const selectedRecipe = recipesData.find(recipe =>
-      recipe.id.toString() === recipeId && recipe.type === 'recipe'
+    const selectedRecipe = recipesData.find(
+      (recipe) => recipe.id.toString() === recipeId && recipe.type === "recipe"
     );
 
     if (!selectedRecipe) {
@@ -899,9 +965,10 @@ export default function StockManagement() {
     // Parse recipe ingredients
     let ingredients;
     try {
-      ingredients = typeof selectedRecipe.ingredients === 'string'
-        ? JSON.parse(selectedRecipe.ingredients)
-        : selectedRecipe.ingredients;
+      ingredients =
+        typeof selectedRecipe.ingredients === "string"
+          ? JSON.parse(selectedRecipe.ingredients)
+          : selectedRecipe.ingredients;
     } catch (error) {
       console.error("Error parsing recipe ingredients:", error);
       return;
@@ -954,16 +1021,18 @@ export default function StockManagement() {
     if (selectedIngredient === "none") {
       ingredientName = customIngredientName;
       // Try to find matching product for custom ingredient
-      matchingProduct = productsData.find(product =>
-        product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
-        ingredientName.toLowerCase().includes(product.name.toLowerCase())
+      matchingProduct = productsData.find(
+        (product) =>
+          product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
+          ingredientName.toLowerCase().includes(product.name.toLowerCase())
       );
     } else if (selectedIngredient) {
       ingredientName = selectedIngredient;
       // Try to find matching product in stock
-      matchingProduct = productsData.find(product =>
-        product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
-        ingredientName.toLowerCase().includes(product.name.toLowerCase())
+      matchingProduct = productsData.find(
+        (product) =>
+          product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
+          ingredientName.toLowerCase().includes(product.name.toLowerCase())
       );
     } else {
       ingredientName = customIngredientName;
@@ -992,12 +1061,16 @@ export default function StockManagement() {
 
     if (matchingProduct) {
       if (matchingProduct.stock < requiredQuantity) {
-        toast.error(`Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${ingredientUnit}\nDisponible: ${matchingProduct.stock}`);
+        toast.error(
+          `Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${ingredientUnit}\nDisponible: ${matchingProduct.stock}`
+        );
         return;
       }
     } else {
       // Warn if no matching product found
-      const confirmAdd = confirm(`No se encontró un producto en stock que coincida con "${ingredientName}".\n¿Deseas agregar este ingrediente de todas formas?`);
+      const confirmAdd = confirm(
+        `No se encontró un producto en stock que coincida con "${ingredientName}".\n¿Deseas agregar este ingrediente de todas formas?`
+      );
       if (!confirmAdd) {
         return;
       }
@@ -1005,7 +1078,12 @@ export default function StockManagement() {
 
     setCustomIngredients([
       ...customIngredients,
-      { name: ingredientName.trim(), quantity: ingredientQuantity, unit: ingredientUnit, productId: productId },
+      {
+        name: ingredientName.trim(),
+        quantity: ingredientQuantity,
+        unit: ingredientUnit,
+        productId: productId,
+      },
     ]);
     setSelectedIngredient("none");
     setCustomIngredientName("");
@@ -1019,13 +1097,23 @@ export default function StockManagement() {
   };
 
   // Function to deduct stock for custom ingredients
-  const deductCustomIngredientStock = async (ingredients: { name: string; quantity: string; unit: string; productId?: string }[], productAmount: number) => {
+  const deductCustomIngredientStock = async (
+    ingredients: {
+      name: string;
+      quantity: string;
+      unit: string;
+      productId?: string;
+    }[],
+    productAmount: number
+  ) => {
     for (const ingredient of ingredients) {
       const requiredQuantity = parseFloat(ingredient.quantity) * productAmount;
 
       // Skip if no linked product
       if (!ingredient.productId) {
-        console.warn(`No linked product for ingredient: ${ingredient.name}. Skipping stock deduction.`);
+        console.warn(
+          `No linked product for ingredient: ${ingredient.name}. Skipping stock deduction.`
+        );
         continue;
       }
 
@@ -1036,15 +1124,23 @@ export default function StockManagement() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: ingredient.productId,
-            stock: Math.max(0, (productsData.find(p => p.id === ingredient.productId)?.stock || 0) - requiredQuantity)
+            stock: Math.max(
+              0,
+              (productsData.find((p) => p.id === ingredient.productId)?.stock ||
+                0) - requiredQuantity
+            ),
           }),
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to deduct stock for ingredient: ${ingredient.name}`);
+          throw new Error(
+            `Failed to deduct stock for ingredient: ${ingredient.name}`
+          );
         }
 
-        console.log(`Deducted ${requiredQuantity} units of ${ingredient.name} from stock`);
+        console.log(
+          `Deducted ${requiredQuantity} units of ${ingredient.name} from stock`
+        );
       } catch (error) {
         console.error(`Error deducting stock for ${ingredient.name}:`, error);
         toast.error(`Error deducting stock for ${ingredient.name}`);
@@ -1053,9 +1149,20 @@ export default function StockManagement() {
   };
 
   // Function to deduct stock for recipe ingredients (from availableStock)
-  const deductRecipeIngredientStock = async (ingredients: { name: string; quantity: string; unit: string; requiredQuantity: number; availableStock: number }[], productAmount: number) => {
+  const deductRecipeIngredientStock = async (
+    ingredients: {
+      name: string;
+      quantity: string;
+      unit: string;
+      requiredQuantity: number;
+      availableStock: number;
+    }[],
+    productAmount: number
+  ) => {
     // Find the recipe to update its ingredients
-    const selectedRecipe = recipesData.find(recipe => recipe.id.toString() === selectedRecipeId);
+    const selectedRecipe = recipesData.find(
+      (recipe) => recipe.id.toString() === selectedRecipeId
+    );
     if (!selectedRecipe) {
       console.error("Selected recipe not found for stock deduction");
       return;
@@ -1065,9 +1172,10 @@ export default function StockManagement() {
       // Get the original recipe ingredients from the database
       let originalIngredients = [];
       try {
-        originalIngredients = typeof selectedRecipe.ingredients === 'string'
-          ? JSON.parse(selectedRecipe.ingredients)
-          : selectedRecipe.ingredients || [];
+        originalIngredients =
+          typeof selectedRecipe.ingredients === "string"
+            ? JSON.parse(selectedRecipe.ingredients)
+            : selectedRecipe.ingredients || [];
       } catch (error) {
         console.error("Error parsing original recipe ingredients:", error);
         originalIngredients = [];
@@ -1076,17 +1184,22 @@ export default function StockManagement() {
       // Update only the availableStock for matching ingredients
       const updatedIngredients = originalIngredients.map((originalIng: any) => {
         // Find the matching ingredient from the current ingredients (with requiredQuantity)
-        const matchingIngredient = ingredients.find(ing =>
-          ing.name === originalIng.name &&
-          ing.quantity === originalIng.quantity &&
-          ing.unit === originalIng.unit
+        const matchingIngredient = ingredients.find(
+          (ing) =>
+            ing.name === originalIng.name &&
+            ing.quantity === originalIng.quantity &&
+            ing.unit === originalIng.unit
         );
 
         if (matchingIngredient) {
           // Update only the availableStock, preserve all other properties
           return {
             ...originalIng,
-            availableStock: Math.max(0, matchingIngredient.availableStock - matchingIngredient.requiredQuantity)
+            availableStock: Math.max(
+              0,
+              matchingIngredient.availableStock -
+                matchingIngredient.requiredQuantity
+            ),
           };
         }
 
@@ -1103,7 +1216,7 @@ export default function StockManagement() {
           name: selectedRecipe.name,
           category: selectedRecipe.category,
           amount: selectedRecipe.stock,
-          ingredients: updatedIngredients
+          ingredients: updatedIngredients,
         }),
       });
 
@@ -1111,7 +1224,9 @@ export default function StockManagement() {
         throw new Error("Failed to update recipe ingredient stock");
       }
 
-      console.log(`Deducted stock from recipe ingredients for ${productAmount} units`);
+      console.log(
+        `Deducted stock from recipe ingredients for ${productAmount} units`
+      );
 
       // Refresh recipes data to reflect changes
       fetchRecipes();
@@ -1122,11 +1237,16 @@ export default function StockManagement() {
   };
 
   // Function to deduct stock for ingredient-type products (from ingredient's stock)
-  const deductIngredientTypeStock = async (ingredientId: string, requiredQuantity: number) => {
+  const deductIngredientTypeStock = async (
+    ingredientId: string,
+    requiredQuantity: number
+  ) => {
     try {
       // Find the ingredient product
-      const ingredient = productsData.find(product =>
-        product.type === 'ingredient' && product.id.toString() === ingredientId
+      const ingredient = productsData.find(
+        (product) =>
+          product.type === "ingredient" &&
+          product.id.toString() === ingredientId
       );
 
       if (!ingredient) {
@@ -1143,15 +1263,19 @@ export default function StockManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: ingredient.id,
-          stock: newStock
+          stock: newStock,
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to deduct stock for ingredient: ${ingredient.name}`);
+        throw new Error(
+          `Failed to deduct stock for ingredient: ${ingredient.name}`
+        );
       }
 
-      console.log(`Deducted ${requiredQuantity} units from ingredient ${ingredient.name}`);
+      console.log(
+        `Deducted ${requiredQuantity} units from ingredient ${ingredient.name}`
+      );
 
       // Refresh products data to reflect changes
       fetchProducts();
@@ -1176,14 +1300,15 @@ export default function StockManagement() {
       setEditingProduct({
         ...editingProduct!,
         has_recipe: false,
-        ingredients: undefined
+        ingredients: undefined,
       });
       return;
     }
 
     // Check if the selected item is an ingredient first (from productsData)
-    const selectedIngredient = productsData.find(product =>
-      product.type === 'ingredient' && product.id.toString() === recipeId
+    const selectedIngredient = productsData.find(
+      (product) =>
+        product.type === "ingredient" && product.id.toString() === recipeId
     );
 
     if (selectedIngredient) {
@@ -1191,14 +1316,14 @@ export default function StockManagement() {
       setEditingProduct({
         ...editingProduct!,
         has_recipe: true,
-        ingredients: undefined // Clear ingredients to hide recipe ingredients display
+        ingredients: undefined, // Clear ingredients to hide recipe ingredients display
       });
       return;
     }
 
     // Find the selected recipe (only actual recipes, not ingredients)
-    const selectedRecipe = recipesData.find(recipe =>
-      recipe.id.toString() === recipeId && recipe.type === 'recipe'
+    const selectedRecipe = recipesData.find(
+      (recipe) => recipe.id.toString() === recipeId && recipe.type === "recipe"
     );
 
     if (!selectedRecipe) {
@@ -1210,7 +1335,7 @@ export default function StockManagement() {
     setEditingProduct({
       ...editingProduct!,
       has_recipe: true,
-      ingredients: JSON.stringify(selectedRecipe.ingredients || [])
+      ingredients: JSON.stringify(selectedRecipe.ingredients || []),
     });
   };
 
@@ -1220,14 +1345,18 @@ export default function StockManagement() {
       setIsLoading(true);
 
       // Validate ingredients before creating recipe
-      const validationResults = await validateRecipeIngredients(newRecipe.ingredients);
-      const hasErrors = validationResults.some(result => result.status !== 'valid');
+      const validationResults = await validateRecipeIngredients(
+        newRecipe.ingredients
+      );
+      const hasErrors = validationResults.some(
+        (result) => result.status !== "valid"
+      );
 
       if (hasErrors) {
         const errorMessages = validationResults
-          .filter(result => result.status !== 'valid')
-          .map(result => result.message)
-          .join('\n');
+          .filter((result) => result.status !== "valid")
+          .map((result) => result.message)
+          .join("\n");
 
         toast.error(`Errores de validación:\n${errorMessages}`);
         return;
@@ -1254,7 +1383,7 @@ export default function StockManagement() {
       setEditingProduct({
         ...editingProduct!,
         has_recipe: true,
-        ingredients: JSON.stringify(newRecipe.ingredients)
+        ingredients: JSON.stringify(newRecipe.ingredients),
       });
 
       // Reset recipe form
@@ -1296,12 +1425,12 @@ export default function StockManagement() {
     const averageMargin =
       productsData.length > 0
         ? productsData.reduce((sum, product) => {
-          const margin =
-            ((product.sale_price - product.purchase_price) /
-              product.purchase_price) *
-            100;
-          return sum + margin;
-        }, 0) / productsData.length
+            const margin =
+              ((product.sale_price - product.purchase_price) /
+                product.purchase_price) *
+              100;
+            return sum + margin;
+          }, 0) / productsData.length
         : 0;
 
     return {
@@ -1320,7 +1449,7 @@ export default function StockManagement() {
     const allItems: any[] = [];
 
     // Add all products first
-    productsData.forEach(item => {
+    productsData.forEach((item) => {
       if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
         allItems.push(item);
@@ -1328,8 +1457,8 @@ export default function StockManagement() {
     });
 
     // Add only recipes (not ingredients) from recipesData that aren't already added
-    recipesData.forEach(item => {
-      if (item.type === 'recipe' && !seenIds.has(item.id)) {
+    recipesData.forEach((item) => {
+      if (item.type === "recipe" && !seenIds.has(item.id)) {
         seenIds.add(item.id);
         allItems.push(item);
       }
@@ -1354,10 +1483,10 @@ export default function StockManagement() {
     // Sales performance filter (mock data for now)
     if (salesFilter !== "all") {
       // Mock sales data - replace with actual sales data from API
-      const mockSalesData = filtered.map(product => ({
+      const mockSalesData = filtered.map((product) => ({
         ...product,
         totalSales: Math.floor(Math.random() * 100) + 1,
-        salesTrend: Math.random() > 0.5 ? 'up' : 'down'
+        salesTrend: Math.random() > 0.5 ? "up" : "down",
       }));
 
       if (salesFilter === "best-selling") {
@@ -1369,9 +1498,9 @@ export default function StockManagement() {
           .sort((a, b) => a.totalSales - b.totalSales)
           .slice(0, Math.ceil(mockSalesData.length * 0.3));
       } else if (salesFilter === "trending-up") {
-        filtered = mockSalesData.filter(p => p.salesTrend === 'up');
+        filtered = mockSalesData.filter((p) => p.salesTrend === "up");
       } else if (salesFilter === "trending-down") {
-        filtered = mockSalesData.filter(p => p.salesTrend === 'down');
+        filtered = mockSalesData.filter((p) => p.salesTrend === "down");
       }
     }
 
@@ -1449,19 +1578,19 @@ export default function StockManagement() {
       // Prepare ingredients data
       let ingredientsData = null;
       if (newProduct.has_recipe && recipeIngredients.length > 0) {
-        ingredientsData = recipeIngredients.map(ing => ({
+        ingredientsData = recipeIngredients.map((ing) => ({
           name: ing.name,
           quantity: ing.quantity,
           unit: ing.unit,
-          requiredQuantity: ing.requiredQuantity
+          requiredQuantity: ing.requiredQuantity,
           // Note: availableStock is NOT stored in product, only in recipe
         }));
       } else if (useCustomIngredients && customIngredients.length > 0) {
-        ingredientsData = customIngredients.map(ing => ({
+        ingredientsData = customIngredients.map((ing) => ({
           name: ing.name,
           quantity: ing.quantity,
           unit: ing.unit,
-          productId: ing.productId
+          productId: ing.productId,
         }));
       }
 
@@ -1472,7 +1601,9 @@ export default function StockManagement() {
           ...newProduct,
           image_url: uploadedUrl,
           updated_at: new Date().toISOString(),
-          has_recipe: (newProduct.has_recipe && recipeIngredients.length > 0) || (useCustomIngredients && customIngredients.length > 0),
+          has_recipe:
+            (newProduct.has_recipe && recipeIngredients.length > 0) ||
+            (useCustomIngredients && customIngredients.length > 0),
           ingredients: ingredientsData ? JSON.stringify(ingredientsData) : null,
         }),
       });
@@ -1485,19 +1616,30 @@ export default function StockManagement() {
       // Deduct ingredient stock based on product type
       if ((newProduct.stock || 0) > 0) {
         // Check if selected item is an ingredient (not a recipe)
-        const selectedIngredient = productsData.find(product =>
-          product.type === 'ingredient' && product.id.toString() === selectedRecipeId
+        const selectedIngredient = productsData.find(
+          (product) =>
+            product.type === "ingredient" &&
+            product.id.toString() === selectedRecipeId
         );
 
         if (selectedIngredient) {
           // For ingredient-type products: deduct from ingredient's stock
-          await deductIngredientTypeStock(selectedRecipeId, ingredientRequiredQuantity);
+          await deductIngredientTypeStock(
+            selectedRecipeId,
+            ingredientRequiredQuantity
+          );
         } else if (newProduct.has_recipe && recipeIngredients.length > 0) {
           // For recipe-type products: deduct from recipe ingredients' availableStock
-          await deductRecipeIngredientStock(recipeIngredients, newProduct.stock || 1);
+          await deductRecipeIngredientStock(
+            recipeIngredients,
+            newProduct.stock || 1
+          );
         } else if (useCustomIngredients && customIngredients.length > 0) {
           // For custom ingredients: existing logic
-          await deductCustomIngredientStock(customIngredients, newProduct.stock || 1);
+          await deductCustomIngredientStock(
+            customIngredients,
+            newProduct.stock || 1
+          );
         }
       }
 
@@ -1528,7 +1670,9 @@ export default function StockManagement() {
       setIngredientUnit("ml");
 
       fetchProducts();
-      alert("Producto agregado exitosamente y stock de ingredientes actualizado");
+      alert(
+        "Producto agregado exitosamente y stock de ingredientes actualizado"
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error adding product");
     } finally {
@@ -1613,41 +1757,53 @@ export default function StockManagement() {
       // Fetch real transfer data from API
       const [transferResponse, adjustmentResponse] = await Promise.all([
         fetch("/api/transfer"),
-        fetch("/api/adjust")
+        fetch("/api/adjust"),
       ]);
 
-      const transfers = transferResponse.ok ? await transferResponse.json() : [];
-      const adjustments = adjustmentResponse.ok ? await adjustmentResponse.json() : [];
+      const transfers = transferResponse.ok
+        ? await transferResponse.json()
+        : [];
+      const adjustments = adjustmentResponse.ok
+        ? await adjustmentResponse.json()
+        : [];
 
       // Filter and format transfer history for this product
       const transferHistory = transfers
-        .filter((transfer: any) => transfer.inventory?.products?.id === productId)
+        .filter(
+          (transfer: any) => transfer.inventory?.products?.id === productId
+        )
         .map((transfer: any) => ({
           id: `transfer-${transfer.id}`,
           date: transfer.created_at || new Date().toISOString(),
           type: "transfer",
           quantity: transfer.amount,
           user: "Sistema",
-          details: `Transferencia de ${transfer.from_bar_details?.name || 'Origen'} a ${transfer.to_bar_details?.name || 'Destino'}`,
-          price: 0
+          details: `Transferencia de ${transfer.from_bar_details?.name || "Origen"} a ${transfer.to_bar_details?.name || "Destino"}`,
+          price: 0,
         }));
 
       // Filter and format adjustment history for this product
       const adjustmentHistory = adjustments
-        .filter((adjustment: any) => adjustment.inventory?.products?.id === productId)
+        .filter(
+          (adjustment: any) => adjustment.inventory?.products?.id === productId
+        )
         .map((adjustment: any) => ({
           id: `adjustment-${adjustment.id}`,
           date: adjustment.created_at || new Date().toISOString(),
-          type: adjustment.type === 'loss' ? 'loss' : 'reentry',
-          quantity: adjustment.type === 'loss' ? -adjustment.amount : adjustment.amount,
+          type: adjustment.type === "loss" ? "loss" : "reentry",
+          quantity:
+            adjustment.type === "loss" ? -adjustment.amount : adjustment.amount,
           user: "Admin",
-          details: adjustment.reason || `${adjustment.type === 'loss' ? 'Pérdida' : 'Re-ingreso'} registrado`,
-          price: adjustment.economic_value || 0
+          details:
+            adjustment.reason ||
+            `${adjustment.type === "loss" ? "Pérdida" : "Re-ingreso"} registrado`,
+          price: adjustment.economic_value || 0,
         }));
 
       // Combine and sort by date
-      const combinedHistory = [...transferHistory, ...adjustmentHistory]
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const combinedHistory = [...transferHistory, ...adjustmentHistory].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
 
       setTransactionHistory(combinedHistory);
     } catch (err) {
@@ -1661,8 +1817,8 @@ export default function StockManagement() {
           quantity: 5,
           user: "Sistema",
           details: "Historial no disponible - datos de ejemplo",
-          price: 0
-        }
+          price: 0,
+        },
       ];
       setTransactionHistory(mockHistory);
     } finally {
@@ -1679,23 +1835,23 @@ export default function StockManagement() {
 
   // Export to Excel functionality
   const handleExportToExcel = () => {
-    const exportData = filteredProducts.map(item => {
+    const exportData = filteredProducts.map((item) => {
       // Check if it's a product or recipe
-      const isProduct = 'purchase_price' in item;
+      const isProduct = "purchase_price" in item;
       const product = item as any; // Cast to any to access all properties
 
       return {
-        'Nombre': product.name,
-        'Tipo': product.type || 'producto',
-        'Categoría': product.category,
-        'Precio Compra': isProduct ? product.purchase_price : 'N/A',
-        'Precio Venta': isProduct ? product.sale_price : 'N/A',
-        'Stock': product.stock || 0,
-        'Estado': calculateStatus(product.stock || 0),
-        'Visible Courtesy': isProduct && product.is_courtsey ? 'Sí' : 'No',
-        'Visible PR Token': isProduct && product.is_pr ? 'Sí' : 'No',
-        'Activo': isProduct && product.is_active ? 'Sí' : 'No',
-        'Fecha Actualización': product.updated_at || 'N/A'
+        Nombre: product.name,
+        Tipo: product.type || "producto",
+        Categoría: product.category,
+        "Precio Compra": isProduct ? product.purchase_price : "N/A",
+        "Precio Venta": isProduct ? product.sale_price : "N/A",
+        Stock: product.stock || 0,
+        Estado: calculateStatus(product.stock || 0),
+        "Visible Courtesy": isProduct && product.is_courtsey ? "Sí" : "No",
+        "Visible PR Token": isProduct && product.is_pr ? "Sí" : "No",
+        Activo: isProduct && product.is_active ? "Sí" : "No",
+        "Fecha Actualización": product.updated_at || "N/A",
       };
     });
 
@@ -1704,12 +1860,15 @@ export default function StockManagement() {
     XLSX.utils.book_append_sheet(wb, ws, "Productos");
 
     // Auto-size columns
-    const colWidths = Object.keys(exportData[0] || {}).map(key => ({
-      wch: Math.max(key.length, 15)
+    const colWidths = Object.keys(exportData[0] || {}).map((key) => ({
+      wch: Math.max(key.length, 15),
     }));
-    ws['!cols'] = colWidths;
+    ws["!cols"] = colWidths;
 
-    XLSX.writeFile(wb, `productos_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(
+      wb,
+      `productos_${new Date().toISOString().split("T")[0]}.xlsx`
+    );
     toast.success("Productos exportados exitosamente");
   };
 
@@ -1833,7 +1992,7 @@ export default function StockManagement() {
               onClick={() => {
                 // Initialize quantities for selected products
                 const initialQuantities: { [key: string]: number } = {};
-                selectedProducts.forEach(productId => {
+                selectedProducts.forEach((productId) => {
                   initialQuantities[productId] = 1;
                 });
                 setTransferQuantities(initialQuantities);
@@ -1851,7 +2010,7 @@ export default function StockManagement() {
                 onClick={() => {
                   // Initialize quantities for selected products
                   const initialQuantities: { [key: string]: number } = {};
-                  selectedProducts.forEach(productId => {
+                  selectedProducts.forEach((productId) => {
                     initialQuantities[productId] = 1;
                   });
                   setAdjustmentQuantities(initialQuantities);
@@ -1866,7 +2025,7 @@ export default function StockManagement() {
                 onClick={() => {
                   // Initialize quantities for selected products
                   const initialQuantities: { [key: string]: number } = {};
-                  selectedProducts.forEach(productId => {
+                  selectedProducts.forEach((productId) => {
                     initialQuantities[productId] = 1;
                   });
                   setAdjustmentQuantities(initialQuantities);
@@ -1896,7 +2055,9 @@ export default function StockManagement() {
                     onCheckedChange={toggleSelectAll}
                   />
                 </th>
-                <th className="text-left p-3 font-medium">Historial de producto</th>
+                <th className="text-left p-3 font-medium">
+                  Historial de producto
+                </th>
                 <th className="text-left p-3 font-medium">Vis. Courtesy</th>
                 <th className="text-left p-3 font-medium">Vis. PR Token</th>
                 <th className="text-left p-3 font-medium">Categoría</th>
@@ -1908,185 +2069,211 @@ export default function StockManagement() {
             <tbody>
               {isLoading
                 ? Array(6)
-                  .fill(0)
-                  .map((_, index) => (
-                    <tr key={index}>
-                      <td colSpan={9} className="p-3">
-                        <Skeleton className="h-10 w-full" />
-                      </td>
-                    </tr>
-                  ))
+                    .fill(0)
+                    .map((_, index) => (
+                      <tr key={index}>
+                        <td colSpan={9} className="p-3">
+                          <Skeleton className="h-10 w-full" />
+                        </td>
+                      </tr>
+                    ))
                 : filteredProducts.map((item) => {
-                  const product = item as any; // Cast to access all properties
-                  const isProduct = 'purchase_price' in item;
+                    const product = item as any; // Cast to access all properties
+                    const isProduct = "purchase_price" in item;
 
-                  return (
-                    <tr key={product.id} className="border-t hover:bg-muted/50">
-                      <td className="p-3">
-                        <Checkbox
-                          checked={selectedProducts.includes(product.id.toString())}
-                          onCheckedChange={() =>
-                            toggleSelectProduct(product.id.toString())
-                          }
-                        />
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="flex items-center gap-2 cursor-pointer flex-1"
-                            onClick={() => isProduct && viewProductDetails(product)}
-                          >
-                            {product.image_url ? (
-                              <img
-                                src={product.image_url}
-                                alt={product.name}
-                                className="h-10 w-10 rounded object-cover"
-                              />
-                            ) : (
-                              <div className="bg-slate-100 p-2 rounded">
-                                <Package className="h-5 w-5 text-slate-500" />
-                              </div>
+                    return (
+                      <tr
+                        key={product.id}
+                        className="border-t hover:bg-muted/50"
+                      >
+                        <td className="p-3">
+                          <Checkbox
+                            checked={selectedProducts.includes(
+                              product.id.toString()
                             )}
-                            <div>
-                              <div className="font-medium">{product.name}</div>
-                              <div className="text-xs text-muted-foreground line-clamp-1">
-                                {product.description} {!isProduct && '(Receta)'}
-                              </div>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleShowTransactionHistory(product)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <History className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-
-                      <td className="p-3">
-                        <Switch
-                          checked={product.is_courtsey}
-                          onCheckedChange={(checked) =>
-                            handleToggleActive(
-                              product.id,
-                              checked,
-                              "is_courtsey"
-                            )
-                          }
-                        />
-                      </td>
-                      <td className="p-3">
-                        <Switch
-                          checked={product.is_pr}
-                          onCheckedChange={(checked) =>
-                            handleToggleActive(product.id, checked, "is_pr")
-                          }
-                        />
-                      </td>
-                      <td className="p-3">
-                        <Badge variant="outline">
-                          {categoryList.find(
-                            (c) => c.value === product.category
-                          )?.label || product.category}
-                        </Badge>
-                      </td>
-                      <td className="p-3">${product.sale_price.toFixed(2)}</td>
-                      <td className="p-3">
-                        <Badge
-                          className={cn(
-                            "font-normal",
-                            calculateStatus(product.stock) === "sufficient" &&
-                            "bg-green-50 text-green-700",
-                            calculateStatus(product.stock) === "low" &&
-                            "bg-amber-50 text-amber-700",
-                            calculateStatus(product.stock) === "out" &&
-                            "bg-red-50 text-red-700"
-                          )}
-                        >
-                          {product.stock}{" "}
-                          {calculateStatus(product.stock) === "sufficient"
-                            ? "✓"
-                            : calculateStatus(product.stock) === "low"
-                              ? "⚠"
-                              : "✕"}
-                        </Badge>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => viewProductDetails(product)}
-                          >
-                            <Info className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setEditingProduct(product);
-                              // Initialize recipe selection if product has a recipe
-                              if (product.has_recipe && product.ingredients) {
-                                // Try to find matching recipe based on ingredients
-                                const matchingRecipe = recipesData.find(recipe => {
-                                  try {
-                                    const productIngredients = typeof product.ingredients === 'string'
-                                      ? JSON.parse(product.ingredients)
-                                      : product.ingredients;
-                                    const recipeIngredients = recipe.ingredients;
-
-                                    // Simple comparison - could be enhanced
-                                    return JSON.stringify(productIngredients) === JSON.stringify(recipeIngredients);
-                                  } catch {
-                                    return false;
-                                  }
-                                });
-
-                                setSelectedEditRecipeId(matchingRecipe ? matchingRecipe.id.toString() : "");
-                              } else {
-                                setSelectedEditRecipeId("");
+                            onCheckedChange={() =>
+                              toggleSelectProduct(product.id.toString())
+                            }
+                          />
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="flex items-center gap-2 cursor-pointer flex-1"
+                              onClick={() =>
+                                isProduct && viewProductDetails(product)
                               }
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-64">
-                              <div className="space-y-2">
-                                <p className="text-sm">
-                                  ¿Eliminar este producto?
-                                </p>
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() =>
-                                      deleteProductFromList(product.id)
-                                    }
-                                    disabled={isDeleting}
-                                  >
-                                    {isDeleting ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      "Eliminar"
-                                    )}
-                                  </Button>
+                            >
+                              {product.image_url ? (
+                                <img
+                                  src={product.image_url}
+                                  alt={product.name}
+                                  className="h-10 w-10 rounded object-cover"
+                                />
+                              ) : (
+                                <div className="bg-slate-100 p-2 rounded">
+                                  <Package className="h-5 w-5 text-slate-500" />
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-medium">
+                                  {product.name}
+                                </div>
+                                <div className="text-xs text-muted-foreground line-clamp-1">
+                                  {product.description}{" "}
+                                  {!isProduct && "(Receta)"}
                                 </div>
                               </div>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                handleShowTransactionHistory(product)
+                              }
+                              className="h-8 w-8 p-0"
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+
+                        <td className="p-3">
+                          <Switch
+                            checked={product.is_courtsey}
+                            onCheckedChange={(checked) =>
+                              handleToggleActive(
+                                product.id,
+                                checked,
+                                "is_courtsey"
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-3">
+                          <Switch
+                            checked={product.is_pr}
+                            onCheckedChange={(checked) =>
+                              handleToggleActive(product.id, checked, "is_pr")
+                            }
+                          />
+                        </td>
+                        <td className="p-3">
+                          <Badge variant="outline">
+                            {categoryList.find(
+                              (c) => c.value === product.category
+                            )?.label || product.category}
+                          </Badge>
+                        </td>
+                        <td className="p-3">
+                          ${product.sale_price.toFixed(2)}
+                        </td>
+                        <td className="p-3">
+                          <Badge
+                            className={cn(
+                              "font-normal",
+                              calculateStatus(product.stock) === "sufficient" &&
+                                "bg-green-50 text-green-700",
+                              calculateStatus(product.stock) === "low" &&
+                                "bg-amber-50 text-amber-700",
+                              calculateStatus(product.stock) === "out" &&
+                                "bg-red-50 text-red-700"
+                            )}
+                          >
+                            {product.stock}{" "}
+                            {calculateStatus(product.stock) === "sufficient"
+                              ? "✓"
+                              : calculateStatus(product.stock) === "low"
+                                ? "⚠"
+                                : "✕"}
+                          </Badge>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => viewProductDetails(product)}
+                            >
+                              <Info className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingProduct(product);
+                                // Initialize recipe selection if product has a recipe
+                                if (product.has_recipe && product.ingredients) {
+                                  // Try to find matching recipe based on ingredients
+                                  const matchingRecipe = recipesData.find(
+                                    (recipe) => {
+                                      try {
+                                        const productIngredients =
+                                          typeof product.ingredients ===
+                                          "string"
+                                            ? JSON.parse(product.ingredients)
+                                            : product.ingredients;
+                                        const recipeIngredients =
+                                          recipe.ingredients;
+
+                                        // Simple comparison - could be enhanced
+                                        return (
+                                          JSON.stringify(productIngredients) ===
+                                          JSON.stringify(recipeIngredients)
+                                        );
+                                      } catch {
+                                        return false;
+                                      }
+                                    }
+                                  );
+
+                                  setSelectedEditRecipeId(
+                                    matchingRecipe
+                                      ? matchingRecipe.id.toString()
+                                      : ""
+                                  );
+                                } else {
+                                  setSelectedEditRecipeId("");
+                                }
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64">
+                                <div className="space-y-2">
+                                  <p className="text-sm">
+                                    ¿Eliminar este producto?
+                                  </p>
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() =>
+                                        deleteProductFromList(product.id)
+                                      }
+                                      disabled={isDeleting}
+                                    >
+                                      {isDeleting ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        "Eliminar"
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
             </tbody>
           </table>
         </div>
@@ -2164,15 +2351,15 @@ export default function StockManagement() {
                           <Badge
                             className={cn(
                               calculateStatus(currentProduct.stock) ===
-                              "sufficient" && "bg-green-100 text-green-800",
+                                "sufficient" && "bg-green-100 text-green-800",
                               calculateStatus(currentProduct.stock) === "low" &&
-                              "bg-amber-100 text-amber-800",
+                                "bg-amber-100 text-amber-800",
                               calculateStatus(currentProduct.stock) === "out" &&
-                              "bg-red-100 text-red-800"
+                                "bg-red-100 text-red-800"
                             )}
                           >
                             {calculateStatus(currentProduct.stock) ===
-                              "sufficient"
+                            "sufficient"
                               ? "Suficiente"
                               : calculateStatus(currentProduct.stock) === "low"
                                 ? "Bajo"
@@ -2272,7 +2459,9 @@ export default function StockManagement() {
             {/* Recipe/Ingredients Selection Field */}
             <div className="space-y-4 border rounded-lg p-4">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">Ingredientes (Opcional)</Label>
+                <Label className="text-base font-semibold">
+                  Ingredientes (Opcional)
+                </Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -2309,7 +2498,9 @@ export default function StockManagement() {
                       setRecipeIngredients([]);
                     }}
                   />
-                  <span className="text-sm">Agregar ingredientes individuales</span>
+                  <span className="text-sm">
+                    Agregar ingredientes individuales
+                  </span>
                 </label>
               </div>
 
@@ -2326,61 +2517,93 @@ export default function StockManagement() {
                       <SelectItem value="no-recipe">Sin receta</SelectItem>
                       {/* Show Recipes only (filter out ingredients from recipesData) */}
                       {recipesData
-                        .filter((recipe) => recipe.type === 'recipe')
+                        .filter((recipe) => recipe.type === "recipe")
                         .map((recipe) => (
-                          <SelectItem key={`recipe-${recipe.id}`} value={recipe.id.toString()}>
+                          <SelectItem
+                            key={`recipe-${recipe.id}`}
+                            value={recipe.id.toString()}
+                          >
                             {recipe.name} ({recipe.category}) - Receta
                           </SelectItem>
                         ))}
                       {/* Show Ingredients from productsData */}
                       {productsData
-                        .filter((product) => product.type === 'ingredient')
+                        .filter((product) => product.type === "ingredient")
                         .map((ingredient) => (
-                          <SelectItem key={`ingredient-${ingredient.id}`} value={ingredient.id.toString()}>
-                            {ingredient.name} ({ingredient.category}) - Ingrediente
+                          <SelectItem
+                            key={`ingredient-${ingredient.id}`}
+                            value={ingredient.id.toString()}
+                          >
+                            {ingredient.name} ({ingredient.category}) -
+                            Ingrediente
                           </SelectItem>
                         ))}
                     </SelectContent>
                   </Select>
 
-                    {/* Show ingredient information if an ingredient is selected */}
-                    {selectedRecipeId && selectedRecipeId !== "no-recipe" && (() => {
+                  {/* Show ingredient information if an ingredient is selected */}
+                  {selectedRecipeId &&
+                    selectedRecipeId !== "no-recipe" &&
+                    (() => {
                       // Check if selected item is an ingredient
-                      const selectedIngredient = productsData.find(product =>
-                        product.type === 'ingredient' && product.id.toString() === selectedRecipeId
+                      const selectedIngredient = productsData.find(
+                        (product) =>
+                          product.type === "ingredient" &&
+                          product.id.toString() === selectedRecipeId
                       );
 
                       if (selectedIngredient) {
-                        const unit = extractUnitFromDescription(selectedIngredient.description || "");
-                        const conversionFactor = extractConversionFromDescription(selectedIngredient.description || "");
+                        const unit = extractUnitFromDescription(
+                          selectedIngredient.description || ""
+                        );
+                        const conversionFactor =
+                          extractConversionFromDescription(
+                            selectedIngredient.description || ""
+                          );
 
                         // Calculate amounts using conversion factor
-                        const totalAmount = (selectedIngredient.stock || 0) * conversionFactor;
-                        const totalRequired = ingredientRequiredQuantity * conversionFactor;
+                        const totalAmount =
+                          (selectedIngredient.stock || 0) * conversionFactor;
+                        const totalRequired =
+                          ingredientRequiredQuantity * conversionFactor;
                         const hasEnoughStock = totalAmount >= totalRequired;
 
                         return (
                           <div className="mt-4 space-y-4">
-                            <h3 className="font-medium text-gray-900">Ingredientes del producto:</h3>
+                            <h3 className="font-medium text-gray-900">
+                              Ingredientes del producto:
+                            </h3>
                             <p className="text-sm text-gray-600">
-                              Especifica cuántas unidades del producto vas a crear. Los ingredientes se descontarán automáticamente.
+                              Especifica cuántas unidades del producto vas a
+                              crear. Los ingredientes se descontarán
+                              automáticamente.
                             </p>
 
                             <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
                               <div>
-                                <Label className="text-sm font-medium text-gray-700">Ingrediente</Label>
-                                <p className="text-sm font-semibold text-gray-900">{selectedIngredient.name}</p>
+                                <Label className="text-sm font-medium text-gray-700">
+                                  Ingrediente
+                                </Label>
+                                <p className="text-sm font-semibold text-gray-900">
+                                  {selectedIngredient.name}
+                                </p>
                                 <p className="text-xs text-green-500">
                                   {conversionFactor} {unit} por unidad
                                 </p>
                               </div>
                               <div>
-                                <Label className="text-sm font-medium text-gray-700">Cantidad a crear</Label>
+                                <Label className="text-sm font-medium text-gray-700">
+                                  Cantidad a crear
+                                </Label>
                                 <Input
                                   type="number"
                                   min="1"
                                   value={ingredientRequiredQuantity}
-                                  onChange={(e) => setIngredientRequiredQuantity(parseInt(e.target.value) || 1)}
+                                  onChange={(e) =>
+                                    setIngredientRequiredQuantity(
+                                      parseInt(e.target.value) || 1
+                                    )
+                                  }
                                   className="h-10 text-center font-medium"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">
@@ -2388,16 +2611,21 @@ export default function StockManagement() {
                                 </p>
                               </div>
                               <div>
-                                <Label className="text-sm font-medium text-gray-700">Stock disponible</Label>
-                                <p className={`text-lg font-bold ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
+                                <Label className="text-sm font-medium text-gray-700">
+                                  Stock disponible
+                                </Label>
+                                <p
+                                  className={`text-lg font-bold ${hasEnoughStock ? "text-green-600" : "text-red-600"}`}
+                                >
                                   {totalAmount} {unit}
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                  Available: {selectedIngredient.stock || 0} units ({totalAmount} {unit})
+                                  Available: {selectedIngredient.stock || 0}{" "}
+                                  units ({totalAmount} {unit})
                                 </p>
                                 {!hasEnoughStock && (
                                   <p className="text-xs text-red-600 font-medium">
-                                    {(totalRequired - totalAmount)} {unit} missing
+                                    {totalRequired - totalAmount} {unit} missing
                                   </p>
                                 )}
                               </div>
@@ -2409,41 +2637,60 @@ export default function StockManagement() {
                     })()}
 
                   <p className="text-sm text-muted-foreground">
-                    Si seleccionas una receta, el stock de los ingredientes se descontará automáticamente cuando se haga un pedido.
+                    Si seleccionas una receta, el stock de los ingredientes se
+                    descontará automáticamente cuando se haga un pedido.
                   </p>
                 </>
               ) : (
                 <>
                   <div className="space-y-3">
-                    <Label className="text-sm font-medium">Agregar Ingredientes:</Label>
+                    <Label className="text-sm font-medium">
+                      Agregar Ingredientes:
+                    </Label>
 
                     {/* Ingredient Selection */}
                     <div className="grid grid-cols-12 gap-2 items-end">
                       <div className="col-span-4">
-                        <Label htmlFor="ingredient" className="sr-only">Ingrediente</Label>
+                        <Label htmlFor="ingredient" className="sr-only">
+                          Ingrediente
+                        </Label>
                         <Select
                           value={selectedIngredient}
-                          onValueChange={(value) => setSelectedIngredient(value)}
+                          onValueChange={(value) =>
+                            setSelectedIngredient(value)
+                          }
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Seleccionar ingrediente" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="none">Seleccionar ingrediente existente</SelectItem>
+                            <SelectItem value="none">
+                              Seleccionar ingrediente existente
+                            </SelectItem>
                             {productsData
-                              .filter((product) =>
-                                (product.category === "ingrediente" && product.has_recipe === false) ||
-                                product.type === 'ingredient'
+                              .filter(
+                                (product) =>
+                                  (product.category === "ingrediente" &&
+                                    product.has_recipe === false) ||
+                                  product.type === "ingredient"
                               )
                               .sort((a, b) => b.stock - a.stock)
                               .map((product) => (
-                                <SelectItem key={product.id} value={product.name}>
+                                <SelectItem
+                                  key={product.id}
+                                  value={product.name}
+                                >
                                   <div className="flex justify-between items-center w-full">
                                     <span>{product.name}</span>
-                                    <span className={`text-xs px-1 py-0.5 rounded ${product.stock > 10 ? 'bg-green-100 text-green-800' :
-                                        product.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
-                                          'bg-red-100 text-red-800'
-                                      }`}>
+                                    <span
+                                      className={`text-xs px-1 py-0.5 rounded ${
+                                        product.stock > 10
+                                          ? "bg-green-100 text-green-800"
+                                          : product.stock > 0
+                                            ? "bg-yellow-100 text-yellow-800"
+                                            : "bg-red-100 text-red-800"
+                                      }`}
+                                    >
                                       {product.stock}
                                     </span>
                                   </div>
@@ -2451,28 +2698,38 @@ export default function StockManagement() {
                               ))}
                           </SelectContent>
                         </Select>
-                        <div className="text-center text-sm text-muted-foreground mt-1">o</div>
+                        <div className="text-center text-sm text-muted-foreground mt-1">
+                          o
+                        </div>
                         <Input
                           disabled={selectedIngredient !== "none"}
                           placeholder="Escribir ingrediente personalizado"
                           value={customIngredientName}
-                          onChange={(e) => setCustomIngredientName(e.target.value)}
+                          onChange={(e) =>
+                            setCustomIngredientName(e.target.value)
+                          }
                           className="mt-1"
                         />
                       </div>
                       <div className="col-span-3">
-                        <Label htmlFor="quantity" className="sr-only">Cantidad</Label>
+                        <Label htmlFor="quantity" className="sr-only">
+                          Cantidad
+                        </Label>
                         <Input
                           placeholder="Cantidad"
                           value={ingredientQuantity}
-                          onChange={(e) => setIngredientQuantity(e.target.value)}
+                          onChange={(e) =>
+                            setIngredientQuantity(e.target.value)
+                          }
                           type="number"
                           min="0"
                           step="0.01"
                         />
                       </div>
                       <div className="col-span-3">
-                        <Label htmlFor="unit" className="sr-only">Unidad</Label>
+                        <Label htmlFor="unit" className="sr-only">
+                          Unidad
+                        </Label>
                         <Select
                           value={ingredientUnit}
                           onValueChange={(value) => setIngredientUnit(value)}
@@ -2502,8 +2759,10 @@ export default function StockManagement() {
                           onClick={addCustomIngredient}
                           disabled={
                             ingredientQuantity.trim() === "" ||
-                            (selectedIngredient === "none" && customIngredientName.trim() === "") ||
-                            (selectedIngredient !== "none" && selectedIngredient.trim() === "")
+                            (selectedIngredient === "none" &&
+                              customIngredientName.trim() === "") ||
+                            (selectedIngredient !== "none" &&
+                              selectedIngredient.trim() === "")
                           }
                         >
                           <Plus className="h-4 w-4" />
@@ -2514,11 +2773,17 @@ export default function StockManagement() {
                     {/* Display added custom ingredients */}
                     {customIngredients.length > 0 && (
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium">Ingredientes agregados:</Label>
+                        <Label className="text-sm font-medium">
+                          Ingredientes agregados:
+                        </Label>
                         {customIngredients.map((ingredient, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                          >
                             <span className="text-sm">
-                              {ingredient.name} - {ingredient.quantity} {ingredient.unit}
+                              {ingredient.name} - {ingredient.quantity}{" "}
+                              {ingredient.unit}
                             </span>
                             <Button
                               type="button"
@@ -2534,7 +2799,8 @@ export default function StockManagement() {
                     )}
 
                     <p className="text-sm text-muted-foreground">
-                      Los ingredientes agregados se descontarán del stock cuando crees el producto.
+                      Los ingredientes agregados se descontarán del stock cuando
+                      crees el producto.
                     </p>
                   </div>
                 </>
@@ -2543,47 +2809,79 @@ export default function StockManagement() {
               {/* Recipe Ingredients Display */}
               {!useCustomIngredients && recipeIngredients.length > 0 && (
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium">Ingredientes de la receta:</Label>
+                  <Label className="text-sm font-medium">
+                    Ingredientes de la receta:
+                  </Label>
                   <p className="text-sm text-muted-foreground">
-                    Especifica cuántas unidades del producto vas a crear. Los ingredientes se descontarán automáticamente.
+                    Especifica cuántas unidades del producto vas a crear. Los
+                    ingredientes se descontarán automáticamente.
                   </p>
 
                   {recipeIngredients.map((ingredient, index) => {
-                    const totalAmount = parseFloat(ingredient.quantity) * ingredient.availableStock;
-                    const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
+                    const totalAmount =
+                      parseFloat(ingredient.quantity) *
+                      ingredient.availableStock;
+                    const totalRequired =
+                      parseFloat(ingredient.quantity) *
+                      ingredient.requiredQuantity;
                     const hasEnoughStock = totalAmount >= totalRequired;
 
                     return (
-                      <div key={index} className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
+                      <div
+                        key={index}
+                        className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg"
+                      >
                         <div>
-                          <Label className="text-sm font-medium text-gray-700">Ingrediente</Label>
-                          <p className="text-sm font-semibold text-gray-900">{ingredient.name}</p>
+                          <Label className="text-sm font-medium text-gray-700">
+                            Ingrediente
+                          </Label>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {ingredient.name}
+                          </p>
                           <p className="text-xs text-green-500">
                             {ingredient.quantity} {ingredient.unit} por unidad
                           </p>
                         </div>
                         <div>
-                          <Label className="text-sm font-medium text-gray-700">Cantidad a crear</Label>
+                          <Label className="text-sm font-medium text-gray-700">
+                            Cantidad a crear
+                          </Label>
                           <Input
                             type="number"
                             min="1"
                             value={ingredient.requiredQuantity}
-                            onChange={(e) => updateIngredientQuantity(index, parseInt(e.target.value) || 1)}
+                            onChange={(e) =>
+                              updateIngredientQuantity(
+                                index,
+                                parseInt(e.target.value) || 1
+                              )
+                            }
                             className="h-10 text-center font-medium"
                           />
                           <p className="text-xs text-gray-500 mt-1">
-                            Total necesario: {totalRequired.toFixed(0)} {ingredient.unit}
+                            Total necesario: {totalRequired.toFixed(0)}{" "}
+                            {ingredient.unit}
                           </p>
                         </div>
                         <div>
-                          <Label className="text-sm font-medium text-gray-700">Stock disponible</Label>
-                          <p className={`text-lg font-bold ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
-                            {ingredient.availableStock * Number(ingredient?.quantity)} {ingredient.unit}
+                          <Label className="text-sm font-medium text-gray-700">
+                            Stock disponible
+                          </Label>
+                          <p
+                            className={`text-lg font-bold ${hasEnoughStock ? "text-green-600" : "text-red-600"}`}
+                          >
+                            {ingredient.availableStock *
+                              Number(ingredient?.quantity)}{" "}
+                            {ingredient.unit}
                           </p>
                           <p>Available: {ingredient.availableStock}</p>
                           {!hasEnoughStock && (
                             <p className="text-xs text-red-600 font-medium">
-                              {ingredient.availableStock * Number(ingredient?.quantity) - Number(ingredient.quantity) * ingredient.requiredQuantity} missing
+                              {ingredient.availableStock *
+                                Number(ingredient?.quantity) -
+                                Number(ingredient.quantity) *
+                                  ingredient.requiredQuantity}{" "}
+                              missing
                             </p>
                           )}
                         </div>
@@ -2593,14 +2891,19 @@ export default function StockManagement() {
 
                   {/* Add New Ingredient to Existing Recipe */}
                   <div className="border-t pt-4 mt-4">
-                    <Label className="text-sm font-medium mb-3 block">Agregar nuevo ingrediente a esta receta:</Label>
+                    <Label className="text-sm font-medium mb-3 block">
+                      Agregar nuevo ingrediente a esta receta:
+                    </Label>
                     <div className="grid grid-cols-12 gap-2">
                       <div className="col-span-5">
                         <Input
                           placeholder="Nombre del ingrediente"
                           value={newIngredient.name}
                           onChange={(e) =>
-                            setNewIngredient({ ...newIngredient, name: e.target.value })
+                            setNewIngredient({
+                              ...newIngredient,
+                              name: e.target.value,
+                            })
                           }
                         />
                       </div>
@@ -2610,7 +2913,10 @@ export default function StockManagement() {
                           placeholder="Cantidad"
                           value={newIngredient.quantity}
                           onChange={(e) =>
-                            setNewIngredient({ ...newIngredient, quantity: e.target.value })
+                            setNewIngredient({
+                              ...newIngredient,
+                              quantity: e.target.value,
+                            })
                           }
                         />
                       </div>
@@ -2644,14 +2950,17 @@ export default function StockManagement() {
                           variant="secondary"
                           className="w-full"
                           onClick={handleAddIngredientToExistingRecipe}
-                          disabled={!newIngredient.name || !newIngredient.quantity}
+                          disabled={
+                            !newIngredient.name || !newIngredient.quantity
+                          }
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Este ingrediente se agregará a la receta seleccionada y se guardará permanentemente.
+                      Este ingrediente se agregará a la receta seleccionada y se
+                      guardará permanentemente.
                     </p>
                   </div>
 
@@ -2680,7 +2989,8 @@ export default function StockManagement() {
               )}
 
               <p className="text-sm text-muted-foreground">
-                Al agregar este producto, los ingredientes se descontarán automáticamente del stock.
+                Al agregar este producto, los ingredientes se descontarán
+                automáticamente del stock.
               </p>
             </div>
 
@@ -2700,12 +3010,17 @@ export default function StockManagement() {
                 <Input
                   id="purchase_price"
                   type="number"
-                  value={newProduct.purchase_price === 0 ? "" : newProduct.purchase_price}
+                  value={
+                    newProduct.purchase_price === 0
+                      ? ""
+                      : newProduct.purchase_price
+                  }
                   placeholder="0.00"
                   onChange={(e) =>
                     setNewProduct({
                       ...newProduct,
-                      purchase_price: e.target.value === "" ? 0 : Number(e.target.value),
+                      purchase_price:
+                        e.target.value === "" ? 0 : Number(e.target.value),
                     })
                   }
                 />
@@ -2715,12 +3030,15 @@ export default function StockManagement() {
                 <Input
                   id="sale_price"
                   type="number"
-                  value={newProduct.sale_price === 0 ? "" : newProduct.sale_price}
+                  value={
+                    newProduct.sale_price === 0 ? "" : newProduct.sale_price
+                  }
                   placeholder="0.00"
                   onChange={(e) =>
                     setNewProduct({
                       ...newProduct,
-                      sale_price: e.target.value === "" ? 0 : Number(e.target.value),
+                      sale_price:
+                        e.target.value === "" ? 0 : Number(e.target.value),
                     })
                   }
                 />
@@ -2828,7 +3146,9 @@ export default function StockManagement() {
             {/* Recipe Selection Field for Edit */}
             <div className="space-y-4 border rounded-lg p-4">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">Receta (Opcional)</Label>
+                <Label className="text-base font-semibold">
+                  Receta (Opcional)
+                </Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -2841,7 +3161,11 @@ export default function StockManagement() {
               </div>
 
               <Select
-                value={editingProduct?.has_recipe ? selectedEditRecipeId : "no-recipe"}
+                value={
+                  editingProduct?.has_recipe
+                    ? selectedEditRecipeId
+                    : "no-recipe"
+                }
                 onValueChange={handleEditRecipeSelection}
               >
                 <SelectTrigger>
@@ -2851,17 +3175,23 @@ export default function StockManagement() {
                   <SelectItem value="no-recipe">Sin receta</SelectItem>
                   {/* Show Recipes only (filter out ingredients from recipesData) */}
                   {recipesData
-                    .filter((recipe) => recipe.type === 'recipe')
+                    .filter((recipe) => recipe.type === "recipe")
                     .map((recipe) => (
-                      <SelectItem key={`recipe-${recipe.id}`} value={recipe.id.toString()}>
+                      <SelectItem
+                        key={`recipe-${recipe.id}`}
+                        value={recipe.id.toString()}
+                      >
                         {recipe.name} ({recipe.category}) - Receta
                       </SelectItem>
                     ))}
                   {/* Show Ingredients from productsData */}
                   {productsData
-                    .filter((product) => product.type === 'ingredient')
+                    .filter((product) => product.type === "ingredient")
                     .map((ingredient) => (
-                      <SelectItem key={`ingredient-${ingredient.id}`} value={ingredient.id.toString()}>
+                      <SelectItem
+                        key={`ingredient-${ingredient.id}`}
+                        value={ingredient.id.toString()}
+                      >
                         {ingredient.name} ({ingredient.category}) - Ingrediente
                       </SelectItem>
                     ))}
@@ -2869,67 +3199,92 @@ export default function StockManagement() {
               </Select>
 
               {/* Show ingredient information if an ingredient is selected */}
-              {selectedEditRecipeId && selectedEditRecipeId !== "no-recipe" && (() => {
-                // Check if selected item is an ingredient
-                const selectedIngredient = productsData.find(product =>
-                  product.type === 'ingredient' && product.id.toString() === selectedEditRecipeId
-                );
+              {selectedEditRecipeId &&
+                selectedEditRecipeId !== "no-recipe" &&
+                (() => {
+                  // Check if selected item is an ingredient
+                  const selectedIngredient = productsData.find(
+                    (product) =>
+                      product.type === "ingredient" &&
+                      product.id.toString() === selectedEditRecipeId
+                  );
 
-                if (selectedIngredient) {
-                  const unit = extractUnitFromDescription(selectedIngredient.description || "");
-                  const conversionFactor = extractConversionFromDescription(selectedIngredient.description || "");
-                  const requiredQuantity = 1; // Default quantity for ingredients (edit mode)
+                  if (selectedIngredient) {
+                    const unit = extractUnitFromDescription(
+                      selectedIngredient.description || ""
+                    );
+                    const conversionFactor = extractConversionFromDescription(
+                      selectedIngredient.description || ""
+                    );
+                    const requiredQuantity = 1; // Default quantity for ingredients (edit mode)
 
-                  // Calculate amounts using conversion factor
-                  const totalAmount = (selectedIngredient.stock || 0) * conversionFactor;
-                  const totalRequired = requiredQuantity * conversionFactor;
-                  const hasEnoughStock = totalAmount >= totalRequired;
+                    // Calculate amounts using conversion factor
+                    const totalAmount =
+                      (selectedIngredient.stock || 0) * conversionFactor;
+                    const totalRequired = requiredQuantity * conversionFactor;
+                    const hasEnoughStock = totalAmount >= totalRequired;
 
-                  return (
-                    <div className="mt-4 space-y-4">
-                      <h3 className="font-medium text-gray-900">Ingredientes del producto:</h3>
-                      <p className="text-sm text-gray-600">
-                        Información del ingrediente seleccionado.
-                      </p>
+                    return (
+                      <div className="mt-4 space-y-4">
+                        <h3 className="font-medium text-gray-900">
+                          Ingredientes del producto:
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          Información del ingrediente seleccionado.
+                        </p>
 
-                      <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700">Ingrediente</Label>
-                          <p className="text-sm font-semibold text-gray-900">{selectedIngredient.name}</p>
-                          <p className="text-xs text-green-500">
-                            {conversionFactor} {unit} por unidad
-                          </p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700">Cantidad por unidad</Label>
-                          <p className="text-lg font-bold text-gray-900">{requiredQuantity}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Total necesario: {totalRequired} {unit}
-                          </p>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700">Stock disponible</Label>
-                          <p className={`text-lg font-bold ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
-                            {totalAmount} {unit}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Available: {selectedIngredient.stock || 0} units ({totalAmount} {unit})
-                          </p>
-                          {!hasEnoughStock && (
-                            <p className="text-xs text-red-600 font-medium">
-                              {(totalRequired - totalAmount)} {unit} missing
+                        <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700">
+                              Ingrediente
+                            </Label>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {selectedIngredient.name}
                             </p>
-                          )}
+                            <p className="text-xs text-green-500">
+                              {conversionFactor} {unit} por unidad
+                            </p>
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700">
+                              Cantidad por unidad
+                            </Label>
+                            <p className="text-lg font-bold text-gray-900">
+                              {requiredQuantity}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Total necesario: {totalRequired} {unit}
+                            </p>
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700">
+                              Stock disponible
+                            </Label>
+                            <p
+                              className={`text-lg font-bold ${hasEnoughStock ? "text-green-600" : "text-red-600"}`}
+                            >
+                              {totalAmount} {unit}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Available: {selectedIngredient.stock || 0} units (
+                              {totalAmount} {unit})
+                            </p>
+                            {!hasEnoughStock && (
+                              <p className="text-xs text-red-600 font-medium">
+                                {totalRequired - totalAmount} {unit} missing
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
+                    );
+                  }
+                  return null;
+                })()}
 
               <p className="text-sm text-muted-foreground">
-                Si seleccionas una receta, el stock de los ingredientes se descontará automáticamente cuando se haga un pedido.
+                Si seleccionas una receta, el stock de los ingredientes se
+                descontará automáticamente cuando se haga un pedido.
               </p>
             </div>
 
@@ -2938,13 +3293,31 @@ export default function StockManagement() {
               <div className="space-y-2">
                 <Label>Ingredientes de la Receta</Label>
                 <div className="space-y-3 max-h-48 overflow-y-auto border rounded-md p-3">
+                  {/* Column Headers */}
+                  <div className="grid grid-cols-12 gap-2 items-center pb-2 border-b border-gray-200">
+                    <div className="col-span-3">
+                      <span className="text-xs font-medium text-gray-600">Ingrediente</span>
+                    </div>
+                    <div className="col-span-3">
+                      <span className="text-xs font-medium text-gray-600">Cantidad</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-xs font-medium text-gray-600">Unidad</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-xs font-medium text-gray-600">Requerido</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-xs font-medium text-gray-600">Estado</span>
+                    </div>
+                  </div>
                   {(() => {
                     try {
                       // Handle different ingredient data formats
                       let ingredients = [];
 
                       if (editingProduct.ingredients) {
-                        if (typeof editingProduct.ingredients === 'string') {
+                        if (typeof editingProduct.ingredients === "string") {
                           ingredients = JSON.parse(editingProduct.ingredients);
                         } else if (Array.isArray(editingProduct.ingredients)) {
                           ingredients = editingProduct.ingredients;
@@ -2955,45 +3328,79 @@ export default function StockManagement() {
                       if (!ingredients || ingredients.length === 0) {
                         return (
                           <div className="text-sm text-muted-foreground">
-                            Este producto tiene receta pero no se encontraron ingredientes.
+                            Este producto tiene receta pero no se encontraron
+                            ingredientes.
                           </div>
                         );
                       }
 
-                      return ingredients.map((ingredient: any, index: number) => (
-                        <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                          <div className="col-span-4">
-                            <span className="text-sm font-medium">{ingredient.name}</span>
+                      return ingredients.map(
+                        (ingredient: any, index: number) => (
+                          <div
+                            key={index}
+                            className="grid grid-cols-12 gap-2 items-center"
+                          >
+                            <div className="col-span-3">
+                              <span className="text-sm font-medium">
+                                {ingredient.name}
+                              </span>
+                            </div>
+                            <div className="col-span-3">
+                              <Input
+                                type="number"
+                                value={ingredient.quantity}
+                                onChange={(e) => {
+                                  const updatedIngredients = [...ingredients];
+                                  updatedIngredients[index] = {
+                                    ...updatedIngredients[index],
+                                    quantity: e.target.value,
+                                  };
+                                  setEditingProduct({
+                                    ...editingProduct,
+                                    ingredients:
+                                      JSON.stringify(updatedIngredients),
+                                  });
+                                }}
+                                className="h-8"
+                                min="0"
+                                step="0.01"
+                                placeholder="Cantidad"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-sm text-muted-foreground">
+                                {ingredient.unit}
+                              </span>
+                            </div>
+                            <div className="col-span-2">
+                              <Input
+                                type="number"
+                                value={ingredient.requiredQuantity}
+                                onChange={(e) => {
+                                  const updatedIngredients = [...ingredients];
+                                  updatedIngredients[index] = {
+                                    ...updatedIngredients[index],
+                                    requiredQuantity: parseInt(e.target.value) || 1,
+                                  };
+                                  setEditingProduct({
+                                    ...editingProduct,
+                                    ingredients:
+                                      JSON.stringify(updatedIngredients),
+                                  });
+                                }}
+                                className="h-8"
+                                min="1"
+                                placeholder="Requerido"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-xs text-green-600">
+                                ✓ Válido
+                              </span>
+                            </div>
                           </div>
-                          <div className="col-span-3">
-                            <Input
-                              type="number"
-                              value={ingredient.quantity}
-                              onChange={(e) => {
-                                const updatedIngredients = [...ingredients];
-                                updatedIngredients[index] = {
-                                  ...updatedIngredients[index],
-                                  quantity: e.target.value
-                                };
-                                setEditingProduct({
-                                  ...editingProduct,
-                                  ingredients: JSON.stringify(updatedIngredients)
-                                });
-                              }}
-                              className="h-8"
-                              min="0"
-                              step="0.01"
-                              placeholder="Cantidad"
-                            />
-                          </div>
-                          <div className="col-span-2">
-                            <span className="text-sm text-muted-foreground">{ingredient.unit}</span>
-                          </div>
-                          <div className="col-span-3">
-                            <span className="text-xs text-green-600">✓ Válido</span>
-                          </div>
-                        </div>
-                      ));
+                        )
+                      );
                     } catch (error) {
                       return (
                         <div className="text-sm text-red-600">
@@ -3004,7 +3411,7 @@ export default function StockManagement() {
                   })()}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Puedes modificar las cantidades de los ingredientes.
+                  Puedes modificar las cantidades y la cantidad requerida de los ingredientes.
                 </p>
               </div>
             )}
@@ -3089,13 +3496,14 @@ export default function StockManagement() {
                 <div className="flex items-center gap-4">
                   <span>Se importarán {importedProducts.length} productos</span>
                   <Badge variant="outline">
-                    {importedProducts.filter(p => p.is_active).length} activos
+                    {importedProducts.filter((p) => p.is_active).length} activos
                   </Badge>
                   <Badge variant="outline">
-                    {importedProducts.filter(p => p.is_pr).length} PR Token
+                    {importedProducts.filter((p) => p.is_pr).length} PR Token
                   </Badge>
                   <Badge variant="outline">
-                    {importedProducts.filter(p => p.is_courtsey).length} Cortesía
+                    {importedProducts.filter((p) => p.is_courtsey).length}{" "}
+                    Cortesía
                   </Badge>
                 </div>
                 <div>
@@ -3214,11 +3622,11 @@ export default function StockManagement() {
                             className={cn(
                               "font-normal",
                               calculateStatus(product.stock) === "sufficient" &&
-                              "bg-green-50 text-green-700",
+                                "bg-green-50 text-green-700",
                               calculateStatus(product.stock) === "low" &&
-                              "bg-amber-50 text-amber-700",
+                                "bg-amber-50 text-amber-700",
                               calculateStatus(product.stock) === "out" &&
-                              "bg-red-50 text-red-700"
+                                "bg-red-50 text-red-700"
                             )}
                           >
                             {product.stock}{" "}
@@ -3284,7 +3692,10 @@ export default function StockManagement() {
 
       {/* Transaction History Modal */}
       {showTransactionHistoryModal && selectedProductForHistory && (
-        <Dialog open={showTransactionHistoryModal} onOpenChange={setShowTransactionHistoryModal}>
+        <Dialog
+          open={showTransactionHistoryModal}
+          onOpenChange={setShowTransactionHistoryModal}
+        >
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -3323,24 +3734,37 @@ export default function StockManagement() {
                           <td className="p-3">
                             <Badge
                               variant={
-                                transaction.type === 'sale' ? 'default' :
-                                  transaction.type === 'purchase' ? 'secondary' :
-                                    'destructive'
+                                transaction.type === "sale"
+                                  ? "default"
+                                  : transaction.type === "purchase"
+                                    ? "secondary"
+                                    : "destructive"
                               }
                             >
-                              {transaction.type === 'sale' ? 'Venta' :
-                                transaction.type === 'purchase' ? 'Compra' :
-                                  'Ajuste'}
+                              {transaction.type === "sale"
+                                ? "Venta"
+                                : transaction.type === "purchase"
+                                  ? "Compra"
+                                  : "Ajuste"}
                             </Badge>
                           </td>
                           <td className="p-3">
-                            <span className={transaction.quantity > 0 ? 'text-green-600' : 'text-red-600'}>
-                              {transaction.quantity > 0 ? '+' : ''}{transaction.quantity}
+                            <span
+                              className={
+                                transaction.quantity > 0
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }
+                            >
+                              {transaction.quantity > 0 ? "+" : ""}
+                              {transaction.quantity}
                             </span>
                           </td>
                           <td className="p-3">{transaction.user}</td>
                           <td className="p-3">
-                            {transaction.price > 0 ? `$${transaction.price.toFixed(2)}` : '-'}
+                            {transaction.price > 0
+                              ? `$${transaction.price.toFixed(2)}`
+                              : "-"}
                           </td>
                           <td className="p-3 text-sm text-muted-foreground">
                             {transaction.details}
@@ -3357,7 +3781,10 @@ export default function StockManagement() {
       )}
 
       {/* Create Recipe Dialog */}
-      <Dialog open={showCreateRecipeDialog} onOpenChange={setShowCreateRecipeDialog}>
+      <Dialog
+        open={showCreateRecipeDialog}
+        onOpenChange={setShowCreateRecipeDialog}
+      >
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Crear Nueva Receta</DialogTitle>
@@ -3373,14 +3800,18 @@ export default function StockManagement() {
                   id="recipe-name"
                   placeholder="Ej: Mojito, Margarita..."
                   value={newRecipe.name}
-                  onChange={(e) => setNewRecipe({ ...newRecipe, name: e.target.value })}
+                  onChange={(e) =>
+                    setNewRecipe({ ...newRecipe, name: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="recipe-category">Categoría</Label>
                 <Select
                   value={newRecipe.category}
-                  onValueChange={(value) => setNewRecipe({ ...newRecipe, category: value })}
+                  onValueChange={(value) =>
+                    setNewRecipe({ ...newRecipe, category: value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -3401,18 +3832,29 @@ export default function StockManagement() {
               {newRecipe.ingredients.length > 0 && (
                 <div className="space-y-2 max-h-32 overflow-y-auto">
                   {newRecipe.ingredients.map((ingredient, index) => {
-                    const validation = ingredientValidation.find(v => v.ingredient === ingredient.name);
+                    const validation = ingredientValidation.find(
+                      (v) => v.ingredient === ingredient.name
+                    );
                     return (
-                      <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 bg-muted rounded"
+                      >
                         <div className="flex-1">
                           <span className="text-sm">
-                            {ingredient.name} - {ingredient.quantity} {ingredient.unit}
+                            {ingredient.name} - {ingredient.quantity}{" "}
+                            {ingredient.unit}
                           </span>
                           {validation && (
-                            <div className={`text-xs mt-1 ${validation.status === 'valid' ? 'text-green-600' :
-                                validation.status === 'insufficient_stock' ? 'text-orange-600' :
-                                  'text-red-600'
-                              }`}>
+                            <div
+                              className={`text-xs mt-1 ${
+                                validation.status === "valid"
+                                  ? "text-green-600"
+                                  : validation.status === "insufficient_stock"
+                                    ? "text-orange-600"
+                                    : "text-red-600"
+                              }`}
+                            >
                               {validation.message}
                             </div>
                           )}
@@ -3421,7 +3863,9 @@ export default function StockManagement() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRemoveIngredientFromRecipe(index)}
+                          onClick={() =>
+                            handleRemoveIngredientFromRecipe(index)
+                          }
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -3439,7 +3883,9 @@ export default function StockManagement() {
                 <div className="col-span-5">
                   <Select
                     value={newIngredient.name}
-                    onValueChange={(value) => setNewIngredient({ ...newIngredient, name: value })}
+                    onValueChange={(value) =>
+                      setNewIngredient({ ...newIngredient, name: value })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar ingrediente" />
@@ -3464,12 +3910,20 @@ export default function StockManagement() {
                     value={newIngredient.quantity}
                     onChange={(e) => {
                       const value = e.target.value;
-                      if (value === '' || (Number(value) >= 0 && !value.includes('-'))) {
+                      if (
+                        value === "" ||
+                        (Number(value) >= 0 && !value.includes("-"))
+                      ) {
                         setNewIngredient({ ...newIngredient, quantity: value });
                       }
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                      if (
+                        e.key === "-" ||
+                        e.key === "+" ||
+                        e.key === "e" ||
+                        e.key === "E"
+                      ) {
                         e.preventDefault();
                       }
                     }}
@@ -3480,7 +3934,9 @@ export default function StockManagement() {
                 <div className="col-span-2">
                   <Select
                     value={newIngredient.unit}
-                    onValueChange={(value) => setNewIngredient({ ...newIngredient, unit: value })}
+                    onValueChange={(value) =>
+                      setNewIngredient({ ...newIngredient, unit: value })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -3527,7 +3983,11 @@ export default function StockManagement() {
             </Button>
             <Button
               onClick={handleCreateRecipe}
-              disabled={!newRecipe.name || newRecipe.ingredients.length === 0 || isLoading}
+              disabled={
+                !newRecipe.name ||
+                newRecipe.ingredients.length === 0 ||
+                isLoading
+              }
             >
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -3540,7 +4000,10 @@ export default function StockManagement() {
       </Dialog>
 
       {/* Create Recipe Dialog for Edit Modal */}
-      <Dialog open={showCreateRecipeDialogEdit} onOpenChange={setShowCreateRecipeDialogEdit}>
+      <Dialog
+        open={showCreateRecipeDialogEdit}
+        onOpenChange={setShowCreateRecipeDialogEdit}
+      >
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Crear Nueva Receta</DialogTitle>
@@ -3591,7 +4054,10 @@ export default function StockManagement() {
                     placeholder="Nombre del ingrediente"
                     value={newIngredient.name}
                     onChange={(e) =>
-                      setNewIngredient({ ...newIngredient, name: e.target.value })
+                      setNewIngredient({
+                        ...newIngredient,
+                        name: e.target.value,
+                      })
                     }
                   />
                 </div>
@@ -3601,7 +4067,10 @@ export default function StockManagement() {
                     placeholder="Cantidad"
                     value={newIngredient.quantity}
                     onChange={(e) =>
-                      setNewIngredient({ ...newIngredient, quantity: e.target.value })
+                      setNewIngredient({
+                        ...newIngredient,
+                        quantity: e.target.value,
+                      })
                     }
                   />
                 </div>
@@ -3646,10 +4115,15 @@ export default function StockManagement() {
             {/* Ingredients List */}
             {newRecipe.ingredients.length > 0 && (
               <div className="space-y-3">
-                <Label className="text-sm font-medium">Ingredientes de la Receta</Label>
+                <Label className="text-sm font-medium">
+                  Ingredientes de la Receta
+                </Label>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {newRecipe.ingredients.map((ingredient, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
                       <div className="flex items-center space-x-3">
                         <span className="font-medium">{ingredient.name}</span>
                         <span className="text-sm text-gray-600">
@@ -3684,7 +4158,11 @@ export default function StockManagement() {
             </Button>
             <Button
               onClick={handleCreateRecipeEdit}
-              disabled={!newRecipe.name || newRecipe.ingredients.length === 0 || isLoading}
+              disabled={
+                !newRecipe.name ||
+                newRecipe.ingredients.length === 0 ||
+                isLoading
+              }
             >
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -3702,21 +4180,27 @@ export default function StockManagement() {
           <DialogHeader>
             <DialogTitle>Transferir Productos Seleccionados</DialogTitle>
             <DialogDescription>
-              Configura las cantidades y selecciona las barras de destino para {selectedProducts.length} producto(s)
+              Configura las cantidades y selecciona las barras de destino para{" "}
+              {selectedProducts.length} producto(s)
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6 max-h-[60vh] overflow-y-auto">
             {/* Products List with Quantities */}
             <div className="space-y-4">
-              <Label className="text-base font-medium">Productos a transferir:</Label>
+              <Label className="text-base font-medium">
+                Productos a transferir:
+              </Label>
               <div className="space-y-3">
-                {selectedProducts.map(productId => {
-                  const product = productsData.find(p => p.id === productId);
+                {selectedProducts.map((productId) => {
+                  const product = productsData.find((p) => p.id === productId);
                   if (!product) return null;
 
                   return (
-                    <div key={productId} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div
+                      key={productId}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
                       <div className="flex items-center space-x-3">
                         {product.image_url && (
                           <img
@@ -3733,7 +4217,10 @@ export default function StockManagement() {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Label htmlFor={`quantity-${productId}`} className="text-sm">
+                        <Label
+                          htmlFor={`quantity-${productId}`}
+                          className="text-sm"
+                        >
                           Cantidad:
                         </Label>
                         <Input
@@ -3744,15 +4231,26 @@ export default function StockManagement() {
                           value={transferQuantities[productId] || 1}
                           onKeyDown={(e) => {
                             // Prevent minus key, plus key, and 'e' key
-                            if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                            if (
+                              e.key === "-" ||
+                              e.key === "+" ||
+                              e.key === "e" ||
+                              e.key === "E"
+                            ) {
                               e.preventDefault();
                             }
                           }}
                           onChange={(e) => {
                             const value = e.target.value;
                             // Only allow positive numbers and empty string
-                            if (value === '' || (Number(value) >= 1 && !value.includes('-'))) {
-                              handleQuantityChange(productId, parseInt(value) || 1);
+                            if (
+                              value === "" ||
+                              (Number(value) >= 1 && !value.includes("-"))
+                            ) {
+                              handleQuantityChange(
+                                productId,
+                                parseInt(value) || 1
+                              );
                             }
                           }}
                           className="w-20"
@@ -3766,9 +4264,18 @@ export default function StockManagement() {
 
             {/* Bar Selection */}
             <div className="space-y-4">
-              <Label className="text-base font-medium">Barras de destino:</Label>
+              <Label className="text-base font-medium">
+                Barras de destino:
+              </Label>
               <div className="grid grid-cols-2 gap-3">
-                {["Bar Central", "Bar Norte", "Bar Sur", "El Alamo", "Stock General", "Otro Local"].map(barName => (
+                {[
+                  "Bar Central",
+                  "Bar Norte",
+                  "Bar Sur",
+                  "El Alamo",
+                  "Stock General",
+                  "Otro Local",
+                ].map((barName) => (
                   <div key={barName} className="flex items-center space-x-2">
                     <Checkbox
                       id={`bar-${barName}`}
@@ -3821,19 +4328,23 @@ export default function StockManagement() {
           <DialogHeader>
             <DialogTitle>Registrar Re-ingreso de Stock</DialogTitle>
             <DialogDescription>
-              Registra el re-ingreso de {selectedProducts.length} producto(s) no utilizados
+              Registra el re-ingreso de {selectedProducts.length} producto(s) no
+              utilizados
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 max-h-[60vh] overflow-y-auto">
             {/* Products List with Quantities */}
             <div className="space-y-3">
-              {selectedProducts.map(productId => {
-                const product = productsData.find(p => p.id === productId);
+              {selectedProducts.map((productId) => {
+                const product = productsData.find((p) => p.id === productId);
                 if (!product) return null;
 
                 return (
-                  <div key={productId} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div
+                    key={productId}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
                     <div className="flex items-center space-x-3">
                       {product.image_url && (
                         <img
@@ -3850,7 +4361,10 @@ export default function StockManagement() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Label htmlFor={`reentry-quantity-${productId}`} className="text-sm">
+                      <Label
+                        htmlFor={`reentry-quantity-${productId}`}
+                        className="text-sm"
+                      >
                         Cantidad:
                       </Label>
                       <Input
@@ -3858,7 +4372,12 @@ export default function StockManagement() {
                         type="number"
                         min="1"
                         value={adjustmentQuantities[productId] || 1}
-                        onChange={(e) => handleAdjustmentQuantityChange(productId, parseInt(e.target.value) || 1)}
+                        onChange={(e) =>
+                          handleAdjustmentQuantityChange(
+                            productId,
+                            parseInt(e.target.value) || 1
+                          )
+                        }
                         className="w-20"
                       />
                     </div>
@@ -3869,7 +4388,9 @@ export default function StockManagement() {
 
             {/* Reason */}
             <div className="space-y-2">
-              <Label htmlFor="reentry-reason">Motivo del re-ingreso (opcional):</Label>
+              <Label htmlFor="reentry-reason">
+                Motivo del re-ingreso (opcional):
+              </Label>
               <Textarea
                 id="reentry-reason"
                 placeholder="Ej: Botellas no abiertas del evento, productos devueltos..."
@@ -3891,10 +4412,7 @@ export default function StockManagement() {
             >
               Cancelar
             </Button>
-            <Button
-              onClick={handleReentry}
-              disabled={isLoading}
-            >
+            <Button onClick={handleReentry} disabled={isLoading}>
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -3921,12 +4439,15 @@ export default function StockManagement() {
           <div className="space-y-4 max-h-[60vh] overflow-y-auto">
             {/* Products List with Quantities */}
             <div className="space-y-3">
-              {selectedProducts.map(productId => {
-                const product = productsData.find(p => p.id === productId);
+              {selectedProducts.map((productId) => {
+                const product = productsData.find((p) => p.id === productId);
                 if (!product) return null;
 
                 return (
-                  <div key={productId} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div
+                    key={productId}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
                     <div className="flex items-center space-x-3">
                       {product.image_url && (
                         <img
@@ -3943,7 +4464,10 @@ export default function StockManagement() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Label htmlFor={`loss-quantity-${productId}`} className="text-sm">
+                      <Label
+                        htmlFor={`loss-quantity-${productId}`}
+                        className="text-sm"
+                      >
                         Cantidad:
                       </Label>
                       <Input
@@ -3952,7 +4476,12 @@ export default function StockManagement() {
                         min="1"
                         max={product.stock}
                         value={adjustmentQuantities[productId] || 1}
-                        onChange={(e) => handleAdjustmentQuantityChange(productId, parseInt(e.target.value) || 1)}
+                        onChange={(e) =>
+                          handleAdjustmentQuantityChange(
+                            productId,
+                            parseInt(e.target.value) || 1
+                          )
+                        }
                         className="w-20"
                       />
                     </div>
@@ -3963,7 +4492,9 @@ export default function StockManagement() {
 
             {/* Reason (Required for losses) */}
             <div className="space-y-2">
-              <Label htmlFor="loss-reason">Motivo de la pérdida (requerido):</Label>
+              <Label htmlFor="loss-reason">
+                Motivo de la pérdida (requerido):
+              </Label>
               <Textarea
                 id="loss-reason"
                 placeholder="Ej: Botella rota, producto vencido, derrame..."
@@ -4005,7 +4536,10 @@ export default function StockManagement() {
       </Dialog>
 
       {/* Clear Records Confirmation Modal */}
-      <Dialog open={showClearRecordsModal} onOpenChange={setShowClearRecordsModal}>
+      <Dialog
+        open={showClearRecordsModal}
+        onOpenChange={setShowClearRecordsModal}
+      >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
@@ -4013,7 +4547,8 @@ export default function StockManagement() {
               Confirmar Limpieza de Registros
             </DialogTitle>
             <DialogDescription>
-              Esta acción eliminará permanentemente todos los registros de transferencias y ajustes de stock.
+              Esta acción eliminará permanentemente todos los registros de
+              transferencias y ajustes de stock.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -4021,18 +4556,28 @@ export default function StockManagement() {
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-red-700">
-                  <p className="font-medium mb-2">⚠️ Advertencia: Esta acción no se puede deshacer</p>
+                  <p className="font-medium mb-2">
+                    ⚠️ Advertencia: Esta acción no se puede deshacer
+                  </p>
                   <ul className="list-disc list-inside space-y-1 text-red-600">
-                    <li>Se eliminarán todos los registros de transferencias entre barras</li>
-                    <li>Se eliminarán todos los registros de ajustes de stock</li>
+                    <li>
+                      Se eliminarán todos los registros de transferencias entre
+                      barras
+                    </li>
+                    <li>
+                      Se eliminarán todos los registros de ajustes de stock
+                    </li>
                     <li>Se perderá el historial completo de movimientos</li>
-                    <li>Los productos y el stock actual no se verán afectados</li>
+                    <li>
+                      Los productos y el stock actual no se verán afectados
+                    </li>
                   </ul>
                 </div>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              ¿Estás seguro de que deseas continuar con la limpieza de registros?
+              ¿Estás seguro de que deseas continuar con la limpieza de
+              registros?
             </p>
           </div>
           <DialogFooter>

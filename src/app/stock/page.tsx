@@ -1231,7 +1231,12 @@ const Stock = () => {
     toast.success(
       `${data.quantity} unidades de ${data.product} reingresadas al stock`
     );
-    // Aquí iría la lógica para actualizar el stock
+
+    // Refresh data to show updated stock
+    await Promise.all([
+      fetchProducts(),
+      fetchStocksOfBar()
+    ]);
   };
   const handleStockLoss = async (data: any) => {
     console.log("Pérdida registrada:", data);
@@ -1253,7 +1258,12 @@ const Stock = () => {
     toast.success(
       `${data.quantity} unidades de ${data.product} registradas como pérdida`
     );
-    // Aquí iría la lógica para actualizar el stock
+
+    // Refresh data to show updated stock
+    await Promise.all([
+      fetchProducts(),
+      fetchStocksOfBar()
+    ]);
   };
 
   const handleToggleActive = async (
