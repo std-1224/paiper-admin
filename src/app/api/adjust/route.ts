@@ -5,7 +5,7 @@ export const GET = async () => {
     try {
         const { data, error } = await supabaseServerClient
             .from("adjust")
-            .select("*, inventory(bar_id,bars(name, location), products(name, category))");
+            .select("*, inventory(bar_id,bars(name, location), products(name, category))").order('created_at', { ascending: false });
         if (error) {
             throw error;
         }
