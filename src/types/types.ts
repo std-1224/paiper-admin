@@ -248,6 +248,7 @@ export interface Product {
 	sale_price: number;
 	created_at: string;
 	updated_at: string;
+	type?: 'product' | 'recipe' | 'ingredient'; // Type field to distinguish between products, recipes, and ingredients
 	has_recipe?: boolean;
 	ingredients?: string; // JSON string containing recipe ingredients
 	is_active?: boolean;
@@ -309,6 +310,7 @@ export type Recipe = {
 	purchase_price?: number;
 	sale_price?: number;
 	category?: string;
+	type?: string;
 };
 
 export type PersonType = 'Staff' | 'Invitados VIP' | 'Clientes frecuentes' | 'Promotores' | 'PR' | 'Embajadores de marca' | 'Staff interno autorizado';

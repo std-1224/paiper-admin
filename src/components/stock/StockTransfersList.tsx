@@ -57,7 +57,6 @@ export const StockTransfersList = ({
         throw new Error('Failed to fetch transfers');
       }
       const data = await response.json();
-      console.log("Fetched transfers:", data);
       setTransfersData(data || []);
     } catch (error) {
       console.error("Error fetching transfers:", error);

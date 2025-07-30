@@ -7,14 +7,15 @@ export const GET = async () => {
         const { data, error } = await supabaseServerClient
             .from('products')
             .select('*')
-            .eq('has_recipe', true);
+            .in('type', ['recipe', 'ingredient'])
+            .order('id', { ascending: true });
         if (error) {
             throw error;
         }
 
         return NextResponse.json(data, { status: 200 });
     } catch (error: any) {
-        console.error('Error fetching users:', error.message);
+        console.error('Error fetching recipes and ingredients:', error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 };
@@ -42,19 +43,21 @@ export const POST = async (req: Request) => {
             .from('products')
             .insert({
                 name,
-                ingredients: JSON.stringify(ingredientValidation.validatedIngredients), // Store with linked product info
+                ingredients: JSON.stringify(ingredients), // Store with availableStock set to recipe amount
                 stock: amount,
                 category,
-                has_recipe: true
+                type: 'recipe', // Set type as recipe
+                has_recipe: false, // Set has_recipe as false for new recipes
+                purchase_price: 0, // Recipes don't have purchase price
+                sale_price: 0, // Recipes don't have sale price initially
+                description: `Recipe with ${ingredientValidation.validatedIngredients.length} ingredients`,
+                image_url: '' // Default empty image URL
             })
             .select();
 
         if (error) throw error;
 
-        // Deduct ingredient stock if recipe amount > 0
-        if (amount > 0) {
-            await deductIngredientStock(ingredientValidation.validatedIngredients, amount);
-        }
+        // Note: Stock deduction is handled by the recipe system, not individual product linking
 
         return NextResponse.json(data, { status: 200 });
     } catch (error: any) {
@@ -96,12 +99,18 @@ export const PUT = async (req: Request) => {
             }, { status: 400 });
         }
 
+        // Add availableStock to ingredients based on recipe amount
+        const ingredientsWithStock = ingredientValidation.validatedIngredients.map(ingredient => ({
+            ...ingredient,
+            availableStock: amount || 1 // Set availableStock to recipe amount
+        }));
+
         // Update the recipe
         const { data, error } = await supabaseServerClient
             .from('products')
             .update({
                 name,
-                ingredients: JSON.stringify(ingredientValidation.validatedIngredients),
+                ingredients: JSON.stringify(ingredientsWithStock),
                 stock: amount,
                 category
             })
@@ -112,15 +121,7 @@ export const PUT = async (req: Request) => {
             throw error;
         }
 
-        // Handle stock changes if recipe amount increased
-        const currentAmount = currentRecipe.stock || 0;
-        const newAmount = amount || 0;
-        const stockIncrease = newAmount - currentAmount;
-
-        if (stockIncrease > 0) {
-            // Deduct additional ingredient stock for the increased amount
-            await deductIngredientStock(ingredientValidation.validatedIngredients, stockIncrease);
-        }
+        // Note: Stock changes are handled by the recipe system, not individual product linking
 
         return NextResponse.json(data, { status: 200 });
     } catch (error: any) {
@@ -157,103 +158,29 @@ export const DELETE = async (req: Request) => {
     }
 };
 
-// Helper function to validate ingredients exist in stock and link them to products
+// Helper function to validate and clean ingredients
 async function validateIngredients(ingredients: any[]) {
-    const errors = [];
     const validatedIngredients = [];
 
     for (const ingredient of ingredients) {
-        let linkedProduct = null;
-
-        // If ingredient already has a productId, validate it exists
-        if (ingredient.productId) {
-            const { data: product } = await supabaseServerClient
-                .from("products")
-                .select("id, name, stock")
-                .eq("id", ingredient.productId)
-                .single();
-
-            if (product) {
-                linkedProduct = product;
-            } else {
-                errors.push(`Product with ID "${ingredient.productId}" not found for ingredient "${ingredient.name}"`);
-                continue;
-            }
-        } else {
-            // Try to find a matching product by name
-            const { data: products } = await supabaseServerClient
-                .from("products")
-                .select("id, name, stock")
-                .ilike("name", `%${ingredient.name}%`)
-                .eq("has_recipe", false); // Only link to non-recipe products
-
-            if (products && products.length > 0) {
-                // Use the first matching product
-                linkedProduct = products[0];
-            }
+        // Validate required fields
+        if (!ingredient.name || !ingredient.quantity || !ingredient.unit) {
+            continue; // Skip invalid ingredients
         }
 
-        // Add the ingredient with linked product info
+        // Add clean ingredient without product linking
         validatedIngredients.push({
-            ...ingredient,
-            productId: linkedProduct?.id || null,
-            linkedProductName: linkedProduct?.name || null,
-            availableStock: linkedProduct?.stock || 0
+            name: ingredient.name,
+            quantity: ingredient.quantity,
+            unit: ingredient.unit
         });
-
-        // Warn if no product was found but don't fail validation
-        if (!linkedProduct) {
-            console.warn(`No matching product found for ingredient "${ingredient.name}". Recipe will use ingredient name only.`);
-        }
     }
 
     return {
-        isValid: errors.length === 0,
-        errors,
+        isValid: true, // Always valid since we're just cleaning the data
+        errors: [],
         validatedIngredients
     };
 }
 
-// Helper function to deduct ingredient stock when creating recipes
-async function deductIngredientStock(ingredients: any[], recipeAmount: number) {
-    for (const ingredient of ingredients) {
-        const requiredQuantity = parseFloat(ingredient.quantity) * recipeAmount;
 
-        // Skip if no linked product
-        if (!ingredient.productId) {
-            console.warn(`No linked product for ingredient: ${ingredient.name}. Skipping stock deduction.`);
-            continue;
-        }
-
-        // Get current product stock
-        const { data: product, error: fetchError } = await supabaseServerClient
-            .from("products")
-            .select("id, name, stock")
-            .eq("id", ingredient.productId)
-            .single();
-
-        if (fetchError || !product) {
-            console.error(`Failed to fetch product for ingredient: ${ingredient.name}`);
-            continue;
-        }
-
-        // Check if sufficient stock is available
-        if (product.stock < requiredQuantity) {
-            throw new Error(`Insufficient stock for ingredient: ${ingredient.name}. Available: ${product.stock}, Required: ${requiredQuantity}`);
-        }
-
-        // Deduct stock
-        const { error: updateError } = await supabaseServerClient
-            .from("products")
-            .update({
-                stock: product.stock - requiredQuantity
-            })
-            .eq("id", ingredient.productId);
-
-        if (updateError) {
-            throw new Error(`Failed to deduct stock for ingredient: ${ingredient.name}`);
-        }
-
-        console.log(`Deducted ${requiredQuantity} units of ${ingredient.name} from stock. Remaining: ${product.stock - requiredQuantity}`);
-    }
-}

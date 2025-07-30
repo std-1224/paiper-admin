@@ -108,8 +108,9 @@ export default function StockManagement() {
 
   // Recipe selection states for product modal
   const [selectedRecipeId, setSelectedRecipeId] = useState<string>("");
-  const [recipeIngredients, setRecipeIngredients] = useState<{ name: string; quantity: string; unit: string; requiredQuantity: number; availableStock: number; productId?: string }[]>([]);
-  const [stockValidationErrors, setStockValidationErrors] = useState<string[]>([]);
+  const [recipeIngredients, setRecipeIngredients] = useState<{ name: string; quantity: string; unit: string; requiredQuantity: number; availableStock: number; stock: number }[]>([]);
+  const [ingredientRequiredQuantity, setIngredientRequiredQuantity] = useState<number>(1);
+  // const [stockValidationErrors, setStockValidationErrors] = useState<string[]>([]);
   const [ingredientValidation, setIngredientValidation] = useState<any[]>([]);
 
   // Custom ingredient states for adding individual ingredients
@@ -126,13 +127,13 @@ export default function StockManagement() {
 
   // Stock transfer states
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [transferQuantities, setTransferQuantities] = useState<{[key: string]: number}>({});
+  const [transferQuantities, setTransferQuantities] = useState<{ [key: string]: number }>({});
   const [selectedBars, setSelectedBars] = useState<string[]>([]);
 
   // Stock adjustment states
   const [showReentryModal, setShowReentryModal] = useState(false);
   const [showLossModal, setShowLossModal] = useState(false);
-  const [adjustmentQuantities, setAdjustmentQuantities] = useState<{[key: string]: number}>({});
+  const [adjustmentQuantities, setAdjustmentQuantities] = useState<{ [key: string]: number }>({});
   const [adjustmentReason, setAdjustmentReason] = useState("");
 
   // Clear records modal state
@@ -323,10 +324,31 @@ export default function StockManagement() {
     image_url: "",
     purchase_price: 0,
     sale_price: 0,
+    type: "product", // Default type is "product"
     has_recipe: false,
   });
 
   const { productsData, fetchProducts, recipesData, fetchRecipes } = useAppContext();
+
+  // Helper function to extract unit from description
+  const extractUnitFromDescription = (description: string): string => {
+    // Extract unit from description like "Unit: L, Conversion: 500g per unit"
+    const unitMatch = description.match(/Unit:\s*([^,]+)/i);
+    if (unitMatch) {
+      return unitMatch[1].trim();
+    }
+    return "unidad"; // Default unit
+  };
+
+  // Helper function to extract conversion amount from description
+  const extractConversionFromDescription = (description: string): number => {
+    // Extract conversion amount from description like "Unit: g, Conversion: 100g per unit"
+    const conversionMatch = description.match(/Conversion:\s*(\d+(?:\.\d+)?)/i);
+    if (conversionMatch) {
+      return parseFloat(conversionMatch[1]);
+    }
+    return 1; // Default conversion factor
+  };
 
   // Fetch recipes on component mount
   useEffect(() => {
@@ -336,7 +358,7 @@ export default function StockManagement() {
   // Validate stock whenever recipe ingredients change
   useEffect(() => {
     if (recipeIngredients.length > 0) {
-      validateIngredientStock();
+      // validateIngredientStock();
     }
   }, [recipeIngredients]);
 
@@ -513,7 +535,7 @@ export default function StockManagement() {
         }
 
         toast.success(`Re-ingreso registrado para ${selectedProducts.length} producto(s)`);
-        
+
         // Refresh data
         await fetchProducts();
       } catch (apiError) {
@@ -584,7 +606,7 @@ export default function StockManagement() {
         }
 
         toast.success(`Pérdida registrada para ${selectedProducts.length} producto(s)`);
-        
+
         // Refresh data
         await fetchProducts();
       } catch (apiError) {
@@ -706,21 +728,14 @@ export default function StockManagement() {
 
       // Process the updated ingredients using the same logic as handleRecipeSelection
       const updatedRecipeIngredients = await Promise.all(
-        updatedIngredients.map(async (ingredient: any) => {
-          // Find matching products by name (same logic as handleRecipeSelection)
-          const matchingProducts = productsData.filter(product =>
-            product.name.toLowerCase().includes(ingredient.name.toLowerCase())
-          );
-
-          const availableStock = matchingProducts.reduce((total, product) => total + product.stock, 0);
-
+        updatedIngredients.map((ingredient: any) => {
           return {
             name: ingredient.name,
             quantity: ingredient.quantity.toString(),
             unit: ingredient.unit,
             requiredQuantity: 1, // Default quantity, user can modify
-            availableStock,
-            productId: matchingProducts[0]?.id || undefined,
+            availableStock: currentRecipe.stock || 0, // Use recipe stock as available stock
+            stock: currentRecipe.stock || 0, // Recipe stock
           };
         })
       );
@@ -749,38 +764,32 @@ export default function StockManagement() {
     }
   };
 
-  // Recipe validation function
+  // Recipe validation function - simplified for recipe-centric approach
   const validateRecipeIngredients = async (ingredients: { name: string; quantity: string; unit: string }[]) => {
     const validationResults = [];
 
     for (const ingredient of ingredients) {
-      // Check if ingredient exists in products
-      const matchingProducts = productsData.filter(product =>
-        product.name.toLowerCase().includes(ingredient.name.toLowerCase())
-      );
-
-      if (matchingProducts.length === 0) {
+      // Basic validation - just check if required fields are present
+      if (!ingredient.name || !ingredient.quantity || !ingredient.unit) {
         validationResults.push({
-          ingredient: ingredient.name,
-          status: 'not_found',
-          message: `Ingrediente "${ingredient.name}" no encontrado en el inventario`,
+          ingredient: ingredient.name || 'Sin nombre',
+          status: 'invalid',
+          message: `Ingrediente "${ingredient.name || 'Sin nombre'}" tiene datos incompletos`,
         });
       } else {
-        // Check stock availability
-        const totalStock = matchingProducts.reduce((sum, product) => sum + product.stock, 0);
-        const requiredQuantity = parseFloat(ingredient.quantity);
-
-        if (totalStock < requiredQuantity) {
+        // Check if quantity is a valid number
+        const quantity = parseFloat(ingredient.quantity);
+        if (isNaN(quantity) || quantity <= 0) {
           validationResults.push({
             ingredient: ingredient.name,
-            status: 'insufficient_stock',
-            message: `Stock insuficiente para "${ingredient.name}". Disponible: ${totalStock}, Requerido: ${requiredQuantity}`,
+            status: 'invalid',
+            message: `Cantidad inválida para "${ingredient.name}". Debe ser un número mayor a 0`,
           });
         } else {
           validationResults.push({
             ingredient: ingredient.name,
             status: 'valid',
-            message: `✓ "${ingredient.name}" disponible`,
+            message: `✓ "${ingredient.name}" es válido`,
           });
         }
       }
@@ -812,7 +821,7 @@ export default function StockManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newRecipe.name,
-          ingredients: JSON.stringify(newRecipe.ingredients),
+          ingredients: newRecipe.ingredients, // Send ingredients directly as array
           amount: 1, // Default amount for inline created recipes
           category: newRecipe.category,
         }),
@@ -849,17 +858,41 @@ export default function StockManagement() {
   // Recipe selection functions
   const handleRecipeSelection = async (recipeId: string) => {
     setSelectedRecipeId(recipeId);
+    setIngredientRequiredQuantity(1); // Reset ingredient quantity
 
     if (!recipeId || recipeId === "no-recipe") {
       setRecipeIngredients([]);
-      setStockValidationErrors([]);
+      // setStockValidationErrors([]);
       setNewProduct({ ...newProduct, has_recipe: false });
       return;
     }
 
-    // Find the selected recipe
-    const selectedRecipe = recipesData.find(recipe => recipe.id.toString() === recipeId);
-    if (!selectedRecipe || !selectedRecipe.ingredients) {
+    // Check if the selected item is an ingredient first (from productsData)
+    const selectedIngredient = productsData.find(product =>
+      product.type === 'ingredient' && product.id.toString() === recipeId
+    );
+
+    if (selectedIngredient) {
+      // For ingredients, clear recipeIngredients to hide "Ingredientes de la receta" section
+      // The ingredient info panel will show the ingredient details instead
+      setRecipeIngredients([]);
+      // setStockValidationErrors([]);
+      setNewProduct({ ...newProduct, has_recipe: true });
+      return;
+    }
+
+    // Find the selected recipe (only actual recipes, not ingredients)
+    const selectedRecipe = recipesData.find(recipe =>
+      recipe.id.toString() === recipeId && recipe.type === 'recipe'
+    );
+
+    if (!selectedRecipe) {
+      // Recipe not found
+      return;
+    }
+
+    // Handle recipes (existing logic)
+    if (!selectedRecipe.ingredients) {
       return;
     }
 
@@ -876,24 +909,15 @@ export default function StockManagement() {
 
     console.log("ingredients: ", ingredients);
 
-    // Get stock information for each ingredient
-    const ingredientsWithStock = await Promise.all(
-      ingredients.map(async (ingredient: any) => {
-        // Find matching products by name
-        const matchingProducts = productsData.filter(product =>
-          product.name.toLowerCase().includes(ingredient.name.toLowerCase())
-        );
-
-        const availableStock = matchingProducts.reduce((total, product) => total + product.stock, 0);
-
-        return {
-          ...ingredient,
-          requiredQuantity: 1, // Default quantity, user can modify
-          availableStock,
-          productId: matchingProducts[0]?.id || null,
-        };
-      })
-    );
+    // Set recipe ingredients with recipe stock as available stock
+    const ingredientsWithStock = ingredients.map((ingredient: any) => {
+      return {
+        ...ingredient,
+        requiredQuantity: 1, // Default quantity, user can modify
+        availableStock: selectedRecipe.stock || 0, // Use recipe stock as available stock
+        stock: selectedRecipe.stock || 0, // Recipe stock
+      };
+    });
 
     setRecipeIngredients(ingredientsWithStock);
     setNewProduct({ ...newProduct, has_recipe: true });
@@ -905,21 +929,21 @@ export default function StockManagement() {
     setRecipeIngredients(updatedIngredients);
 
     // Validate stock
-    validateIngredientStock();
+    // validateIngredientStock();
   };
 
-  const validateIngredientStock = () => {
-    const errors: string[] = [];
+  // const validateIngredientStock = () => {
+  //   const errors: string[] = [];
 
-    recipeIngredients.forEach((ingredient) => {
-      const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
-      if (totalRequired > ingredient.availableStock) {
-        errors.push(`${ingredient.name}: Necesitas ${totalRequired}${ingredient.unit}, pero solo hay ${ingredient.availableStock}${ingredient.unit} disponible`);
-      }
-    });
+  //   recipeIngredients.forEach((ingredient) => {
+  //     const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
+  //     if (totalRequired > ingredient.availableStock) {
+  //       errors.push(`${ingredient.name}: Necesitas ${totalRequired}${ingredient.unit}, pero solo hay ${ingredient.availableStock}${ingredient.unit} disponible`);
+  //     }
+  //   });
 
-    setStockValidationErrors(errors);
-  };
+  //   setStockValidationErrors(errors);
+  // };
 
   // Add custom ingredient function
   const addCustomIngredient = () => {
@@ -1028,6 +1052,115 @@ export default function StockManagement() {
     }
   };
 
+  // Function to deduct stock for recipe ingredients (from availableStock)
+  const deductRecipeIngredientStock = async (ingredients: { name: string; quantity: string; unit: string; requiredQuantity: number; availableStock: number }[], productAmount: number) => {
+    // Find the recipe to update its ingredients
+    const selectedRecipe = recipesData.find(recipe => recipe.id.toString() === selectedRecipeId);
+    if (!selectedRecipe) {
+      console.error("Selected recipe not found for stock deduction");
+      return;
+    }
+
+    try {
+      // Get the original recipe ingredients from the database
+      let originalIngredients = [];
+      try {
+        originalIngredients = typeof selectedRecipe.ingredients === 'string'
+          ? JSON.parse(selectedRecipe.ingredients)
+          : selectedRecipe.ingredients || [];
+      } catch (error) {
+        console.error("Error parsing original recipe ingredients:", error);
+        originalIngredients = [];
+      }
+
+      // Update only the availableStock for matching ingredients
+      const updatedIngredients = originalIngredients.map((originalIng: any) => {
+        // Find the matching ingredient from the current ingredients (with requiredQuantity)
+        const matchingIngredient = ingredients.find(ing =>
+          ing.name === originalIng.name &&
+          ing.quantity === originalIng.quantity &&
+          ing.unit === originalIng.unit
+        );
+
+        if (matchingIngredient) {
+          // Update only the availableStock, preserve all other properties
+          return {
+            ...originalIng,
+            availableStock: Math.max(0, matchingIngredient.availableStock - matchingIngredient.requiredQuantity)
+          };
+        }
+
+        // If no match found, return original ingredient unchanged
+        return originalIng;
+      });
+
+      // Update the recipe with new ingredient availableStock values
+      const response = await fetch(`/api/recipe`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedRecipe.id,
+          name: selectedRecipe.name,
+          category: selectedRecipe.category,
+          amount: selectedRecipe.stock,
+          ingredients: updatedIngredients
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update recipe ingredient stock");
+      }
+
+      console.log(`Deducted stock from recipe ingredients for ${productAmount} units`);
+
+      // Refresh recipes data to reflect changes
+      fetchRecipes();
+    } catch (error) {
+      console.error("Error deducting recipe ingredient stock:", error);
+      toast.error("Error deducting recipe ingredient stock");
+    }
+  };
+
+  // Function to deduct stock for ingredient-type products (from ingredient's stock)
+  const deductIngredientTypeStock = async (ingredientId: string, requiredQuantity: number) => {
+    try {
+      // Find the ingredient product
+      const ingredient = productsData.find(product =>
+        product.type === 'ingredient' && product.id.toString() === ingredientId
+      );
+
+      if (!ingredient) {
+        console.error("Ingredient not found for stock deduction");
+        return;
+      }
+
+      // Calculate new stock
+      const newStock = Math.max(0, (ingredient.stock || 0) - requiredQuantity);
+
+      // Update the ingredient's stock
+      const response = await fetch(`/api/products`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: ingredient.id,
+          stock: newStock
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to deduct stock for ingredient: ${ingredient.name}`);
+      }
+
+      console.log(`Deducted ${requiredQuantity} units from ingredient ${ingredient.name}`);
+
+      // Refresh products data to reflect changes
+      fetchProducts();
+    } catch (error) {
+      console.error("Error deducting ingredient stock:", error);
+      toast.error("Error deducting ingredient stock");
+    }
+  };
+
   // Helper functions
   const calculateStatus = (stock: number): "sufficient" | "low" | "out" => {
     if (stock === 0) return "out";
@@ -1048,8 +1181,30 @@ export default function StockManagement() {
       return;
     }
 
-    const selectedRecipe = recipesData.find(recipe => recipe.id.toString() === recipeId);
-    if (!selectedRecipe) return;
+    // Check if the selected item is an ingredient first (from productsData)
+    const selectedIngredient = productsData.find(product =>
+      product.type === 'ingredient' && product.id.toString() === recipeId
+    );
+
+    if (selectedIngredient) {
+      // For ingredients, set has_recipe to true but don't set ingredients to avoid showing recipe ingredients section
+      setEditingProduct({
+        ...editingProduct!,
+        has_recipe: true,
+        ingredients: undefined // Clear ingredients to hide recipe ingredients display
+      });
+      return;
+    }
+
+    // Find the selected recipe (only actual recipes, not ingredients)
+    const selectedRecipe = recipesData.find(recipe =>
+      recipe.id.toString() === recipeId && recipe.type === 'recipe'
+    );
+
+    if (!selectedRecipe) {
+      // Recipe not found
+      return;
+    }
 
     // Set the product to have a recipe and update ingredients
     setEditingProduct({
@@ -1078,12 +1233,12 @@ export default function StockManagement() {
         return;
       }
 
-      const response = await fetch(`/api/recipes`, {
+      const response = await fetch(`/api/recipe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newRecipe.name,
-          ingredients: JSON.stringify(newRecipe.ingredients),
+          ingredients: newRecipe.ingredients, // Send ingredients directly as array
           amount: 1,
           category: newRecipe.category,
         }),
@@ -1141,12 +1296,12 @@ export default function StockManagement() {
     const averageMargin =
       productsData.length > 0
         ? productsData.reduce((sum, product) => {
-            const margin =
-              ((product.sale_price - product.purchase_price) /
-                product.purchase_price) *
-              100;
-            return sum + margin;
-          }, 0) / productsData.length
+          const margin =
+            ((product.sale_price - product.purchase_price) /
+              product.purchase_price) *
+            100;
+          return sum + margin;
+        }, 0) / productsData.length
         : 0;
 
     return {
@@ -1160,7 +1315,27 @@ export default function StockManagement() {
 
   // Filter products based on search, category filter, and sales filter
   const filteredProducts = useMemo(() => {
-    let filtered = productsData.filter((product) => {
+    // Combine productsData and recipesData, but avoid duplicates by ID
+    const seenIds = new Set();
+    const allItems: any[] = [];
+
+    // Add all products first
+    productsData.forEach(item => {
+      if (!seenIds.has(item.id)) {
+        seenIds.add(item.id);
+        allItems.push(item);
+      }
+    });
+
+    // Add only recipes (not ingredients) from recipesData that aren't already added
+    recipesData.forEach(item => {
+      if (item.type === 'recipe' && !seenIds.has(item.id)) {
+        seenIds.add(item.id);
+        allItems.push(item);
+      }
+    });
+
+    let filtered = allItems.filter((product) => {
       const matchesSearch = product.name
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
@@ -1207,7 +1382,7 @@ export default function StockManagement() {
     setSelectedProducts((prev) =>
       prev.length === filteredProducts.length
         ? []
-        : filteredProducts.map((p) => p.id)
+        : filteredProducts.map((p) => p.id.toString())
     );
   }, [filteredProducts]);
 
@@ -1243,47 +1418,30 @@ export default function StockManagement() {
       setIsLoading(true);
 
       // Validate stock if recipe is selected
-      if (newProduct.has_recipe && stockValidationErrors.length > 0) {
-        alert("No se puede agregar el producto. Hay errores de stock:\n" + stockValidationErrors.join("\n"));
-        setIsLoading(false);
-        return;
-      }
+      // if (newProduct.has_recipe && stockValidationErrors.length > 0) {
+      //   alert("No se puede agregar el producto. Hay errores de stock:\n" + stockValidationErrors.join("\n"));
+      //   setIsLoading(false);
+      //   return;
+      // }
 
-      // Validate custom ingredients if they are being used
-      if (useCustomIngredients && customIngredients.length > 0) {
-        for (const ingredient of customIngredients) {
-          const requiredQuantity = parseFloat(ingredient.quantity) * (newProduct.stock || 1);
-          const matchingProduct = productsData.find(p => p.id === ingredient.productId);
+      // // Validate custom ingredients if they are being used
+      // if (useCustomIngredients && customIngredients.length > 0) {
+      //   for (const ingredient of customIngredients) {
+      //     const requiredQuantity = parseFloat(ingredient.quantity) * (newProduct.stock || 1);
+      //     const matchingProduct = productsData.find(p => p.id === ingredient.productId);
 
-          if (matchingProduct && matchingProduct.stock < requiredQuantity) {
-            toast.error(`Stock insuficiente para ${ingredient.name}: Requerido ${requiredQuantity}, Disponible ${matchingProduct.stock}`);
-            setIsLoading(false);
-            return;
-          }
-        }
-      }
+      //     if (matchingProduct && matchingProduct.stock < requiredQuantity) {
+      //       toast.error(`Stock insuficiente para ${ingredient.name}: Requerido ${requiredQuantity}, Disponible ${matchingProduct.stock}`);
+      //       setIsLoading(false);
+      //       return;
+      //     }
+      //   }
+      // }
 
       // Deduct ingredients from stock if recipe is selected
       if (newProduct.has_recipe && recipeIngredients.length > 0) {
-        for (const ingredient of recipeIngredients) {
-          const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
-
-          if (ingredient.productId) {
-            // Update the specific product stock
-            const updateResponse = await fetch(`/api/products`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                id: ingredient.productId,
-                stock: ingredient.availableStock - totalRequired,
-              }),
-            });
-
-            if (!updateResponse.ok) {
-              throw new Error(`Failed to update stock for ${ingredient.name}`);
-            }
-          }
-        }
+        // Note: Stock updates will be handled by the recipe system
+        // No need to update individual product stocks since we removed productId linking
       }
 
       const uploadedUrl = await handleImageUpload();
@@ -1295,7 +1453,8 @@ export default function StockManagement() {
           name: ing.name,
           quantity: ing.quantity,
           unit: ing.unit,
-          productId: ing.productId
+          requiredQuantity: ing.requiredQuantity
+          // Note: availableStock is NOT stored in product, only in recipe
         }));
       } else if (useCustomIngredients && customIngredients.length > 0) {
         ingredientsData = customIngredients.map(ing => ({
@@ -1323,9 +1482,23 @@ export default function StockManagement() {
         throw new Error(errorData.error || "Failed to add product");
       }
 
-      // Deduct ingredient stock if custom ingredients are used and product stock > 0
-      if (useCustomIngredients && customIngredients.length > 0 && (newProduct.stock || 0) > 0) {
-        await deductCustomIngredientStock(customIngredients, newProduct.stock || 1);
+      // Deduct ingredient stock based on product type
+      if ((newProduct.stock || 0) > 0) {
+        // Check if selected item is an ingredient (not a recipe)
+        const selectedIngredient = productsData.find(product =>
+          product.type === 'ingredient' && product.id.toString() === selectedRecipeId
+        );
+
+        if (selectedIngredient) {
+          // For ingredient-type products: deduct from ingredient's stock
+          await deductIngredientTypeStock(selectedRecipeId, ingredientRequiredQuantity);
+        } else if (newProduct.has_recipe && recipeIngredients.length > 0) {
+          // For recipe-type products: deduct from recipe ingredients' availableStock
+          await deductRecipeIngredientStock(recipeIngredients, newProduct.stock || 1);
+        } else if (useCustomIngredients && customIngredients.length > 0) {
+          // For custom ingredients: existing logic
+          await deductCustomIngredientStock(customIngredients, newProduct.stock || 1);
+        }
       }
 
       setShowAddProductModal(false);
@@ -1344,7 +1517,7 @@ export default function StockManagement() {
       // Reset recipe states
       setSelectedRecipeId("");
       setRecipeIngredients([]);
-      setStockValidationErrors([]);
+      // setStockValidationErrors([]);
 
       // Reset custom ingredient states
       setUseCustomIngredients(false);
@@ -1506,18 +1679,25 @@ export default function StockManagement() {
 
   // Export to Excel functionality
   const handleExportToExcel = () => {
-    const exportData = filteredProducts.map(product => ({
-      'Nombre': product.name,
-      'Categoría': product.category,
-      'Precio Compra': product.purchase_price,
-      'Precio Venta': product.sale_price,
-      'Stock': product.stock,
-      'Estado': calculateStatus(product.stock),
-      'Visible Courtesy': product.is_courtsey ? 'Sí' : 'No',
-      'Visible PR Token': product.is_pr ? 'Sí' : 'No',
-      'Activo': product.is_active ? 'Sí' : 'No',
-      'Fecha Actualización': product.updated_at
-    }));
+    const exportData = filteredProducts.map(item => {
+      // Check if it's a product or recipe
+      const isProduct = 'purchase_price' in item;
+      const product = item as any; // Cast to any to access all properties
+
+      return {
+        'Nombre': product.name,
+        'Tipo': product.type || 'producto',
+        'Categoría': product.category,
+        'Precio Compra': isProduct ? product.purchase_price : 'N/A',
+        'Precio Venta': isProduct ? product.sale_price : 'N/A',
+        'Stock': product.stock || 0,
+        'Estado': calculateStatus(product.stock || 0),
+        'Visible Courtesy': isProduct && product.is_courtsey ? 'Sí' : 'No',
+        'Visible PR Token': isProduct && product.is_pr ? 'Sí' : 'No',
+        'Activo': isProduct && product.is_active ? 'Sí' : 'No',
+        'Fecha Actualización': product.updated_at || 'N/A'
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -1652,7 +1832,7 @@ export default function StockManagement() {
               variant="outline"
               onClick={() => {
                 // Initialize quantities for selected products
-                const initialQuantities: {[key: string]: number} = {};
+                const initialQuantities: { [key: string]: number } = {};
                 selectedProducts.forEach(productId => {
                   initialQuantities[productId] = 1;
                 });
@@ -1670,7 +1850,7 @@ export default function StockManagement() {
                 variant="outline"
                 onClick={() => {
                   // Initialize quantities for selected products
-                  const initialQuantities: {[key: string]: number} = {};
+                  const initialQuantities: { [key: string]: number } = {};
                   selectedProducts.forEach(productId => {
                     initialQuantities[productId] = 1;
                   });
@@ -1685,7 +1865,7 @@ export default function StockManagement() {
                 variant="outline"
                 onClick={() => {
                   // Initialize quantities for selected products
-                  const initialQuantities: {[key: string]: number} = {};
+                  const initialQuantities: { [key: string]: number } = {};
                   selectedProducts.forEach(productId => {
                     initialQuantities[productId] = 1;
                   });
@@ -1728,21 +1908,25 @@ export default function StockManagement() {
             <tbody>
               {isLoading
                 ? Array(6)
-                    .fill(0)
-                    .map((_, index) => (
-                      <tr key={index}>
-                        <td colSpan={9} className="p-3">
-                          <Skeleton className="h-10 w-full" />
-                        </td>
-                      </tr>
-                    ))
-                : filteredProducts.map((product) => (
+                  .fill(0)
+                  .map((_, index) => (
+                    <tr key={index}>
+                      <td colSpan={9} className="p-3">
+                        <Skeleton className="h-10 w-full" />
+                      </td>
+                    </tr>
+                  ))
+                : filteredProducts.map((item) => {
+                  const product = item as any; // Cast to access all properties
+                  const isProduct = 'purchase_price' in item;
+
+                  return (
                     <tr key={product.id} className="border-t hover:bg-muted/50">
                       <td className="p-3">
                         <Checkbox
-                          checked={selectedProducts.includes(product.id)}
+                          checked={selectedProducts.includes(product.id.toString())}
                           onCheckedChange={() =>
-                            toggleSelectProduct(product.id)
+                            toggleSelectProduct(product.id.toString())
                           }
                         />
                       </td>
@@ -1750,7 +1934,7 @@ export default function StockManagement() {
                         <div className="flex items-center gap-2">
                           <div
                             className="flex items-center gap-2 cursor-pointer flex-1"
-                            onClick={() => viewProductDetails(product)}
+                            onClick={() => isProduct && viewProductDetails(product)}
                           >
                             {product.image_url ? (
                               <img
@@ -1766,7 +1950,7 @@ export default function StockManagement() {
                             <div>
                               <div className="font-medium">{product.name}</div>
                               <div className="text-xs text-muted-foreground line-clamp-1">
-                                {product.description}
+                                {product.description} {!isProduct && '(Receta)'}
                               </div>
                             </div>
                           </div>
@@ -1814,11 +1998,11 @@ export default function StockManagement() {
                           className={cn(
                             "font-normal",
                             calculateStatus(product.stock) === "sufficient" &&
-                              "bg-green-50 text-green-700",
+                            "bg-green-50 text-green-700",
                             calculateStatus(product.stock) === "low" &&
-                              "bg-amber-50 text-amber-700",
+                            "bg-amber-50 text-amber-700",
                             calculateStatus(product.stock) === "out" &&
-                              "bg-red-50 text-red-700"
+                            "bg-red-50 text-red-700"
                           )}
                         >
                           {product.stock}{" "}
@@ -1901,7 +2085,8 @@ export default function StockManagement() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );
+                })}
             </tbody>
           </table>
         </div>
@@ -1979,15 +2164,15 @@ export default function StockManagement() {
                           <Badge
                             className={cn(
                               calculateStatus(currentProduct.stock) ===
-                                "sufficient" && "bg-green-100 text-green-800",
+                              "sufficient" && "bg-green-100 text-green-800",
                               calculateStatus(currentProduct.stock) === "low" &&
-                                "bg-amber-100 text-amber-800",
+                              "bg-amber-100 text-amber-800",
                               calculateStatus(currentProduct.stock) === "out" &&
-                                "bg-red-100 text-red-800"
+                              "bg-red-100 text-red-800"
                             )}
                           >
                             {calculateStatus(currentProduct.stock) ===
-                            "sufficient"
+                              "sufficient"
                               ? "Suficiente"
                               : calculateStatus(currentProduct.stock) === "low"
                                 ? "Bajo"
@@ -2037,7 +2222,7 @@ export default function StockManagement() {
 
       {/* Add Product Modal */}
       <Dialog open={showAddProductModal} onOpenChange={setShowAddProductModal}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Agregar Nuevo Producto</DialogTitle>
             <DialogDescription>
@@ -2100,58 +2285,148 @@ export default function StockManagement() {
               </div>
 
               {/* Toggle between existing recipes and custom ingredients */}
-              <div className="flex gap-4">
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    name="ingredientType"
-                    checked={!useCustomIngredients}
-                    onChange={() => {
-                      setUseCustomIngredients(false);
-                      setCustomIngredients([]);
-                    }}
-                  />
-                  <span className="text-sm">Usar receta existente</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input
-                    disabled
-                    type="radio"
-                    name="ingredientType"
-                    checked={useCustomIngredients}
-                    onChange={() => {
-                      setUseCustomIngredients(true);
-                      setSelectedRecipeId("");
-                      setRecipeIngredients([]);
-                    }}
-                  />
-                  <span className="text-sm">Agregar ingredientes individuales</span>
-                </label>
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-muted-foreground">
+                  Elige una de las dos opciones para agregar receta al producto:
+                </p>
+                <div className="flex gap-4">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="ingredientType"
+                      checked={!useCustomIngredients}
+                      onChange={() => {
+                        setUseCustomIngredients(false);
+                        setCustomIngredients([]);
+                      }}
+                    />
+                    <span className="text-sm font-medium">Opción 1: Usar receta existente</span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="ingredientType"
+                      checked={useCustomIngredients}
+                      onChange={() => {
+                        setUseCustomIngredients(true);
+                        setSelectedRecipeId("");
+                        setRecipeIngredients([]);
+                      }}
+                    />
+                    <span className="text-sm font-medium">Opción 2: Agregar receta directamente</span>
+                  </label>
+                </div>
               </div>
 
               {!useCustomIngredients ? (
                 <>
-                  <Select
-                    value={selectedRecipeId}
-                    onValueChange={handleRecipeSelection}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar receta existente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="no-recipe">Sin receta</SelectItem>
-                      {recipesData.map((recipe) => (
-                        <SelectItem key={recipe.id} value={recipe.id.toString()}>
-                          {recipe.name} ({recipe.category})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Selecciona una receta existente. Se mostrarán todos los ingredientes y se descontarán del stock al crear el producto.
+                    </p>
+                    <Select
+                      value={selectedRecipeId}
+                      onValueChange={handleRecipeSelection}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar receta existente" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="no-recipe">Sin receta</SelectItem>
+                        {/* Show Recipes only (filter out ingredients from recipesData) */}
+                        {recipesData
+                          .filter((recipe) => recipe.type === 'recipe')
+                          .map((recipe) => (
+                            <SelectItem key={`recipe-${recipe.id}`} value={recipe.id.toString()}>
+                              {recipe.name} ({recipe.category}) - Receta
+                            </SelectItem>
+                          ))}
+                        {/* Show Ingredients from productsData */}
+                        {productsData
+                          .filter((product) => product.type === 'ingredient')
+                          .map((ingredient) => (
+                            <SelectItem key={`ingredient-${ingredient.id}`} value={ingredient.id.toString()}>
+                              {ingredient.name} ({ingredient.category}) - Ingrediente
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Show ingredient information if an ingredient is selected */}
+                    {selectedRecipeId && selectedRecipeId !== "no-recipe" && (() => {
+                      // Check if selected item is an ingredient
+                      const selectedIngredient = productsData.find(product =>
+                        product.type === 'ingredient' && product.id.toString() === selectedRecipeId
+                      );
+
+                      if (selectedIngredient) {
+                        const unit = extractUnitFromDescription(selectedIngredient.description || "");
+                        const conversionFactor = extractConversionFromDescription(selectedIngredient.description || "");
+
+                        // Calculate amounts using conversion factor
+                        const totalAmount = (selectedIngredient.stock || 0) * conversionFactor;
+                        const totalRequired = ingredientRequiredQuantity * conversionFactor;
+                        const hasEnoughStock = totalAmount >= totalRequired;
+
+                        return (
+                          <div className="mt-4 space-y-4">
+                            <h3 className="font-medium text-gray-900">Ingredientes del producto:</h3>
+                            <p className="text-sm text-gray-600">
+                              Especifica cuántas unidades del producto vas a crear. Los ingredientes se descontarán automáticamente.
+                            </p>
+
+                            <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700">Ingrediente</Label>
+                                <p className="text-sm font-semibold text-gray-900">{selectedIngredient.name}</p>
+                                <p className="text-xs text-green-500">
+                                  {conversionFactor} {unit} por unidad
+                                </p>
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700">Cantidad a crear</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={ingredientRequiredQuantity}
+                                  onChange={(e) => setIngredientRequiredQuantity(parseInt(e.target.value) || 1)}
+                                  className="h-10 text-center font-medium"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Total necesario: {totalRequired} {unit}
+                                </p>
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700">Stock disponible</Label>
+                                <p className={`text-lg font-bold ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
+                                  {totalAmount} {unit}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Available: {selectedIngredient.stock || 0} units ({totalAmount} {unit})
+                                </p>
+                                {!hasEnoughStock && (
+                                  <p className="text-xs text-red-600 font-medium">
+                                    {(totalRequired - totalAmount)} {unit} missing
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                 </>
               ) : (
                 <>
                   <div className="space-y-3">
-                    <Label className="text-sm font-medium">Agregar Ingredientes:</Label>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Agregar Receta Directamente:</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Agrega ingredientes directamente a este producto. Los ingredientes se guardarán solo en este producto y se descontarán del stock.
+                      </p>
+                    </div>
 
                     {/* Ingredient Selection */}
                     <div className="grid grid-cols-12 gap-2 items-end">
@@ -2168,18 +2443,18 @@ export default function StockManagement() {
                             <SelectItem value="none">Seleccionar ingrediente existente</SelectItem>
                             {productsData
                               .filter((product) =>
-                                product.category === "ingrediente" && product.has_recipe === false
+                                (product.category === "ingrediente" && product.has_recipe === false) ||
+                                product.type === 'ingredient'
                               )
                               .sort((a, b) => b.stock - a.stock)
                               .map((product) => (
                                 <SelectItem key={product.id} value={product.name}>
                                   <div className="flex justify-between items-center w-full">
                                     <span>{product.name}</span>
-                                    <span className={`text-xs px-1 py-0.5 rounded ${
-                                      product.stock > 10 ? 'bg-green-100 text-green-800' :
-                                      product.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
-                                      'bg-red-100 text-red-800'
-                                    }`}>
+                                    <span className={`text-xs px-1 py-0.5 rounded ${product.stock > 10 ? 'bg-green-100 text-green-800' :
+                                        product.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
+                                          'bg-red-100 text-red-800'
+                                      }`}>
                                       {product.stock}
                                     </span>
                                   </div>
@@ -2217,10 +2492,15 @@ export default function StockManagement() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="ml">ml</SelectItem>
-                            <SelectItem value="g">g</SelectItem>
-                            <SelectItem value="unidad">unidad</SelectItem>
-                            <SelectItem value="hojas">hojas</SelectItem>
+                            <SelectItem value="g">Grams (g)</SelectItem>
+                            <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                            <SelectItem value="L">Liters (L)</SelectItem>
+                            <SelectItem value="ml">Milliliters (mL)</SelectItem>
+                            <SelectItem value="unidad">Units</SelectItem>
+                            <SelectItem value="parts">Parts</SelectItem>
+                            <SelectItem value="cups">Cups</SelectItem>
+                            <SelectItem value="tbsp">Tablespoons</SelectItem>
+                            <SelectItem value="tsp">Teaspoons</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -2283,47 +2563,37 @@ export default function StockManagement() {
                     const hasEnoughStock = ingredient.availableStock >= totalRequired;
 
                     return (
-                      <div key={index} className="grid grid-cols-3 gap-4 p-3 bg-white border rounded-lg">
+                      <div key={index} className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
                         <div>
-                          <Label className="text-xs text-gray-600">Ingredient</Label>
-                          <p className="text-sm font-medium">{ingredient.name}</p>
+                          <Label className="text-sm font-medium text-gray-700">Ingrediente</Label>
+                          <p className="text-sm font-semibold text-gray-900">{ingredient.name}</p>
                           <p className="text-xs text-gray-500">
-                            {ingredient.quantity} {ingredient.unit} per unit
+                            {ingredient.quantity} {ingredient.unit} por unidad
                           </p>
                         </div>
                         <div>
-                          <Label className="text-xs text-gray-600">Amount to create</Label>
+                          <Label className="text-sm font-medium text-gray-700">Cantidad a crear</Label>
                           <Input
                             type="number"
                             min="1"
                             value={ingredient.requiredQuantity}
                             onChange={(e) => updateIngredientQuantity(index, parseInt(e.target.value) || 1)}
-                            className="h-8"
+                            className="h-10 text-center font-medium"
                           />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Total necesario: {totalRequired.toFixed(0)} {ingredient.unit}
+                          </p>
                         </div>
                         <div>
-                          <Label className="text-xs text-gray-600">Stock available</Label>
-                          <div className="flex items-center space-x-2">
-                            <p className={`text-sm font-medium ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
-                              {ingredient.availableStock} {ingredient.unit}
-                            </p>
-                            {hasEnoughStock ? (
-                              <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
-                              </div>
-                            ) : (
-                              <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            Required: {totalRequired.toFixed(1)} {ingredient.unit}
+                          <Label className="text-sm font-medium text-gray-700">Stock disponible</Label>
+                          <p className={`text-lg font-bold ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
+                            {ingredient.availableStock * Number(ingredient?.quantity)}
                           </p>
+                          {!hasEnoughStock && (
+                            <p className="text-xs text-red-600 font-medium">
+                              {ingredient.availableStock * Number(ingredient?.quantity) - Number(ingredient.quantity) * ingredient.requiredQuantity} missing
+                            </p>
+                          )}
                         </div>
                       </div>
                     );
@@ -2363,10 +2633,16 @@ export default function StockManagement() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="ml">ml</SelectItem>
-                            <SelectItem value="g">g</SelectItem>
-                            <SelectItem value="unidad">unidad</SelectItem>
-                            <SelectItem value="hojas">hojas</SelectItem>
+                            <SelectItem value="g">Grams (g)</SelectItem>
+                            <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                            <SelectItem value="ml">Milliliters (mL)</SelectItem>
+                            <SelectItem value="L">Liters (L)</SelectItem>
+                            <SelectItem value="unidad">Units</SelectItem>
+                            <SelectItem value="parts">Parts</SelectItem>
+                            <SelectItem value="cups">Cups</SelectItem>
+                            <SelectItem value="tbsp">Tablespoons</SelectItem>
+                            <SelectItem value="tsp">Teaspoons</SelectItem>
+                            <SelectItem value="hojas">Leaves</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -2388,7 +2664,7 @@ export default function StockManagement() {
                   </div>
 
                   {/* Stock Validation Errors */}
-                  {stockValidationErrors.length > 0 && (
+                  {/* {stockValidationErrors.length > 0 && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                       <div className="flex items-center space-x-2">
                         <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
@@ -2407,7 +2683,7 @@ export default function StockManagement() {
                         ))}
                       </ul>
                     </div>
-                  )}
+                  )} */}
                 </div>
               )}
 
@@ -2581,13 +2857,84 @@ export default function StockManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="no-recipe">Sin receta</SelectItem>
-                  {recipesData.map((recipe) => (
-                    <SelectItem key={recipe.id} value={recipe.id.toString()}>
-                      {recipe.name} ({recipe.category})
-                    </SelectItem>
-                  ))}
+                  {/* Show Recipes only (filter out ingredients from recipesData) */}
+                  {recipesData
+                    .filter((recipe) => recipe.type === 'recipe')
+                    .map((recipe) => (
+                      <SelectItem key={`recipe-${recipe.id}`} value={recipe.id.toString()}>
+                        {recipe.name} ({recipe.category}) - Receta
+                      </SelectItem>
+                    ))}
+                  {/* Show Ingredients from productsData */}
+                  {productsData
+                    .filter((product) => product.type === 'ingredient')
+                    .map((ingredient) => (
+                      <SelectItem key={`ingredient-${ingredient.id}`} value={ingredient.id.toString()}>
+                        {ingredient.name} ({ingredient.category}) - Ingrediente
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
+
+              {/* Show ingredient information if an ingredient is selected */}
+              {selectedEditRecipeId && selectedEditRecipeId !== "no-recipe" && (() => {
+                // Check if selected item is an ingredient
+                const selectedIngredient = productsData.find(product =>
+                  product.type === 'ingredient' && product.id.toString() === selectedEditRecipeId
+                );
+
+                if (selectedIngredient) {
+                  const unit = extractUnitFromDescription(selectedIngredient.description || "");
+                  const conversionFactor = extractConversionFromDescription(selectedIngredient.description || "");
+                  const requiredQuantity = 1; // Default quantity for ingredients (edit mode)
+
+                  // Calculate amounts using conversion factor
+                  const totalAmount = (selectedIngredient.stock || 0) * conversionFactor;
+                  const totalRequired = requiredQuantity * conversionFactor;
+                  const hasEnoughStock = totalAmount >= totalRequired;
+
+                  return (
+                    <div className="mt-4 space-y-4">
+                      <h3 className="font-medium text-gray-900">Ingredientes del producto:</h3>
+                      <p className="text-sm text-gray-600">
+                        Información del ingrediente seleccionado.
+                      </p>
+
+                      <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700">Ingrediente</Label>
+                          <p className="text-sm font-semibold text-gray-900">{selectedIngredient.name}</p>
+                          <p className="text-xs text-green-500">
+                            {conversionFactor} {unit} por unidad
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700">Cantidad por unidad</Label>
+                          <p className="text-lg font-bold text-gray-900">{requiredQuantity}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Total necesario: {totalRequired} {unit}
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700">Stock disponible</Label>
+                          <p className={`text-lg font-bold ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
+                            {totalAmount} {unit}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Available: {selectedIngredient.stock || 0} units ({totalAmount} {unit})
+                          </p>
+                          {!hasEnoughStock && (
+                            <p className="text-xs text-red-600 font-medium">
+                              {(totalRequired - totalAmount)} {unit} missing
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               <p className="text-sm text-muted-foreground">
                 Si seleccionas una receta, el stock de los ingredientes se descontará automáticamente cuando se haga un pedido.
@@ -2875,11 +3222,11 @@ export default function StockManagement() {
                             className={cn(
                               "font-normal",
                               calculateStatus(product.stock) === "sufficient" &&
-                                "bg-green-50 text-green-700",
+                              "bg-green-50 text-green-700",
                               calculateStatus(product.stock) === "low" &&
-                                "bg-amber-50 text-amber-700",
+                              "bg-amber-50 text-amber-700",
                               calculateStatus(product.stock) === "out" &&
-                                "bg-red-50 text-red-700"
+                              "bg-red-50 text-red-700"
                             )}
                           >
                             {product.stock}{" "}
@@ -2985,13 +3332,13 @@ export default function StockManagement() {
                             <Badge
                               variant={
                                 transaction.type === 'sale' ? 'default' :
-                                transaction.type === 'purchase' ? 'secondary' :
-                                'destructive'
+                                  transaction.type === 'purchase' ? 'secondary' :
+                                    'destructive'
                               }
                             >
                               {transaction.type === 'sale' ? 'Venta' :
-                               transaction.type === 'purchase' ? 'Compra' :
-                               'Ajuste'}
+                                transaction.type === 'purchase' ? 'Compra' :
+                                  'Ajuste'}
                             </Badge>
                           </td>
                           <td className="p-3">
@@ -3070,11 +3417,10 @@ export default function StockManagement() {
                             {ingredient.name} - {ingredient.quantity} {ingredient.unit}
                           </span>
                           {validation && (
-                            <div className={`text-xs mt-1 ${
-                              validation.status === 'valid' ? 'text-green-600' :
-                              validation.status === 'insufficient_stock' ? 'text-orange-600' :
-                              'text-red-600'
-                            }`}>
+                            <div className={`text-xs mt-1 ${validation.status === 'valid' ? 'text-green-600' :
+                                validation.status === 'insufficient_stock' ? 'text-orange-600' :
+                                  'text-red-600'
+                              }`}>
                               {validation.message}
                             </div>
                           )}
@@ -3148,10 +3494,16 @@ export default function StockManagement() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ml">ml</SelectItem>
-                      <SelectItem value="g">g</SelectItem>
-                      <SelectItem value="unidad">unidad</SelectItem>
-                      <SelectItem value="hojas">hojas</SelectItem>
+                      <SelectItem value="g">Grams (g)</SelectItem>
+                      <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                      <SelectItem value="ml">Milliliters (mL)</SelectItem>
+                      <SelectItem value="L">Liters (L)</SelectItem>
+                      <SelectItem value="unidad">Units</SelectItem>
+                      <SelectItem value="parts">Parts</SelectItem>
+                      <SelectItem value="cups">Cups</SelectItem>
+                      <SelectItem value="tbsp">Tablespoons</SelectItem>
+                      <SelectItem value="tsp">Teaspoons</SelectItem>
+                      <SelectItem value="hojas">Leaves</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -3272,10 +3624,16 @@ export default function StockManagement() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ml">ml</SelectItem>
-                      <SelectItem value="g">g</SelectItem>
-                      <SelectItem value="unidad">unidad</SelectItem>
-                      <SelectItem value="hojas">hojas</SelectItem>
+                      <SelectItem value="g">Grams (g)</SelectItem>
+                      <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                      <SelectItem value="ml">Milliliters (mL)</SelectItem>
+                      <SelectItem value="L">Liters (L)</SelectItem>
+                      <SelectItem value="unidad">Units</SelectItem>
+                      <SelectItem value="parts">Parts</SelectItem>
+                      <SelectItem value="cups">Cups</SelectItem>
+                      <SelectItem value="tbsp">Tablespoons</SelectItem>
+                      <SelectItem value="tsp">Teaspoons</SelectItem>
+                      <SelectItem value="hojas">Leaves</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

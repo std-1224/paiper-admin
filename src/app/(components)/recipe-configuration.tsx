@@ -40,16 +40,17 @@ export default function RecipeConfiguration() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddRecipeModal, setShowAddRecipeModal] = useState(false);
   const [newIngredients, setNewIngredients] = useState<
-    { name: string; quantity: string; unit: string; productId?: string }[]
+    { name: string; quantity: string; unit: string; availableStock: number; productId?: string }[]
   >([]);
   const [recipeName, setRecipeName] = useState("");
   const [selectedIngredient, setSelectedIngredient] = useState("none");
   const [customIngredient, setCustomIngredient] = useState("");
   const [quantity, setQuantity] = useState("");
   const [unit, setUnit] = useState("ml");
+  const [availableStock, setAvailableStock] = useState("1");
   const [selectedRecipe, setSelectedRecipe] = useState<number | null>(null);
   const [amount, setAmount] = useState<string>("");
-  const { fetchRecipes, recipesData, productsData, fetchProducts } = useAppContext();
+  const { fetchRecipes, recipesData, recipesLoading, productsData, fetchProducts } = useAppContext();
   const [category, setCategory] = useState("bebida");
   const [loading, setLoading] = useState(false);
 
@@ -66,6 +67,16 @@ export default function RecipeConfiguration() {
   const filteredRecipes = recipesData.filter((recipe) =>
     recipe.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Helper function to extract unit from description
+  const extractUnitFromDescription = (description: string): string => {
+    // Extract unit from description like "Unit: L, Conversion: 500g per unit"
+    const unitMatch = description.match(/Unit:\s*([^,]+)/i);
+    if (unitMatch) {
+      return unitMatch[1].trim();
+    }
+    return "unidad"; // Default unit
+  };
 
   useEffect(() => {
     fetchRecipes();
@@ -99,6 +110,7 @@ export default function RecipeConfiguration() {
   // Calculate most used ingredients
   const ingredientCounts: Record<string, number> = {};
   recipesData.forEach((recipe) => {
+    if (recipe.type === 'ingredient') return;
     recipe.ingredients.forEach((ingredient) => {
       if (ingredientCounts[ingredient.name]) {
         ingredientCounts[ingredient.name]++;
@@ -173,12 +185,13 @@ export default function RecipeConfiguration() {
 
     setNewIngredients([
       ...newIngredients,
-      { name: ingredientName.trim(), quantity: quantity, unit: unit, productId: productId },
+      { name: ingredientName.trim(), quantity: quantity, unit: unit, availableStock: parseInt(availableStock) || 1, productId: productId },
     ]);
     setSelectedIngredient("none");
     setCustomIngredient("");
     setQuantity("");
     setUnit("ml");
+    setAvailableStock("1");
   };
 
   const addNewRecipe = async () => {
@@ -241,9 +254,11 @@ export default function RecipeConfiguration() {
           description: `Unit: ${newIngredientUnit}, Conversion: ${newIngredientConversionFactor}g per unit`,
           category: "ingrediente",
           stock: parseInt(newIngredientDefaultStock) || 0,
-          purchase_price: 0,
-          sale_price: 0,
+          purchase_price: 0, // Ingredients don't have purchase price in this context
+          sale_price: 0, // Ingredients are not sold directly
           has_recipe: false,
+          type: 'ingredient', // Set type as ingredient when creating ingredients directly
+          image_url: '', // Default empty image URL
         }),
       });
 
@@ -307,13 +322,65 @@ export default function RecipeConfiguration() {
 
   const handleEditRecipe = (id: number) => {
     setSelectedRecipe(id);
-    setRecipeName(recipesData.find((recipe) => recipe.id === id)?.name || "");
-    setAmount(
-      String(recipesData.find((recipe) => recipe.id === id)?.stock || "")
-    );
-    setNewIngredients(
-      recipesData.find((recipe) => recipe.id === id)?.ingredients || []
-    );
+
+    // Find the item in recipesData (which now contains both recipes and ingredients)
+    const selectedItem = recipesData.find((item) => item.id === id);
+
+    if (selectedItem) {
+      setRecipeName(selectedItem.name || "");
+      setAmount(String(selectedItem.stock || ""));
+
+      // Handle ingredients based on type
+      if (selectedItem.type === 'recipe') {
+        const ingredients = (selectedItem.ingredients || []).map((ing: any) => ({
+          ...ing,
+          availableStock: ing.availableStock || 1 // Default to 1 if not set
+        }));
+        setNewIngredients(ingredients);
+      } else if (selectedItem.type === 'ingredient') {
+        // For ingredients, create the ingredient info from the ingredient data
+        let existingIngredients = [];
+
+        if (selectedItem.ingredients && selectedItem.ingredients !== null) {
+          try {
+            const parsedIngredients = typeof selectedItem.ingredients === 'string'
+              ? JSON.parse(selectedItem.ingredients)
+              : selectedItem.ingredients;
+
+            // Ensure it's an array and add availableStock if missing
+            if (Array.isArray(parsedIngredients)) {
+              existingIngredients = parsedIngredients.map((ing: any) => ({
+                ...ing,
+                availableStock: ing.availableStock || 1 // Default to 1 if not set
+              }));
+            } else {
+              existingIngredients = [];
+            }
+          } catch (error) {
+            console.error('Error parsing ingredient ingredients:', error);
+            existingIngredients = [];
+          }
+        } else {
+          // Manually create ingredient info from the ingredient data
+          const ingredientData = selectedItem as any; // Cast to access description property
+          const ingredientInfo = {
+            name: ingredientData.name,
+            quantity: "1",
+            unit: extractUnitFromDescription(ingredientData.description || ""),
+            productId: ingredientData.id,
+            linkedProductName: ingredientData.name,
+            availableStock: ingredientData.stock || 0
+          };
+
+          existingIngredients = [ingredientInfo];
+        }
+
+        setNewIngredients(existingIngredients);
+      }
+
+      setCategory(selectedItem.category || "bebida");
+    }
+
     fetchRecipes();
     setShowAddRecipeModal(true);
   };
@@ -350,7 +417,7 @@ export default function RecipeConfiguration() {
                 Total de Recetas
               </div>
               <div className="text-2xl font-bold text-blue-500">
-                {recipesData.length}
+                {recipesLoading ? "..." : recipesData.length}
               </div>
             </div>
           </div>
@@ -417,40 +484,59 @@ export default function RecipeConfiguration() {
         <Input
           placeholder="Buscar receta..."
           className="pl-8"
-          // value={recipeName}
-          // onChange={(e) => setRecipeName(e.target.value)}
+        // value={recipeName}
+        // onChange={(e) => setRecipeName(e.target.value)}
         />
       </div>
 
       {/* Recipe Cards */}
-      {recipesData.length === 0 ? (
+      {recipesLoading ? (
         <Loading />
+      ) : recipesData.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <Book className="h-12 w-12 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay recetas</h3>
+          <p className="text-gray-500 mb-6">
+            No se han creado recetas aún. Crea tu primera receta para comenzar.
+          </p>
+          <Button onClick={() => setShowAddRecipeModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Crear Primera Receta
+          </Button>
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredRecipes.map((recipe) => (
-              <div key={recipe.id} className="border rounded-lg p-4">
+            {filteredRecipes.filter(item => item.type === 'recipe').map((item) => (
+              <div key={item.id} className="border rounded-lg p-4">
                 <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-lg font-medium">{recipe.name}</h3>
-                  <Button
-                    onClick={() => handleEditRecipe(recipe.id)}
-                    variant="ghost"
-                    size="icon"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                  <h3 className="text-lg font-medium">{item.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {item.type === 'recipe' ? 'Receta' : 'Ingrediente'}
+                    </Badge>
+                    <Button
+                      onClick={() => handleEditRecipe(item.id)}
+                      variant="ghost"
+                      size="icon"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
-                {recipe.stock !== null ? (
+                {item.stock !== null ? (
                   <Badge
                     className={cn(
                       "mb-3",
-                      recipe.stock > 0
+                      item.stock > 0
                         ? "bg-green-50 text-green-700 border-green-200"
                         : "bg-red-50 text-red-700 border-red-200"
                     )}
                   >
-                    {recipe.stock} disponibles
+                    {item.stock} disponibles
                   </Badge>
                 ) : (
                   <Badge className="mb-3 bg-red-50 text-red-700 border-red-200">
@@ -458,19 +544,61 @@ export default function RecipeConfiguration() {
                   </Badge>
                 )}
 
-                <div className="text-sm font-medium mb-2">Ingredientes:</div>
-                <div className="space-y-1">
-                  {recipe.ingredients.map((ingredient, index) => (
-                    <div key={index} className="flex justify-between text-sm">
-                      <span>{ingredient.name}</span>
-                      <span className="text-muted-foreground">
-                        {ingredient.quantity} {ingredient.unit}
-                      </span>
+                {/* Show ingredients for recipes, or ingredient info for ingredients */}
+                {item.type === 'recipe' ? (
+                  <>
+                    <div className="text-sm font-medium mb-2">Ingredientes:</div>
+                    <div className="space-y-1">
+                      {item.ingredients && item.ingredients.map((ingredient, index) => (
+                        <div key={index} className="flex justify-between text-sm">
+                          <span>{ingredient.name}</span>
+                          <span className="text-muted-foreground">
+                            {ingredient.quantity} {ingredient.unit}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sm font-medium mb-2">Ingredientes:</div>
+                    <div className="space-y-1">
+                      {/* Show the ingredient itself as a single ingredient */}
+                      <div className="flex justify-between text-sm">
+                        <span>{item.name}</span>
+                        <span className="text-muted-foreground">
+                          1 unidad
+                        </span>
+                      </div>
 
-                {recipe.stock === null && (
+                      {/* Show additional ingredients if any (for ingredients that have been enhanced with more ingredients) */}
+                      {item.ingredients && item.ingredients !== null && (() => {
+                        try {
+                          const ingredients = typeof item.ingredients === 'string'
+                            ? JSON.parse(item.ingredients)
+                            : item.ingredients;
+
+                          // Only show if ingredients array exists and has items
+                          if (Array.isArray(ingredients) && ingredients.length > 0) {
+                            return ingredients.map((ingredient: any, index: number) => (
+                              <div key={index} className="flex justify-between text-sm">
+                                <span>{ingredient.name}</span>
+                                <span className="text-muted-foreground">
+                                  {ingredient.quantity} {ingredient.unit}
+                                </span>
+                              </div>
+                            ));
+                          }
+                          return null;
+                        } catch (error) {
+                          return null;
+                        }
+                      })()}
+                    </div>
+                  </>
+                )}
+
+                {item.stock === null && (
                   <div className="mt-3 p-2 bg-red-50 text-red-700 text-sm rounded border border-red-200">
                     Falta stock de ingredientes
                   </div>
@@ -493,7 +621,11 @@ export default function RecipeConfiguration() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Cocktail className="h-5 w-5" />
-              {selectedRecipe ? "Editar Receta" : "Crear Nueva Receta"}
+              {selectedRecipe ?
+                (recipesData.find(item => item.id === selectedRecipe)?.type === 'ingredient'
+                  ? "Editar Ingrediente"
+                  : "Editar Receta")
+                : "Crear Nueva Receta"}
             </DialogTitle>
           </DialogHeader>
 
@@ -558,200 +690,289 @@ export default function RecipeConfiguration() {
               </SelectContent>
             </Select>
 
-            <div className="space-y-2">
-              <Label>Ingredientes</Label>
-              {newIngredients.length === 0 ? (
-                <div className="bg-muted/50 p-6 text-center rounded-md">
-                  No hay ingredientes agregados
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {newIngredients.map((ingredient, index) => (
-                    <div key={index} className="flex gap-2 items-center">
-                      <div className="flex-grow">
-                        {ingredient.name || "Ingrediente sin nombre"}
+            {/* Show ingredient information if editing an ingredient */}
+            {selectedRecipe && recipesData.find(item => item.id === selectedRecipe)?.type === 'ingredient' && (() => {
+              const selectedIngredient = recipesData.find(item => item.id === selectedRecipe) as any;
+              return (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                  <h3 className="font-medium text-blue-900">Información del Ingrediente</h3>
+
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-blue-800">Ingrediente</span>
+                      <div className="text-blue-700">
+                        {selectedIngredient?.name}
                       </div>
-                      <div>
-                        {ingredient.quantity} {ingredient.unit}
+                      <div className="text-blue-600 text-xs">
+                        {selectedIngredient?.description || 'Sin descripción'}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          setNewIngredients(
-                            newIngredients.filter((_, i) => i !== index)
-                          )
-                        }
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            <div className="border-t pt-4">
-              <Label className="mb-2 block">Agregar Ingrediente</Label>
-              <div className="grid grid-cols-12 gap-2 items-center">
-                <div className="col-span-5">
-                  <Label className="mb-2 block">Ingrediente</Label>
-                  <div className="space-y-2">
-                    <Select
-                      value={selectedIngredient}
-					  disabled={customIngredient ? true : false}
-                      onValueChange={(value) => setSelectedIngredient(value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar ingrediente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Seleccionar ingrediente existente</SelectItem>
+                    <div>
+                      <span className="font-medium text-blue-800">Cantidad a crear</span>
+                      <div className="text-blue-700 text-lg font-semibold">
+                        {amount || 1}
+                      </div>
+                      <div className="text-blue-600 text-xs">
+                        Total necesario: {amount || 1} {extractUnitFromDescription(selectedIngredient?.description || "")}
+                      </div>
+                    </div>
 
-                        {/* Available products in stock */}
-                        {productsData
-                          .filter((product) =>
-                            product.category === "ingrediente" && product.has_recipe === false
-                          )
-                          .sort((a, b) => b.stock - a.stock) // Sort by stock level (highest first)
-                          .map((product) => (
-                            <SelectItem key={product.id} value={product.name}>
-                              <div className="flex justify-between items-center w-full">
-                                <span>{product.name}</span>
-                                <span className={`text-xs px-1 py-0.5 rounded ${
-                                  product.stock > 10 ? 'bg-green-100 text-green-800' :
-                                  product.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-red-100 text-red-800'
-                                }`}>
-                                  {product.stock}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
-
-                        {/* Products with recipes - show calculated ingredient requirements (grouped) */}
-                        {(() => {
-                          // Collect all ingredient requirements from all recipes
-                          const allIngredientRequirements: { [key: string]: { totalAmount: number; unit: string; sources: string[] } } = {};
-
-                          productsData
-                            .filter((product) => product.has_recipe === true && product.ingredients)
-                            .forEach((product) => {
-                              const ingredientRequirements = calculateIngredientRequirements(product, 1);
-                              ingredientRequirements.forEach((req: { name: string; totalRequired: number; unit: string; originalQuantity: string }) => {
-                                const key = req.name?.toLowerCase();
-                                if (!allIngredientRequirements[key]) {
-                                  allIngredientRequirements[key] = {
-                                    totalAmount: 0,
-                                    unit: req.unit,
-                                    sources: []
-                                  };
-                                }
-                                allIngredientRequirements[key].totalAmount += req.totalRequired;
-                                allIngredientRequirements[key].sources.push(product.name);
-                              });
-                            });
-
-                          // Convert to array and render
-                          return Object.entries(allIngredientRequirements).map(([ingredientName, data]) => (
-                            <SelectItem
-                              key={`recipe-ingredient-${ingredientName}`}
-                              value={`${ingredientName} (from recipes)`}
-                            >
-                              {ingredientName} - {data.totalAmount} {data.unit} (from {data.sources.length} recipe{data.sources.length > 1 ? 's' : ''})
-                            </SelectItem>
-                          ));
-                        })()}
-                      </SelectContent>
-                    </Select>
-                    <div className="text-center text-sm text-muted-foreground">o</div>
-                    <Input
-						disabled={selectedIngredient !== "none" ? true : false}
-                      placeholder="Escribir ingrediente personalizado"
-                      value={customIngredient}
-                      onChange={(e) => setCustomIngredient(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addNewIngredient();
+                    <div>
+                      <span className="font-medium text-blue-800">Stock disponible</span>
+                      <div className={`text-lg font-semibold ${(selectedIngredient?.stock || 0) >= (Number(amount) || 1)
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                        }`}>
+                        {selectedIngredient?.stock || 0} {extractUnitFromDescription(selectedIngredient?.description || "")}
+                      </div>
+                      <div className={`text-xs ${(selectedIngredient?.stock || 0) >= (Number(amount) || 1)
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                        }`}>
+                        {(selectedIngredient?.stock || 0) >= (Number(amount) || 1)
+                          ? `Suficiente stock`
+                          : `Faltan ${(Number(amount) || 1) - (selectedIngredient?.stock || 0)} ${extractUnitFromDescription(selectedIngredient?.description || "")}`
                         }
-                      }}
-                    />
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="col-span-3">
-                  <Label htmlFor="quantity" className="sr-only">
-                    Cantidad
-                  </Label>
-                  <Input
-                    type="number"
-                    placeholder="Ingrese cantidad"
-                    value={quantity}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      // Only allow positive numbers and empty string
-                      if (
-                        value === "" ||
-                        (Number(value) >= 0 && !value.includes("-"))
-                      ) {
-                        setQuantity(value);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      // Prevent minus key, plus key, and 'e' key
-                      if (
-                        e.key === "-" ||
-                        e.key === "+" ||
-                        e.key === "e" ||
-                        e.key === "E"
-                      ) {
-                        e.preventDefault();
-                      }
-                      // Allow Enter to add ingredient
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addNewIngredient();
-                      }
-                    }}
-                    min="0"
-                    step="0.01"
-                  />
+              );
+            })()}
+            {/* Ingredientes Section - Show for new recipes or when editing recipes (not ingredients) */}
+            {(!selectedRecipe || recipesData.find(item => item.id === selectedRecipe)?.type !== 'ingredient') && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-base font-medium">Ingredientes</Label>
+                  {newIngredients.length === 0 ? (
+                    <div className="bg-gray-50 border border-gray-200 p-8 text-center rounded-lg">
+                      <p className="text-gray-500 text-sm">No hay ingredientes agregados</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {newIngredients.map((ingredient, index) => (
+                        <div key={index} className="grid grid-cols-4 gap-3 items-center p-3 bg-gray-50 rounded-lg border">
+                          <div>
+                            <span className="font-medium text-sm">{ingredient.name || "Ingrediente sin nombre"}</span>
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {ingredient.quantity} {ingredient.unit}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Stock:</span>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={ingredient.availableStock}
+                              onChange={(e) => {
+                                const newValue = parseInt(e.target.value) || 0;
+                                const updatedIngredients = [...newIngredients];
+                                updatedIngredients[index].availableStock = newValue;
+                                setNewIngredients(updatedIngredients);
+                              }}
+                              className="h-8 w-16 text-center text-sm"
+                            />
+                          </div>
+                          <div className="flex justify-end">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setNewIngredients(
+                                newIngredients.filter((_, i) => i !== index)
+                              )}
+                              className="h-8 w-8"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="col-span-2">
-                  <Label htmlFor="unit" className="sr-only">
-                    Unidad
-                  </Label>
-                  <Select
-                    value={unit}
-                    onValueChange={(value) => setUnit(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ml">ml</SelectItem>
-                      <SelectItem value="g">g</SelectItem>
-                      <SelectItem value="unidad">unidad</SelectItem>
-                      <SelectItem value="hojas">hojas</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+                {/* Agregar Ingrediente Section */}
+                <div className="border-t pt-4 space-y-4">
+                  <Label className="text-base font-medium">Agregar Ingrediente</Label>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Ingrediente</Label>
+                      <Select
+                        value={selectedIngredient}
+                        disabled={customIngredient ? true : false}
+                        onValueChange={(value) => setSelectedIngredient(value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar ingrediente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Seleccionar ingrediente existente</SelectItem>
+
+                            {/* Available products in stock */}
+                            {productsData
+                              .filter((product) => (product.category === "ingrediente" && product.has_recipe === false) ||
+                                product.type === 'ingredient'
+                              )
+                              .sort((a, b) => b.stock - a.stock) // Sort by stock level (highest first)
+                              .map((product) => (
+                                <SelectItem key={product.id} value={product.name}>
+                                  <div className="flex justify-between items-center w-full">
+                                    <span>{product.name}</span>
+                                    <span className={`text-xs px-1 py-0.5 rounded ${product.stock > 10 ? 'bg-green-100 text-green-800' :
+                                        product.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
+                                          'bg-red-100 text-red-800'}`}>
+                                      {product.stock}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+
+                            {/* Products with recipes - show calculated ingredient requirements (grouped) */}
+                            {(() => {
+                              // Collect all ingredient requirements from all recipes
+                              const allIngredientRequirements: { [key: string]: { totalAmount: number; unit: string; sources: string[]; }; } = {};
+
+                              productsData
+                                .filter((product) => product.has_recipe === true && product.ingredients)
+                                .forEach((product) => {
+                                  const ingredientRequirements = calculateIngredientRequirements(product, 1);
+                                  ingredientRequirements.forEach((req: { name: string; totalRequired: number; unit: string; originalQuantity: string; }) => {
+                                    const key = req.name?.toLowerCase();
+                                    if (!allIngredientRequirements[key]) {
+                                      allIngredientRequirements[key] = {
+                                        totalAmount: 0,
+                                        unit: req.unit,
+                                        sources: []
+                                      };
+                                    }
+                                    allIngredientRequirements[key].totalAmount += req.totalRequired;
+                                    allIngredientRequirements[key].sources.push(product.name);
+                                  });
+                                });
+
+                              // Convert to array and render
+                              return Object.entries(allIngredientRequirements).map(([ingredientName, data]) => (
+                                <SelectItem
+                                  key={`recipe-ingredient-${ingredientName}`}
+                                  value={`${ingredientName} (from recipes)`}
+                                >
+                                  {ingredientName} - {data.totalAmount} {data.unit} (from {data.sources.length} recipe{data.sources.length > 1 ? 's' : ''})
+                                </SelectItem>
+                              ));
+                            })()}
+                          </SelectContent>
+                        </Select>
+                        <div className="text-center text-sm text-muted-foreground">o</div>
+                        <Input
+                          disabled={selectedIngredient !== "none" ? true : false}
+                          placeholder="Escribir ingrediente personalizado"
+                          value={customIngredient}
+                          onChange={(e) => setCustomIngredient(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addNewIngredient();
+                            }
+                          } } />
+                      </div>
+                    </div>
+
+                    {/* Quantity, Unit, and Available Stock in horizontal layout */}
+                    <div className="grid grid-cols-4 gap-2 items-end">
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-1 block">Cantidad</Label>
+                        <Input
+                          type="number"
+                          placeholder="Cantidad"
+                          value={quantity}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Only allow positive numbers and empty string
+                            if (value === "" ||
+                              (Number(value) >= 0 && !value.includes("-"))) {
+                              setQuantity(value);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            // Prevent minus key, plus key, and 'e' key
+                            if (e.key === "-" ||
+                              e.key === "+" ||
+                              e.key === "e" ||
+                              e.key === "E") {
+                              e.preventDefault();
+                            }
+                            // Allow Enter to add ingredient
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addNewIngredient();
+                            }
+                          }}
+                          min="0"
+                          step="0.01"
+                          className="h-10"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-1 block">Unidad</Label>
+                        <Select
+                          value={unit}
+                          onValueChange={(value) => setUnit(value)}
+                        >
+                          <SelectTrigger className="h-10">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ml">ml</SelectItem>
+                            <SelectItem value="L">L</SelectItem>
+                            <SelectItem value="g">g</SelectItem>
+                            <SelectItem value="kg">kg</SelectItem>
+                            <SelectItem value="unidad">unidad</SelectItem>
+                            <SelectItem value="parts">parts</SelectItem>
+                            <SelectItem value="cups">cups</SelectItem>
+                            <SelectItem value="tbsp">tbsp</SelectItem>
+                            <SelectItem value="tsp">tsp</SelectItem>
+                            <SelectItem value="hojas">hojas</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-1 block">Stock Disponible</Label>
+                        <Input
+                          type="number"
+                          placeholder="Stock"
+                          value={availableStock}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Only allow positive numbers and empty string
+                            if (value === "" ||
+                              (Number(value) >= 0 && !value.includes("-"))) {
+                              setAvailableStock(value);
+                            }
+                          }}
+                          min="0"
+                          step="1"
+                          className="h-10"
+                        />
+                      </div>
+                      <div>
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          onClick={addNewIngredient}
+                          disabled={quantity.trim() === "" ||
+                            (selectedIngredient === "none" && customIngredient.trim() === "") ||
+                            (selectedIngredient !== "none" && selectedIngredient.trim() === "")}
+                          className="h-10 w-10"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="col-span-2">
-                  <Button
-                    variant="secondary"
-                    className="w-full"
-                    onClick={addNewIngredient}
-                    disabled={
-                      quantity.trim() === "" ||
-                      (selectedIngredient === "none" && customIngredient.trim() === "") ||
-                      (selectedIngredient !== "none" && selectedIngredient.trim() === "")
-                    }
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           <DialogFooter>

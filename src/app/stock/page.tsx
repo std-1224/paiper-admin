@@ -193,8 +193,9 @@ const Stock = () => {
 
   // Recipe ingredient states for product modal
   const [selectedRecipeId, setSelectedRecipeId] = useState<string>("");
-  const [recipeIngredients, setRecipeIngredients] = useState<{ name: string; quantity: string; unit: string; requiredQuantity: number; availableStock: number; productId?: string }[]>([]);
-  const [stockValidationErrors, setStockValidationErrors] = useState<string[]>([]);
+  const [recipeIngredients, setRecipeIngredients] = useState<{ name: string; quantity: string; unit: string; requiredQuantity: number; availableStock: number; stock: number }[]>([]);
+  const [ingredientRequiredQuantity, setIngredientRequiredQuantity] = useState<number>(1);
+  // const [stockValidationErrors, setStockValidationErrors] = useState<string[]>([]);
 
   // Custom ingredient states for adding individual ingredients
   const [useCustomIngredients, setUseCustomIngredients] = useState<boolean>(false);
@@ -215,7 +216,7 @@ const Stock = () => {
     quantity: "",
     unit: "ml",
   });
-  const [ingredientValidation, setIngredientValidation] = useState<any[]>([]);
+  // const [ingredientValidation, setIngredientValidation] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const { uploadImageToSupabase } = useAppContext();
@@ -304,7 +305,7 @@ const Stock = () => {
   // Validate stock whenever recipe ingredients change
   useEffect(() => {
     if (recipeIngredients.length > 0) {
-      validateIngredientStock();
+      // validateIngredientStock();
     }
   }, [recipeIngredients]);
 
@@ -354,11 +355,11 @@ const Stock = () => {
       // Validate recipe ingredients if recipe is selected
       if (newProduct.has_recipe && recipeIngredients.length > 0) {
         // Check for stock validation errors
-        if (stockValidationErrors.length > 0) {
-          toast.error("Hay errores de stock en los ingredientes. Por favor corrígelos antes de continuar");
-          setIsLoading(false);
-          return;
-        }
+        // if (stockValidationErrors.length > 0) {
+        //   toast.error("Hay errores de stock en los ingredientes. Por favor corrígelos antes de continuar");
+        //   setIsLoading(false);
+        //   return;
+        // }
       }
 
       // Validate custom ingredients if they are being used
@@ -384,7 +385,8 @@ const Stock = () => {
           name: ing.name,
           quantity: ing.quantity,
           unit: ing.unit,
-          productId: ing.productId
+          requiredQuantity: ing.requiredQuantity
+          // Note: availableStock is NOT stored in product, only in recipe
         }));
       } else if (useCustomIngredients && customIngredients.length > 0) {
         ingredientsData = customIngredients.map(ing => ({
@@ -415,9 +417,23 @@ const Stock = () => {
         throw new Error(errorData.error || "Failed to add product");
       }
 
-      // Deduct ingredient stock if custom ingredients are used and product stock > 0
-      if (useCustomIngredients && customIngredients.length > 0 && (newProduct.stock || 0) > 0) {
-        await deductCustomIngredientStock(customIngredients, newProduct.stock || 1);
+      // Deduct ingredient stock based on product type
+      if ((newProduct.stock || 0) > 0) {
+        // Check if selected item is an ingredient (not a recipe)
+        const selectedIngredient = productsData.find(product =>
+          product.type === 'ingredient' && product.id.toString() === selectedRecipeId
+        );
+
+        if (selectedIngredient) {
+          // For ingredient-type products: deduct from ingredient's stock
+          await deductIngredientTypeStock(selectedRecipeId, ingredientRequiredQuantity);
+        } else if (newProduct.has_recipe && recipeIngredients.length > 0) {
+          // For recipe-type products: deduct from recipe ingredients' availableStock
+          await deductRecipeIngredientStock(recipeIngredients, newProduct.stock || 1);
+        } else if (useCustomIngredients && customIngredients.length > 0) {
+          // For custom ingredients: existing logic
+          await deductCustomIngredientStock(customIngredients, newProduct.stock || 1);
+        }
       }
 
       toast.success("Producto creado exitosamente");
@@ -432,20 +448,64 @@ const Stock = () => {
     }
   };
 
+  // Helper function to extract unit from description
+  const extractUnitFromDescription = (description: string): string => {
+    // Extract unit from description like "Unit: L, Conversion: 500g per unit"
+    const unitMatch = description.match(/Unit:\s*([^,]+)/i);
+    if (unitMatch) {
+      return unitMatch[1].trim();
+    }
+    return "unidad"; // Default unit
+  };
+
+  // Helper function to extract conversion amount from description
+  const extractConversionFromDescription = (description: string): number => {
+    // Extract conversion amount from description like "Unit: g, Conversion: 100g per unit"
+    const conversionMatch = description.match(/Conversion:\s*(\d+(?:\.\d+)?)/i);
+    if (conversionMatch) {
+      return parseFloat(conversionMatch[1]);
+    }
+    return 1; // Default conversion factor
+  };
+
   // Recipe handling functions
   const handleRecipeSelection = async (recipeId: string) => {
     setSelectedRecipeId(recipeId);
+    setIngredientRequiredQuantity(1); // Reset ingredient quantity
 
     if (!recipeId || recipeId === "no-recipe") {
       setRecipeIngredients([]);
-      setStockValidationErrors([]);
+      // setStockValidationErrors([]);
       setNewProduct({ ...newProduct, has_recipe: false });
       return;
     }
 
-    // Find the selected recipe
-    const selectedRecipe = recipesData.find(recipe => recipe.id.toString() === recipeId);
-    if (!selectedRecipe || !selectedRecipe.ingredients) {
+    // Check if the selected item is an ingredient first (from productsData)
+    const selectedIngredient = productsData.find(product =>
+      product.type === 'ingredient' && product.id.toString() === recipeId
+    );
+
+    if (selectedIngredient) {
+      // For ingredients, clear recipeIngredients to hide recipe ingredients section
+      // The ingredient info panel will show the ingredient details instead
+      setRecipeIngredients([]);
+      // setStockValidationErrors([]);
+      setNewProduct({ ...newProduct, has_recipe: true });
+      return;
+    }
+
+    // Find the selected recipe (only actual recipes, not ingredients)
+    const selectedRecipe = recipesData.find(recipe =>
+      recipe.id.toString() === recipeId && recipe.type === 'recipe'
+    );
+
+    if (!selectedRecipe) {
+      // Recipe not found
+      return;
+    }
+
+    // Handle recipes (existing logic)
+    if (!selectedRecipe.ingredients) {
       return;
     }
 
@@ -462,24 +522,14 @@ const Stock = () => {
 
     console.log("ingredients: ", ingredients);
 
-    // Get stock information for each ingredient
-    const ingredientsWithStock = await Promise.all(
-      ingredients.map(async (ingredient: any) => {
-        // Find matching products by name
-        const matchingProducts = productsData.filter(product =>
-          product.name.toLowerCase().includes(ingredient.name.toLowerCase())
-        );
-
-        const availableStock = matchingProducts.reduce((total, product) => total + product.stock, 0);
-
-        return {
-          ...ingredient,
-          requiredQuantity: 1, // Default quantity, user can modify
-          availableStock,
-          productId: matchingProducts[0]?.id || null,
-        };
-      })
-    );
+    // Set recipe ingredients with recipe stock as available stock
+    const ingredientsWithStock = ingredients.map((ingredient: any) => {
+      return {
+        ...ingredient,
+        requiredQuantity: 1, // Default quantity, user can modify
+        stock: selectedRecipe.stock || 0, // Recipe stock
+      };
+    });
 
     setRecipeIngredients(ingredientsWithStock);
     setNewProduct({ ...newProduct, has_recipe: true });
@@ -491,21 +541,21 @@ const Stock = () => {
     setRecipeIngredients(updatedIngredients);
 
     // Validate stock
-    validateIngredientStock();
+    // validateIngredientStock();
   };
 
-  const validateIngredientStock = () => {
-    const errors: string[] = [];
+  // const validateIngredientStock = () => {
+  //   const errors: string[] = [];
 
-    recipeIngredients.forEach((ingredient) => {
-      const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
-      if (totalRequired > ingredient.availableStock) {
-        errors.push(`${ingredient.name}: Necesitas ${totalRequired}${ingredient.unit}, pero solo hay ${ingredient.availableStock}${ingredient.unit} disponible`);
-      }
-    });
+  //   recipeIngredients.forEach((ingredient) => {
+  //     const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
+  //     if (totalRequired > ingredient.availableStock) {
+  //       errors.push(`${ingredient.name}: Necesitas ${totalRequired}${ingredient.unit}, pero solo hay ${ingredient.availableStock}${ingredient.unit} disponible`);
+  //     }
+  //   });
 
-    setStockValidationErrors(errors);
-  };
+  //   setStockValidationErrors(errors);
+  // };
 
   // Recipe creation functions
   const handleAddIngredientToRecipe = () => {
@@ -611,26 +661,17 @@ const Stock = () => {
       // Update local recipe ingredients display immediately
       console.log("🔄 Updating local recipe ingredients display...");
 
-      // Process the updated ingredients using the same logic as handleRecipeSelection
-      const updatedRecipeIngredients = await Promise.all(
-        updatedIngredients.map(async (ingredient: any) => {
-          // Find matching products by name (same logic as handleRecipeSelection)
-          const matchingProducts = productsData.filter(product =>
-            product.name.toLowerCase().includes(ingredient.name.toLowerCase())
-          );
-
-          const availableStock = matchingProducts.reduce((total, product) => total + product.stock, 0);
-
-          return {
-            name: ingredient.name,
-            quantity: ingredient.quantity.toString(),
-            unit: ingredient.unit,
-            requiredQuantity: 1, // Default quantity, user can modify
-            availableStock,
-            productId: matchingProducts[0]?.id || undefined,
-          };
-        })
-      );
+      // Process the updated ingredients with recipe stock
+      const updatedRecipeIngredients = updatedIngredients.map((ingredient: any) => {
+        return {
+          name: ingredient.name,
+          quantity: ingredient.quantity.toString(),
+          unit: ingredient.unit,
+          requiredQuantity: 1, // Default quantity, user can modify
+          availableStock: currentRecipe.stock || 0, // Use recipe stock as available stock
+          stock: currentRecipe.stock || 0, // Recipe stock
+        };
+      });
 
       // Update the recipe ingredients state immediately
       console.log("🔍 Current recipe ingredients before update:", recipeIngredients);
@@ -659,46 +700,46 @@ const Stock = () => {
     }
   };
 
-  const validateRecipeIngredients = async (ingredients: { name: string; quantity: string; unit: string }[]) => {
-    const validationResults = [];
+  // const validateRecipeIngredients = async (ingredients: { name: string; quantity: string; unit: string }[]) => {
+  //   const validationResults = [];
 
-    for (const ingredient of ingredients) {
-      if (!ingredient.name || !ingredient.quantity) {
-        validationResults.push({
-          ingredient: ingredient.name || 'Sin nombre',
-          status: 'invalid',
-          message: `Ingrediente "${ingredient.name || 'Sin nombre'}" tiene datos incompletos`,
-        });
-      } else {
-        validationResults.push({
-          ingredient: ingredient.name,
-          status: 'valid',
-          message: `✓ "${ingredient.name}" es válido`,
-        });
-      }
-    }
+  //   for (const ingredient of ingredients) {
+  //     if (!ingredient.name || !ingredient.quantity) {
+  //       validationResults.push({
+  //         ingredient: ingredient.name || 'Sin nombre',
+  //         status: 'invalid',
+  //         message: `Ingrediente "${ingredient.name || 'Sin nombre'}" tiene datos incompletos`,
+  //       });
+  //     } else {
+  //       validationResults.push({
+  //         ingredient: ingredient.name,
+  //         status: 'valid',
+  //         message: `✓ "${ingredient.name}" es válido`,
+  //       });
+  //     }
+  //   }
 
-    setIngredientValidation(validationResults);
-    return validationResults;
-  };
+  //   setIngredientValidation(validationResults);
+  //   return validationResults;
+  // };
 
   const handleCreateRecipe = async () => {
     try {
       setIsLoading(true);
 
       // Validate ingredients before creating recipe
-      const validationResults = await validateRecipeIngredients(newRecipe.ingredients);
-      const hasErrors = validationResults.some(result => result.status !== 'valid');
+      // const validationResults = await validateRecipeIngredients(newRecipe.ingredients);
+      // const hasErrors = validationResults.some(result => result.status !== 'valid');
 
-      if (hasErrors) {
-        const errorMessages = validationResults
-          .filter(result => result.status !== 'valid')
-          .map(result => result.message)
-          .join('\n');
+      // if (hasErrors) {
+      //   const errorMessages = validationResults
+      //     .filter(result => result.status !== 'valid')
+      //     .map(result => result.message)
+      //     .join('\n');
 
-        toast.error(`Errores de validación:\n${errorMessages}`);
-        return;
-      }
+      //   toast.error(`Errores de validación:\n${errorMessages}`);
+      //   return;
+      // }
 
       const response = await fetch(`/api/recipes`, {
         method: "POST",
@@ -722,24 +763,15 @@ const Stock = () => {
         has_recipe: true,
       });
 
-      // Set recipe ingredients with stock information
-      const ingredientsWithStock = await Promise.all(
-        newRecipe.ingredients.map(async (ingredient: any) => {
-          // Find matching products by name
-          const matchingProducts = productsData.filter(product =>
-            product.name.toLowerCase().includes(ingredient.name.toLowerCase())
-          );
-
-          const availableStock = matchingProducts.reduce((total, product) => total + product.stock, 0);
-
-          return {
-            ...ingredient,
-            requiredQuantity: 1, // Default quantity, user can modify
-            availableStock,
-            productId: matchingProducts[0]?.id || null,
-          };
-        })
-      );
+      // Set recipe ingredients with recipe stock as available stock
+      const ingredientsWithStock = newRecipe.ingredients.map((ingredient: any) => {
+        return {
+          ...ingredient,
+          requiredQuantity: 1, // Default quantity, user can modify
+          availableStock: createdRecipe.stock || 1, // Use recipe stock as available stock
+          stock: createdRecipe.stock || 1, // Recipe stock
+        };
+      });
       setRecipeIngredients(ingredientsWithStock);
 
       // Reset recipe form
@@ -866,6 +898,115 @@ const Stock = () => {
     }
   };
 
+  // Function to deduct stock for recipe ingredients (from availableStock)
+  const deductRecipeIngredientStock = async (ingredients: { name: string; quantity: string; unit: string; requiredQuantity: number; availableStock: number }[], productAmount: number) => {
+    // Find the recipe to update its ingredients
+    const selectedRecipe = recipesData.find(recipe => recipe.id.toString() === selectedRecipeId);
+    if (!selectedRecipe) {
+      console.error("Selected recipe not found for stock deduction");
+      return;
+    }
+
+    try {
+      // Get the original recipe ingredients from the database
+      let originalIngredients = [];
+      try {
+        originalIngredients = typeof selectedRecipe.ingredients === 'string'
+          ? JSON.parse(selectedRecipe.ingredients)
+          : selectedRecipe.ingredients || [];
+      } catch (error) {
+        console.error("Error parsing original recipe ingredients:", error);
+        originalIngredients = [];
+      }
+
+      // Update only the availableStock for matching ingredients
+      const updatedIngredients = originalIngredients.map((originalIng: any) => {
+        // Find the matching ingredient from the current ingredients (with requiredQuantity)
+        const matchingIngredient = ingredients.find(ing =>
+          ing.name === originalIng.name &&
+          ing.quantity === originalIng.quantity &&
+          ing.unit === originalIng.unit
+        );
+
+        if (matchingIngredient) {
+          // Update only the availableStock, preserve all other properties
+          return {
+            ...originalIng,
+            availableStock: Math.max(0, matchingIngredient.availableStock - matchingIngredient.requiredQuantity)
+          };
+        }
+
+        // If no match found, return original ingredient unchanged
+        return originalIng;
+      });
+
+      // Update the recipe with new ingredient availableStock values
+      const response = await fetch(`/api/recipe`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedRecipe.id,
+          name: selectedRecipe.name,
+          category: selectedRecipe.category,
+          amount: selectedRecipe.stock,
+          ingredients: updatedIngredients
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update recipe ingredient stock");
+      }
+
+      console.log(`Deducted stock from recipe ingredients for ${productAmount} units`);
+
+      // Refresh recipes data to reflect changes
+      fetchRecipes();
+    } catch (error) {
+      console.error("Error deducting recipe ingredient stock:", error);
+      toast.error("Error deducting recipe ingredient stock");
+    }
+  };
+
+  // Function to deduct stock for ingredient-type products (from ingredient's stock)
+  const deductIngredientTypeStock = async (ingredientId: string, requiredQuantity: number) => {
+    try {
+      // Find the ingredient product
+      const ingredient = productsData.find(product =>
+        product.type === 'ingredient' && product.id.toString() === ingredientId
+      );
+
+      if (!ingredient) {
+        console.error("Ingredient not found for stock deduction");
+        return;
+      }
+
+      // Calculate new stock
+      const newStock = Math.max(0, (ingredient.stock || 0) - requiredQuantity);
+
+      // Update the ingredient's stock
+      const response = await fetch(`/api/products`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: ingredient.id,
+          stock: newStock
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to deduct stock for ingredient: ${ingredient.name}`);
+      }
+
+      console.log(`Deducted ${requiredQuantity} units from ingredient ${ingredient.name}`);
+
+      // Refresh products data to reflect changes
+      fetchProducts();
+    } catch (error) {
+      console.error("Error deducting ingredient stock:", error);
+      toast.error("Error deducting ingredient stock");
+    }
+  };
+
   const resetProductModal = () => {
     setNewProduct({
       name: "",
@@ -964,7 +1105,7 @@ const Stock = () => {
   const onSubmitAssign = async (data: any) => {
     try {
       setIsLoading(true);
-      
+
       if (!selectedProduct?.id) {
         toast.error("No se ha seleccionado un producto");
         return;
@@ -982,7 +1123,7 @@ const Stock = () => {
 
       const destinationBarId = Number(data.destination.split("_*_")[0]);
       const destinationBarName = data.destination.split("_*_")[1];
-      
+
       // First, use the adjust API for re-entry to assign stock to a bar
       const adjustResponse = await fetch("/api/adjust", {
         method: "POST",
@@ -1007,10 +1148,10 @@ const Stock = () => {
       // Now create a transfer record to show in the transfer history
       // We need to find the inventory item that was just created/updated
       await fetchStocksOfBar();
-      
+
       // Find the destination inventory item
-      const destinationInventory = stocksData.find((stock: any) => 
-        stock.productId === selectedProduct.id && 
+      const destinationInventory = stocksData.find((stock: any) =>
+        stock.productId === selectedProduct.id &&
         stock.barId === destinationBarId
       );
 
@@ -1037,11 +1178,11 @@ const Stock = () => {
       toast.success(
         `${data.quantity} unidades de ${selectedProduct.name} asignadas a ${destinationBarName}`
       );
-      
+
       // Refresh data
       await fetchStocksOfBar();
       await fetchProducts();
-      
+
       setAssignStockDialogOpen(false);
       assignForm.reset();
       setSelectedProduct(null);
@@ -1474,125 +1615,151 @@ const Stock = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {productsData.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedStockItems.includes(item.id || "")}
-                          onCheckedChange={() =>
-                            toggleStockItemSelection(item.id || "")
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <Button
-                          variant="link"
-                          onClick={
-                            () =>
-                              // "category" in item && "status" in item
-                              viewProductDetail(item)
-                            // : console.error("Invalid product data", item)
-                          }
-                          className="p-0 h-auto font-medium text-orange-900"
-                        >
-                          {item.name}
-                        </Button>
-                      </TableCell>
-                      <TableCell>
-                        <Switch
-                          checked={item.is_active}
-                          onCheckedChange={(checked) =>
-                            handleToggleActive(item.id, checked, "is_active")
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {"category" in item ? item.category : "N/A"}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium text-green-600">
-                          ${item.purchase_price?.toFixed(2) || "0.00"}
-                        </span>
-                      </TableCell>
-                      <TableCell>{item.stock}</TableCell>
-                      <TableCell>
-                        {stocksData
-                          .filter((s) => item.id == s.productId)
-                          .slice(0, 2)
-                          .map((s) => (
-                            <div key={s.id}>
-                              <Button
-                                variant="link"
-                                className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800"
-                                onClick={() => router.push(`/bars/${s.barId}`)}
-                              >
-                                {`${s.barName} (${s.quantity})`}
-                              </Button>
-                            </div>
-                          ))}
-                        {stocksData.filter((s) => item.id == s.productId)
-                          .length > 2 && "..."}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            "quantity" in item && item.stock > 5
-                              ? "bg-green-50 text-green-700 border-green-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200"
-                          }
-                        >
-                          {item.stock > 5 ? "En Stock" : "Falta Stock"}
-                        </Badge>
-                      </TableCell>
-                      {showUnredeemed && "date" in item && (
-                        <TableCell>{item.created_at}</TableCell>
-                      )}
-                      {/* {showUnredeemed && "user" in item && (
+                  {(() => {
+                    // Combine productsData and recipesData, but avoid duplicates by ID
+                    const seenIds = new Set();
+                    const allItems: any[] = [];
+
+                    // Add all products first
+                    productsData.forEach(item => {
+                      if (!seenIds.has(item.id)) {
+                        seenIds.add(item.id);
+                        allItems.push(item);
+                      }
+                    });
+
+                    // Add only recipes from recipesData that aren't already added
+                    recipesData.forEach(item => {
+                      if (item.type === 'recipe' && !seenIds.has(item.id)) {
+                        seenIds.add(item.id);
+                        allItems.push(item);
+                      }
+                    });
+
+                    return allItems;
+                  })().map((item) => {
+                    const isProduct = 'purchase_price' in item;
+                    const product = item as any; // Cast to access all properties
+
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedStockItems.includes(item.id?.toString() || "")}
+                            onCheckedChange={() =>
+                              toggleStockItemSelection(item.id?.toString() || "")
+                            }
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <Button
+                            variant="link"
+                            onClick={() => isProduct && viewProductDetail(product)}
+                            className="p-0 h-auto font-medium text-orange-900"
+                          >
+                            {item.name} {!isProduct && '(Receta)'}
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={isProduct ? product.is_active : false}
+                            onCheckedChange={(checked) =>
+                              isProduct && handleToggleActive(item.id?.toString(), checked, "is_active")
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          {"category" in item ? item.category : "N/A"}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium text-green-600">
+                            ${item.purchase_price?.toFixed(2) || "0.00"}
+                          </span>
+                        </TableCell>
+                        <TableCell>{item.stock}</TableCell>
+                        <TableCell>
+                          {stocksData
+                            .filter((s) => item.id == s.productId)
+                            .slice(0, 2)
+                            .map((s) => (
+                              <div key={s.id}>
+                                <Button
+                                  variant="link"
+                                  className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800"
+                                  onClick={() => router.push(`/bars/${s.barId}`)}
+                                >
+                                  {`${s.barName} (${s.quantity})`}
+                                </Button>
+                              </div>
+                            ))}
+                          {stocksData.filter((s) => item.id == s.productId)
+                            .length > 2 && "..."}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              "quantity" in item && item.stock > 5
+                                ? "bg-green-50 text-green-700 border-green-200"
+                                : "bg-amber-50 text-amber-700 border-amber-200"
+                            }
+                          >
+                            {item.stock > 5 ? "En Stock" : "Falta Stock"}
+                          </Badge>
+                        </TableCell>
+                        {showUnredeemed && "date" in item && (
+                          <TableCell>{product.created_at || 'N/A'}</TableCell>
+                        )}
+                        {/* {showUnredeemed && "user" in item && (
                         // <TableCell>{item.user}</TableCell>
                       )} */}
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleAssignStock(item)}
-                          >
-                            <ArrowRightLeft className="mr-2 h-4 w-4" />
-                            Asignar
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                            onClick={() => handleAdjustStock(item)}
-                          >
-                            <PackagePlus className="mr-2 h-4 w-4" />
-                            Ajustar
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                            onClick={() => handleDeleteClick(item)}
-                            disabled={deletingProductId === item.id}
-                          >
-                            {deletingProductId === item.id ? (
+                        <TableCell>
+                          <div className="flex gap-2">
+                            {isProduct && (
                               <>
-                                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                                Eliminando...
-                              </>
-                            ) : (
-                              <>
-                                <Trash className="mr-2 h-4 w-4" />
-                                Eliminar
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleAssignStock(product)}
+                                >
+                                  <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                  Asignar
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                                  onClick={() => handleAdjustStock(product)}
+                                >
+                                  <PackagePlus className="mr-2 h-4 w-4" />
+                                  Ajustar
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                                  onClick={() => handleDeleteClick(product)}
+                                  disabled={deletingProductId === item.id}
+                                >
+                                  {deletingProductId === item.id ? (
+                                    <>
+                                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                                      Eliminando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Trash className="mr-2 h-4 w-4" />
+                                      Eliminar
+                                    </>
+                                  )}
+                                </Button>
                               </>
                             )}
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TabsContent>
@@ -1699,8 +1866,8 @@ const Stock = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -1943,7 +2110,7 @@ const Stock = () => {
         setShowAddProductModal(open);
         if (!open) resetProductModal();
       }}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Agregar Nuevo Producto</DialogTitle>
             <DialogDescription>
@@ -2021,7 +2188,6 @@ const Stock = () => {
                 </label>
                 <label className="flex items-center space-x-2">
                   <input
-                    disabled
                     type="radio"
                     name="ingredientType"
                     checked={useCustomIngredients}
@@ -2046,13 +2212,90 @@ const Stock = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="no-recipe">Sin receta</SelectItem>
-                      {recipesData.map((recipe) => (
-                        <SelectItem key={recipe.id} value={recipe.id.toString()}>
-                          {recipe.name} ({recipe.category})
-                        </SelectItem>
-                      ))}
+                      {/* Show Recipes only (filter out ingredients from recipesData) */}
+                      {recipesData
+                        .filter((recipe) => recipe.type === 'recipe')
+                        .map((recipe) => (
+                          <SelectItem key={`recipe-${recipe.id}`} value={recipe.id.toString()}>
+                            {recipe.name} ({recipe.category}) - Receta
+                          </SelectItem>
+                        ))}
+                      {/* Show Ingredients from productsData */}
+                      {productsData
+                        .filter((product) => product.type === 'ingredient')
+                        .map((ingredient) => (
+                          <SelectItem key={`ingredient-${ingredient.id}`} value={ingredient.id.toString()}>
+                            {ingredient.name} ({ingredient.category}) - Ingrediente
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
+
+                  {/* Show ingredient information if an ingredient is selected */}
+                  {selectedRecipeId && selectedRecipeId !== "no-recipe" && (() => {
+                    // Check if selected item is an ingredient
+                    const selectedIngredient = productsData.find(product =>
+                      product.type === 'ingredient' && product.id.toString() === selectedRecipeId
+                    );
+
+                    if (selectedIngredient) {
+                      const unit = extractUnitFromDescription(selectedIngredient.description || "");
+                      const conversionFactor = extractConversionFromDescription(selectedIngredient.description || "");
+
+                      // Calculate amounts using conversion factor
+                      const totalAmount = (selectedIngredient.stock || 0) * conversionFactor;
+                      const totalRequired = ingredientRequiredQuantity * conversionFactor;
+                      const hasEnoughStock = totalAmount >= totalRequired;
+
+                      return (
+                        <div className="mt-4 space-y-4">
+                          <h3 className="font-medium text-gray-900">Ingredientes del producto:</h3>
+                          <p className="text-sm text-gray-600">
+                            Especifica cuántas unidades del producto vas a crear. Los ingredientes se descontarán automáticamente.
+                          </p>
+
+                          <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700">Ingrediente</Label>
+                              <p className="text-sm font-semibold text-gray-900">{selectedIngredient.name}</p>
+                              <p className="text-xs text-green-500">
+                                {conversionFactor} {unit} por unidad
+                              </p>
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700">Cantidad a crear</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={ingredientRequiredQuantity}
+                                onChange={(e) => setIngredientRequiredQuantity(parseInt(e.target.value) || 1)}
+                                className="h-10 text-center font-medium"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">
+                                Total necesario: {totalRequired} {unit}
+                              </p>
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-700">Stock disponible</Label>
+                              <p className={`text-lg font-bold ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
+                                {totalAmount} {unit}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Available: {selectedIngredient.stock || 0} units ({totalAmount} {unit})
+                              </p>
+                              {!hasEnoughStock && (
+                                <p className="text-xs text-red-600 font-medium">
+                                  {(totalRequired - totalAmount)} {unit} missing
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   <p className="text-sm text-muted-foreground">
                     Si seleccionas una receta, el stock de los ingredientes se descontará automáticamente cuando se haga un pedido.
                   </p>
@@ -2084,11 +2327,10 @@ const Stock = () => {
                                 <SelectItem key={product.id} value={product.name}>
                                   <div className="flex justify-between items-center w-full">
                                     <span>{product.name}</span>
-                                    <span className={`text-xs px-1 py-0.5 rounded ${
-                                      product.stock > 10 ? 'bg-green-100 text-green-800' :
-                                      product.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
-                                      'bg-red-100 text-red-800'
-                                    }`}>
+                                    <span className={`text-xs px-1 py-0.5 rounded ${product.stock > 10 ? 'bg-green-100 text-green-800' :
+                                        product.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
+                                          'bg-red-100 text-red-800'
+                                      }`}>
                                       {product.stock}
                                     </span>
                                   </div>
@@ -2126,10 +2368,16 @@ const Stock = () => {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="ml">ml</SelectItem>
-                            <SelectItem value="g">g</SelectItem>
-                            <SelectItem value="unidad">unidad</SelectItem>
-                            <SelectItem value="hojas">hojas</SelectItem>
+                            <SelectItem value="g">Grams (g)</SelectItem>
+                            <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                            <SelectItem value="ml">Milliliters (mL)</SelectItem>
+                            <SelectItem value="L">Liters (L)</SelectItem>
+                            <SelectItem value="unidad">Units</SelectItem>
+                            <SelectItem value="parts">Parts</SelectItem>
+                            <SelectItem value="cups">Cups</SelectItem>
+                            <SelectItem value="tbsp">Tablespoons</SelectItem>
+                            <SelectItem value="tsp">Teaspoons</SelectItem>
+                            <SelectItem value="hojas">Leaves</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -2189,39 +2437,41 @@ const Stock = () => {
                 </p>
 
                 {recipeIngredients.map((ingredient, index) => {
+                  const totalAmount = parseFloat(ingredient.quantity) * ingredient.availableStock;
                   const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
-                  const hasEnoughStock = ingredient.availableStock >= totalRequired;
+                  const hasEnoughStock = totalAmount >= totalRequired;
 
                   return (
-                    <div key={index} className="grid grid-cols-3 gap-4 p-3 bg-white border rounded-lg">
+                    <div key={index} className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
                       <div>
-                        <Label className="text-xs text-gray-600">Ingrediente</Label>
-                        <p className="text-sm font-medium">{ingredient.name}</p>
-                        <p className="text-xs text-gray-500">
+                        <Label className="text-sm font-medium text-gray-700">Ingrediente</Label>
+                        <p className="text-sm font-semibold text-gray-900">{ingredient.name}</p>
+                        <p className="text-xs text-green-500">
                           {ingredient.quantity} {ingredient.unit} por unidad
                         </p>
                       </div>
                       <div>
-                        <Label className="text-xs text-gray-600">Cantidad a crear</Label>
+                        <Label className="text-sm font-medium text-gray-700">Cantidad a crear</Label>
                         <Input
                           type="number"
                           min="1"
                           value={ingredient.requiredQuantity}
                           onChange={(e) => updateIngredientQuantity(index, parseInt(e.target.value) || 1)}
-                          className="h-8 mt-1"
+                          className="h-10 text-center font-medium"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Total necesario: {totalRequired} {ingredient.unit}
+                          Total necesario: {totalRequired.toFixed(0)} {ingredient.unit}
                         </p>
                       </div>
                       <div>
-                        <Label className="text-xs text-gray-600">Stock disponible</Label>
-                        <p className={`text-sm font-medium mt-1 ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
-                          {ingredient.availableStock} {ingredient.unit}
+                        <Label className="text-sm font-medium text-gray-700">Stock disponible</Label>
+                        <p className={`text-lg font-bold ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
+                          {ingredient.availableStock * Number(ingredient?.quantity)} {ingredient.unit}
                         </p>
+                        <p>Available: {ingredient.availableStock}</p>
                         {!hasEnoughStock && (
-                          <p className="text-xs text-red-600 mt-1">
-                            Faltan {totalRequired - ingredient.availableStock} {ingredient.unit}
+                          <p className="text-xs text-red-600 font-medium">
+                            {ingredient.availableStock * Number(ingredient?.quantity) - Number(ingredient.quantity) * ingredient.requiredQuantity} missing
                           </p>
                         )}
                       </div>
@@ -2263,10 +2513,16 @@ const Stock = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="ml">ml</SelectItem>
-                          <SelectItem value="g">g</SelectItem>
-                          <SelectItem value="unidad">unidad</SelectItem>
-                          <SelectItem value="hojas">hojas</SelectItem>
+                          <SelectItem value="g">Grams (g)</SelectItem>
+                          <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                          <SelectItem value="ml">Milliliters (mL)</SelectItem>
+                          <SelectItem value="L">Liters (L)</SelectItem>
+                          <SelectItem value="unidad">Units</SelectItem>
+                          <SelectItem value="parts">Parts</SelectItem>
+                          <SelectItem value="cups">Cups</SelectItem>
+                          <SelectItem value="tbsp">Tablespoons</SelectItem>
+                          <SelectItem value="tsp">Teaspoons</SelectItem>
+                          <SelectItem value="hojas">Leaves</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2288,7 +2544,7 @@ const Stock = () => {
                 </div>
 
                 {/* Stock validation errors */}
-                {stockValidationErrors.length > 0 && (
+                {/* {stockValidationErrors.length > 0 && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-sm font-medium text-red-800 mb-2">Errores de stock:</p>
                     <ul className="text-sm text-red-700 space-y-1">
@@ -2297,7 +2553,7 @@ const Stock = () => {
                       ))}
                     </ul>
                   </div>
-                )}
+                )} */}
               </div>
             )}
 
@@ -2512,7 +2768,7 @@ const Stock = () => {
                 setShowCreateRecipeDialog(false);
                 setNewRecipe({ name: "", category: "bebida", ingredients: [] });
                 setNewIngredient({ name: "", quantity: "", unit: "ml" });
-                setIngredientValidation([]);
+                // setIngredientValidation([]);
               }}
             >
               Cancelar

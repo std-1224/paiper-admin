@@ -16,6 +16,7 @@ interface AppContextProps {
   recipesData: Recipe[];
   ordersData: Order[];
   notificationsData: Notification[];
+  recipesLoading: boolean;
   fetchOrders: () => Promise<void>;
   fetchBars: () => Promise<void>;
   fetchQRCodes: () => Promise<void>;
@@ -43,6 +44,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [usersData, setUsersData] = useState<User[]>([]);
   const [staffData, setStaffData] = useState<Staff[]>([]);
   const [recipesData, setRecipesData] = useState<Recipe[]>([]);
+  const [recipesLoading, setRecipesLoading] = useState<boolean>(false);
   const [ordersData, setOrdersData] = useState<Order[]>([]);
   const [notificationsData, setNotificationsData] = useState<Notification[]>(
     []
@@ -60,7 +62,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         },
         async (payload: any) => {
           try {
-            console.log("Order change detected:", payload);
             fetchOrders();
           } catch (err) {
             console.error("Error processing order update:", err);
@@ -69,7 +70,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       )
       .subscribe((status, err) => {
         if (status === "SUBSCRIBED") {
-          console.log("Successfully subscribed to orders changes");
         }
         if (err) {
           console.error("Subscription error:", err);
@@ -110,8 +110,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
               return;
             }
 
-            console.log("Fetched updated notification:", updatedNotification);
-
             setNotificationsData((prev) => {
               switch (payload.eventType) {
                 case "INSERT":
@@ -138,7 +136,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       )
       .subscribe((status, err) => {
         if (status === "SUBSCRIBED") {
-          console.log("Successfully subscribed to notifications changes");
         }
         if (err) {
           console.error("Subscription error:", err);
@@ -148,13 +145,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(notificationChannel);
-      console.log("Cleaned up orders channel");
     };
   }, []);
 
   const uploadImageToSupabase = async (file: File | Blob, fileName: string) => {
     try {
-      console.log("Uploading image:", file, fileName);
       // Generate unique filename
       const fileExt = fileName.split(".").pop();
       const filePath = `${Date.now()}.${fileExt}`;
@@ -352,7 +347,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const fetchRecipes = async () => {
     try {
-      console.log("🔄 Fetching recipes from API...");
+      setRecipesLoading(true);
       const res = await fetch("/api/recipe");
 
       if (!res.ok) {
@@ -360,7 +355,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       const data = await res.json();
-      console.log("📋 Raw recipes data:", data);
 
       data.map((recipe: Recipe) => {
         // @ts-ignore
@@ -369,11 +363,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       });
 
-      console.log("📋 Processed recipes data:", data);
       setRecipesData(data);
     } catch (error) {
       console.error("❌ Error fetching recipes:", error);
       setRecipesData([]);
+    } finally {
+      setRecipesLoading(false);
     }
   };
 
@@ -393,6 +388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         usersData,
         staffData,
         recipesData,
+        recipesLoading,
         ordersData,
         notificationsData,
         fetchOrders,

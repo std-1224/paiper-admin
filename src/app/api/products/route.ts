@@ -2,19 +2,32 @@ import { NextResponse } from 'next/server';
 import { supabase as supabaseServerClient } from '@/lib/supabaseClient';
 
 
-export const GET = async () => {
+export const GET = async (req: Request) => {
     try {
-        const { data, error } = await supabaseServerClient
+        const { searchParams } = new URL(req.url);
+        const type = searchParams.get('type');
+
+        console.log("type: ", type)
+
+        let query = supabaseServerClient
             .from("products")
             .select("*")
             .order("id", { ascending: true });
+
+        // Filter by type if specified
+        if (type) {
+            query = query.eq('type', type);
+        }
+
+        const { data, error } = await query;
+
         if (error) {
             throw error;
         }
 
         return NextResponse.json(data, { status: 200 });
     } catch (error: any) {
-        console.error('Error fetching users:', error.message);
+        console.error('Error fetching products:', error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 };
@@ -32,6 +45,7 @@ export const POST = async (req: Request) => {
                 image_url: body.image_url,
                 purchase_price: body.purchase_price,
                 sale_price: body.sale_price,
+                type: body.type || 'product', // Default type is "product"
                 has_recipe: body.has_recipe || false,
                 ingredients: body.ingredients || null
             }])
