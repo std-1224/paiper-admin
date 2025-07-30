@@ -75,14 +75,14 @@ export const PUT = async (req: Request) => {
         if (!id) {
             return NextResponse.json({ error: 'Recipe ID is required' }, { status: 400 });
         }
-        if (!name || !ingredients) {
-            return NextResponse.json({ error: 'Name and ingredients are required' }, { status: 400 });
+        if (!ingredients) {
+            return NextResponse.json({ error: 'Ingredients are required' }, { status: 400 });
         }
 
-        // Get the current recipe to compare stock changes
+        // Get the current recipe to get existing data
         const { data: currentRecipe, error: fetchError } = await supabaseServerClient
             .from('products')
-            .select('stock, ingredients')
+            .select('name, stock, ingredients, category')
             .eq('id', id)
             .single();
 
@@ -99,20 +99,25 @@ export const PUT = async (req: Request) => {
             }, { status: 400 });
         }
 
+        // Use provided values or fall back to current recipe values
+        const recipeName = name || currentRecipe.name;
+        const recipeAmount = amount !== undefined ? amount : currentRecipe.stock;
+        const recipeCategory = category || currentRecipe.category;
+
         // Add availableStock to ingredients based on recipe amount
         const ingredientsWithStock = ingredientValidation.validatedIngredients.map(ingredient => ({
             ...ingredient,
-            availableStock: amount || 1 // Set availableStock to recipe amount
+            availableStock: ingredient.availableStock || recipeAmount || 1 // Preserve existing availableStock or use recipe amount
         }));
 
         // Update the recipe
         const { data, error } = await supabaseServerClient
             .from('products')
             .update({
-                name,
+                name: recipeName,
                 ingredients: JSON.stringify(ingredientsWithStock),
-                stock: amount,
-                category
+                stock: recipeAmount,
+                category: recipeCategory
             })
             .eq('id', id)
             .select();
@@ -168,12 +173,19 @@ async function validateIngredients(ingredients: any[]) {
             continue; // Skip invalid ingredients
         }
 
-        // Add clean ingredient without product linking
-        validatedIngredients.push({
+        // Add clean ingredient, preserving availableStock if provided
+        const cleanIngredient: any = {
             name: ingredient.name,
             quantity: ingredient.quantity,
             unit: ingredient.unit
-        });
+        };
+
+        // Preserve availableStock if it exists
+        if (ingredient.availableStock !== undefined) {
+            cleanIngredient.availableStock = ingredient.availableStock;
+        }
+
+        validatedIngredients.push(cleanIngredient);
     }
 
     return {

@@ -2285,72 +2285,63 @@ export default function StockManagement() {
               </div>
 
               {/* Toggle between existing recipes and custom ingredients */}
-              <div className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">
-                  Elige una de las dos opciones para agregar receta al producto:
-                </p>
-                <div className="flex gap-4">
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      name="ingredientType"
-                      checked={!useCustomIngredients}
-                      onChange={() => {
-                        setUseCustomIngredients(false);
-                        setCustomIngredients([]);
-                      }}
-                    />
-                    <span className="text-sm font-medium">Opción 1: Usar receta existente</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      name="ingredientType"
-                      checked={useCustomIngredients}
-                      onChange={() => {
-                        setUseCustomIngredients(true);
-                        setSelectedRecipeId("");
-                        setRecipeIngredients([]);
-                      }}
-                    />
-                    <span className="text-sm font-medium">Opción 2: Agregar receta directamente</span>
-                  </label>
-                </div>
+              <div className="flex gap-4">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="ingredientType"
+                    checked={!useCustomIngredients}
+                    onChange={() => {
+                      setUseCustomIngredients(false);
+                      setCustomIngredients([]);
+                    }}
+                  />
+                  <span className="text-sm">Usar receta existente</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="ingredientType"
+                    checked={useCustomIngredients}
+                    onChange={() => {
+                      setUseCustomIngredients(true);
+                      setSelectedRecipeId("");
+                      setRecipeIngredients([]);
+                    }}
+                  />
+                  <span className="text-sm">Agregar ingredientes individuales</span>
+                </label>
               </div>
 
               {!useCustomIngredients ? (
                 <>
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      Selecciona una receta existente. Se mostrarán todos los ingredientes y se descontarán del stock al crear el producto.
-                    </p>
-                    <Select
-                      value={selectedRecipeId}
-                      onValueChange={handleRecipeSelection}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar receta existente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="no-recipe">Sin receta</SelectItem>
-                        {/* Show Recipes only (filter out ingredients from recipesData) */}
-                        {recipesData
-                          .filter((recipe) => recipe.type === 'recipe')
-                          .map((recipe) => (
-                            <SelectItem key={`recipe-${recipe.id}`} value={recipe.id.toString()}>
-                              {recipe.name} ({recipe.category}) - Receta
-                            </SelectItem>
-                          ))}
-                        {/* Show Ingredients from productsData */}
-                        {productsData
-                          .filter((product) => product.type === 'ingredient')
-                          .map((ingredient) => (
-                            <SelectItem key={`ingredient-${ingredient.id}`} value={ingredient.id.toString()}>
-                              {ingredient.name} ({ingredient.category}) - Ingrediente
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                  <Select
+                    value={selectedRecipeId || "no-recipe"}
+                    onValueChange={handleRecipeSelection}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar receta existente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="no-recipe">Sin receta</SelectItem>
+                      {/* Show Recipes only (filter out ingredients from recipesData) */}
+                      {recipesData
+                        .filter((recipe) => recipe.type === 'recipe')
+                        .map((recipe) => (
+                          <SelectItem key={`recipe-${recipe.id}`} value={recipe.id.toString()}>
+                            {recipe.name} ({recipe.category}) - Receta
+                          </SelectItem>
+                        ))}
+                      {/* Show Ingredients from productsData */}
+                      {productsData
+                        .filter((product) => product.type === 'ingredient')
+                        .map((ingredient) => (
+                          <SelectItem key={`ingredient-${ingredient.id}`} value={ingredient.id.toString()}>
+                            {ingredient.name} ({ingredient.category}) - Ingrediente
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
 
                     {/* Show ingredient information if an ingredient is selected */}
                     {selectedRecipeId && selectedRecipeId !== "no-recipe" && (() => {
@@ -2416,17 +2407,15 @@ export default function StockManagement() {
                       }
                       return null;
                     })()}
-                  </div>
+
+                  <p className="text-sm text-muted-foreground">
+                    Si seleccionas una receta, el stock de los ingredientes se descontará automáticamente cuando se haga un pedido.
+                  </p>
                 </>
               ) : (
                 <>
                   <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Agregar Receta Directamente:</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Agrega ingredientes directamente a este producto. Los ingredientes se guardarán solo en este producto y se descontarán del stock.
-                      </p>
-                    </div>
+                    <Label className="text-sm font-medium">Agregar Ingredientes:</Label>
 
                     {/* Ingredient Selection */}
                     <div className="grid grid-cols-12 gap-2 items-end">
@@ -2494,13 +2483,14 @@ export default function StockManagement() {
                           <SelectContent>
                             <SelectItem value="g">Grams (g)</SelectItem>
                             <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                            <SelectItem value="L">Liters (L)</SelectItem>
                             <SelectItem value="ml">Milliliters (mL)</SelectItem>
+                            <SelectItem value="L">Liters (L)</SelectItem>
                             <SelectItem value="unidad">Units</SelectItem>
                             <SelectItem value="parts">Parts</SelectItem>
                             <SelectItem value="cups">Cups</SelectItem>
                             <SelectItem value="tbsp">Tablespoons</SelectItem>
                             <SelectItem value="tsp">Teaspoons</SelectItem>
+                            <SelectItem value="hojas">Leaves</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -2559,15 +2549,16 @@ export default function StockManagement() {
                   </p>
 
                   {recipeIngredients.map((ingredient, index) => {
+                    const totalAmount = parseFloat(ingredient.quantity) * ingredient.availableStock;
                     const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
-                    const hasEnoughStock = ingredient.availableStock >= totalRequired;
+                    const hasEnoughStock = totalAmount >= totalRequired;
 
                     return (
                       <div key={index} className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
                         <div>
                           <Label className="text-sm font-medium text-gray-700">Ingrediente</Label>
                           <p className="text-sm font-semibold text-gray-900">{ingredient.name}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-green-500">
                             {ingredient.quantity} {ingredient.unit} por unidad
                           </p>
                         </div>
@@ -2587,8 +2578,9 @@ export default function StockManagement() {
                         <div>
                           <Label className="text-sm font-medium text-gray-700">Stock disponible</Label>
                           <p className={`text-lg font-bold ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
-                            {ingredient.availableStock * Number(ingredient?.quantity)}
+                            {ingredient.availableStock * Number(ingredient?.quantity)} {ingredient.unit}
                           </p>
+                          <p>Available: {ingredient.availableStock}</p>
                           {!hasEnoughStock && (
                             <p className="text-xs text-red-600 font-medium">
                               {ingredient.availableStock * Number(ingredient?.quantity) - Number(ingredient.quantity) * ingredient.requiredQuantity} missing
@@ -2601,11 +2593,11 @@ export default function StockManagement() {
 
                   {/* Add New Ingredient to Existing Recipe */}
                   <div className="border-t pt-4 mt-4">
-                    <Label className="text-sm font-medium mb-3 block">Add new ingredient to this recipe:</Label>
+                    <Label className="text-sm font-medium mb-3 block">Agregar nuevo ingrediente a esta receta:</Label>
                     <div className="grid grid-cols-12 gap-2">
                       <div className="col-span-5">
                         <Input
-                          placeholder="Ingredient name"
+                          placeholder="Nombre del ingrediente"
                           value={newIngredient.name}
                           onChange={(e) =>
                             setNewIngredient({ ...newIngredient, name: e.target.value })
@@ -2615,7 +2607,7 @@ export default function StockManagement() {
                       <div className="col-span-3">
                         <Input
                           type="number"
-                          placeholder="Quantity"
+                          placeholder="Cantidad"
                           value={newIngredient.quantity}
                           onChange={(e) =>
                             setNewIngredient({ ...newIngredient, quantity: e.target.value })
@@ -2659,7 +2651,7 @@ export default function StockManagement() {
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      This ingredient will be added to the selected recipe and saved permanently.
+                      Este ingrediente se agregará a la receta seleccionada y se guardará permanentemente.
                     </p>
                   </div>
 
