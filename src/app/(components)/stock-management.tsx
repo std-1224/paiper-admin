@@ -134,7 +134,7 @@ export default function StockManagement() {
   const [newRecipe, setNewRecipe] = useState({
     name: "",
     category: "bebida",
-    ingredients: [] as { name: string; quantity: string; unit: string }[],
+    ingredients: [] as { name: string; quantity: string; unit: string, availableStock?: string | number }[],
   });
   const [newIngredient, setNewIngredient] = useState({
     name: "",
@@ -3524,7 +3524,7 @@ export default function StockManagement() {
                 <Label htmlFor="edit-name">Nombre</Label>
                 <Input
                   id="edit-name"
-                  value={editingProduct?.name}
+                  value={editingProduct?.name || ""}
                   onChange={(e) =>
                     setEditingProduct({
                       ...editingProduct!,
@@ -3536,7 +3536,7 @@ export default function StockManagement() {
               <div className="space-y-2">
                 <Label htmlFor="edit-category">Categoría</Label>
                 <Select
-                  value={editingProduct?.category}
+                  value={editingProduct?.category || ""}
                   onValueChange={(value) =>
                     setEditingProduct({ ...editingProduct!, category: value })
                   }
@@ -3556,7 +3556,7 @@ export default function StockManagement() {
               <Label htmlFor="edit-description">Descripción</Label>
               <Textarea
                 id="edit-description"
-                value={editingProduct?.description}
+                value={editingProduct?.description || ""}
                 onChange={(e) =>
                   setEditingProduct({
                     ...editingProduct!,
@@ -4066,7 +4066,7 @@ export default function StockManagement() {
                 <Input
                   id="edit-purchase_price"
                   type="number"
-                  value={editingProduct?.purchase_price}
+                  value={editingProduct?.purchase_price || ""}
                   onChange={(e) =>
                     setEditingProduct({
                       ...editingProduct!,
@@ -4080,7 +4080,7 @@ export default function StockManagement() {
                 <Input
                   id="edit-sale_price"
                   type="number"
-                  value={editingProduct?.sale_price}
+                  value={editingProduct?.sale_price || ""}
                   onChange={(e) =>
                     setEditingProduct({
                       ...editingProduct!,
@@ -4095,7 +4095,7 @@ export default function StockManagement() {
               <Input
                 id="edit-stock"
                 type="number"
-                value={editingProduct?.stock}
+                value={editingProduct?.stock || ""}
                 onChange={(e) =>
                   setEditingProduct({
                     ...editingProduct!,
@@ -4492,7 +4492,7 @@ export default function StockManagement() {
                             {ingredient.name} - {ingredient.quantity}{" "}
                             {ingredient.unit}
                           </span>
-                          {ingredient.availableStock && (
+                          {ingredient?.availableStock && (
                             <div className="text-xs text-gray-600 mt-1">
                               Stock disponible: {ingredient.availableStock}
                             </div>
