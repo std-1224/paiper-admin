@@ -41,7 +41,16 @@ export const PUT = async (req: Request) => {
         }
         const { data, error } = await supabaseServerClient
             .from('profiles')
-            .update({ address: updateData.address, phone: updateData.phone, name: updateData.name, role: updateData.role, status: updateData.status, sector_id: updateData.sector_id, balance: updateData.balance })
+            .update({
+                address: updateData.address,
+                phone: updateData.phone,
+                name: updateData.name,
+                role: updateData.role,
+                status: updateData.status,
+                approval_status: updateData.approval_status,
+                sector_id: updateData.sector_id,
+                balance: updateData.balance
+            })
             .eq('id', id);
 
         if (error) {

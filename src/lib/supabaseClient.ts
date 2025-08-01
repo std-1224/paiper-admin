@@ -1,12 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 import { createBrowserClient } from "@supabase/ssr";
 import { UserRole } from "@/context/AuthContext";
+import { ApprovalStatus } from "@/types/types";
 
 // Type definitions
 type SupabaseClient = ReturnType<typeof createBrowserClient>;
 type Profile = {
   id: string;
   role: UserRole;
+  approval_status: ApprovalStatus;
 };
 
 // Environment variables validation
@@ -79,7 +81,7 @@ export const getUserRole = async (): Promise<UserRole | null> => {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, approval_status")
       .eq("id", user.id)
       .single();
 
@@ -91,6 +93,36 @@ export const getUserRole = async (): Promise<UserRole | null> => {
     return profile.role;
   } catch (error) {
     console.error("Error getting user role:", error);
+    return null;
+  }
+};
+
+// Get user profile with approval status
+export const getUserProfile = async (): Promise<Profile | null> => {
+  try {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!user) return null;
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role, approval_status")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) throw profileError;
+    if (!profile) return null;
+
+    return {
+      id: user.id,
+      role: profile.role,
+      approval_status: profile.approval_status,
+    };
+  } catch (error) {
+    console.error("Error getting user profile:", error);
     return null;
   }
 };

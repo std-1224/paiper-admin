@@ -10,6 +10,11 @@ export enum ActiveStatus {
 	Inactive = 'inactive',
 };
 
+export enum ApprovalStatus {
+	Pending = 'pending',
+	Approved = 'approved',
+};
+
 export type MailType = "sign_up" | 'new_order' | "order_delivered" | "order_cancelled" | "order_delayed" | "balance_updated" | "reminder"
 
 
@@ -66,6 +71,7 @@ export interface User {
 	avatar?: string;
 	role: UserType;
 	status?: ActiveStatus;
+	approval_status?: ApprovalStatus;
 	balance?: string;
 	spent?: string;
 	phone?: string;

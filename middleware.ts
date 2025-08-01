@@ -11,9 +11,15 @@ export async function middleware(req: NextRequest) {
   // Get the session from the request
   const { data: { session } } = await supabase.auth.getSession();
 
-  // Define protected routes (all routes except login)
+  // Define protected routes (all routes except login and auth callback)
   const protectedRoutes = ['/dashboard', '/admin', '/users', '/bars', '/inventory', '/orders', '/qr-codes', '/staff'];
   const isProtectedRoute = protectedRoutes.some(route => req.nextUrl.pathname.startsWith(route));
+  const isAuthCallback = req.nextUrl.pathname === '/auth/callback';
+
+  // Allow access to auth callback page without checks
+  if (isAuthCallback) {
+    return NextResponse.next();
+  }
 
   // If accessing a protected route
   if (isProtectedRoute) {

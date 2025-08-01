@@ -45,6 +45,7 @@ import { Switch } from "@/components/ui/switch";
 import { GiftService } from "(components)/gift-service";
 import {
   ActiveStatus,
+  ApprovalStatus,
   Transaction,
   User,
   UserTransaction,
@@ -386,6 +387,7 @@ export default function RoleManagement() {
                   </div>
                 </th>
                 <th className="p-3 font-medium">Total Gastado</th>
+                <th className="p-3 font-medium">Estado de Aprobación</th>
                 <th className="p-3 font-medium text-right">Acciones</th>
               </tr>
             </thead>
@@ -463,6 +465,20 @@ export default function RoleManagement() {
                   </td>
                   <td className="p-3" id={`spent-cell-${user.id}`}>
                     {user.spent}
+                  </td>
+                  <td className="p-3" id={`approval-status-cell-${user.id}`}>
+                    <div className="flex items-center">
+                      <Badge
+                        variant={user.approval_status === ApprovalStatus.Approved ? "default" : "secondary"}
+                        className={`${
+                          user.approval_status === ApprovalStatus.Approved
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                        }`}
+                      >
+                        {user.approval_status === ApprovalStatus.Approved ? "Aprobado" : "Pendiente"}
+                      </Badge>
+                    </div>
                   </td>
                   <td className="p-3 text-right" id={`actions-cell-${user.id}`}>
                     <div
@@ -737,6 +753,28 @@ export default function RoleManagement() {
                             : "Inactivo"}
                         </Label>
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="approval_status" className="dark:text-gray-300">
+                        Estado de Aprobación
+                      </Label>
+                      <Select
+                        defaultValue={selectedUser.approval_status || ApprovalStatus.Pending}
+                        onValueChange={(value) =>
+                          setSelectedUser({
+                            ...selectedUser,
+                            approval_status: value as ApprovalStatus,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                          <SelectValue placeholder="Seleccionar estado de aprobación" />
+                        </SelectTrigger>
+                        <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
+                          <SelectItem value={ApprovalStatus.Pending}>Pendiente</SelectItem>
+                          <SelectItem value={ApprovalStatus.Approved}>Aprobado</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="address" className="dark:text-gray-300">
