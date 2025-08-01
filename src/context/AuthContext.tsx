@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(new Error('Database query timeout after 3 seconds'));
-        }, 500);
+        }, 300);
       });
 
       // Race between the query and timeout
@@ -127,7 +127,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           approval_status: profile.approval_status,
         });
       }
-      }, 500);
+      }, 300);
     },
     [getUserProfile, router]
   );
