@@ -66,6 +66,7 @@ import CourtesyConfigModal from "@/components/stock/CourtesyConfigModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 export default function StockManagement() {
   // State management
@@ -76,7 +77,7 @@ export default function StockManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
+  const {user} = useAuth()
   // Modal states
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showProductDetailModal, setShowProductDetailModal] = useState(false);
@@ -98,9 +99,8 @@ export default function StockManagement() {
   >([]);
 
   // Store original ingredient quantities for calculating differences during edit
-  const [originalIngredientQuantities, setOriginalIngredientQuantities] = useState<
-    { [ingredientName: string]: number }
-  >({});
+  const [originalIngredientQuantities, setOriginalIngredientQuantities] =
+    useState<{ [ingredientName: string]: number }>({});
 
   // Edit modal custom ingredients states
   const [editUseCustomIngredients, setEditUseCustomIngredients] =
@@ -134,7 +134,12 @@ export default function StockManagement() {
   const [newRecipe, setNewRecipe] = useState({
     name: "",
     category: "bebida",
-    ingredients: [] as { name: string; quantity: string; unit: string, availableStock?: string | number }[],
+    ingredients: [] as {
+      name: string;
+      quantity: string;
+      unit: string;
+      availableStock?: string | number;
+    }[],
   });
   const [newIngredient, setNewIngredient] = useState({
     name: "",
@@ -727,7 +732,12 @@ export default function StockManagement() {
         ...newRecipe,
         ingredients: updatedIngredients,
       });
-      setNewIngredient({ name: "", quantity: "", unit: "ml", availableStock: "1" });
+      setNewIngredient({
+        name: "",
+        quantity: "",
+        unit: "ml",
+        availableStock: "1",
+      });
 
       // Validate ingredients after adding
       const validation = await validateRecipeIngredients(updatedIngredients);
@@ -932,19 +942,23 @@ export default function StockManagement() {
 
       const createdRecipeResponse = await response.json();
       // The API returns an array, so get the first element
-      const createdRecipe = Array.isArray(createdRecipeResponse) ? createdRecipeResponse[0] : createdRecipeResponse;
+      const createdRecipe = Array.isArray(createdRecipeResponse)
+        ? createdRecipeResponse[0]
+        : createdRecipeResponse;
 
       await fetchRecipes(); // Refresh recipes list
 
       // Process the newly created recipe ingredients directly since we have the data
-      const processedIngredients = newRecipe.ingredients.map((ingredient: { name: string; quantity: string; unit: string }) => ({
-        name: ingredient.name,
-        quantity: ingredient.quantity.toString(),
-        unit: ingredient.unit,
-        requiredQuantity: ingredientRequiredQuantity,
-        availableStock: createdRecipe.stock || 1,
-        stock: createdRecipe.stock || 1,
-      }));
+      const processedIngredients = newRecipe.ingredients.map(
+        (ingredient: { name: string; quantity: string; unit: string }) => ({
+          name: ingredient.name,
+          quantity: ingredient.quantity.toString(),
+          unit: ingredient.unit,
+          requiredQuantity: ingredientRequiredQuantity,
+          availableStock: createdRecipe.stock || 1,
+          stock: createdRecipe.stock || 1,
+        })
+      );
 
       // Set the recipe selection and ingredients
       setSelectedRecipeId(createdRecipe.id.toString());
@@ -965,7 +979,8 @@ export default function StockManagement() {
       toast.success("Receta creada exitosamente y vinculada al producto");
     } catch (error) {
       console.error("❌ Error creating recipe:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
       toast.error(`Error al crear la receta: ${errorMessage}`);
     } finally {
       setIsLoading(false);
@@ -1223,12 +1238,15 @@ export default function StockManagement() {
 
       // Find the recipe that contains these ingredients
       // Based on your sample data: Recipe has type="recipe" and matching ingredient names
-      console.log("Available recipes:", recipesData.map(r => ({
-        id: r.id,
-        name: r.name,
-        type: r.type,
-        hasIngredients: !!r.ingredients
-      })));
+      console.log(
+        "Available recipes:",
+        recipesData.map((r) => ({
+          id: r.id,
+          name: r.name,
+          type: r.type,
+          hasIngredients: !!r.ingredients,
+        }))
+      );
 
       const matchingRecipe = recipesData.find((recipe) => {
         // Must be a recipe type with ingredients
@@ -1237,31 +1255,42 @@ export default function StockManagement() {
         }
 
         try {
-          const recipeIngredients = typeof recipe.ingredients === "string"
-            ? JSON.parse(recipe.ingredients)
-            : recipe.ingredients;
+          const recipeIngredients =
+            typeof recipe.ingredients === "string"
+              ? JSON.parse(recipe.ingredients)
+              : recipe.ingredients;
 
           // Check if all new ingredients exist in this recipe by name
-          const allIngredientsMatch = newIngredients.every(newIng =>
-            recipeIngredients.some((recipeIng: any) => recipeIng.name === newIng.name)
+          const allIngredientsMatch = newIngredients.every((newIng) =>
+            recipeIngredients.some(
+              (recipeIng: any) => recipeIng.name === newIng.name
+            )
           );
 
           console.log(`Recipe "${recipe.name}":`, {
-            recipeIngredientNames: recipeIngredients.map((ing: any) => ing.name),
-            newIngredientNames: newIngredients.map(ing => ing.name),
-            matches: allIngredientsMatch
+            recipeIngredientNames: recipeIngredients.map(
+              (ing: any) => ing.name
+            ),
+            newIngredientNames: newIngredients.map((ing) => ing.name),
+            matches: allIngredientsMatch,
           });
 
           return allIngredientsMatch;
         } catch (error) {
-          console.error(`Error parsing recipe ${recipe.name} ingredients:`, error);
+          console.error(
+            `Error parsing recipe ${recipe.name} ingredients:`,
+            error
+          );
           return false;
         }
       });
 
       if (!matchingRecipe) {
         console.error("❌ No matching recipe found for these ingredients");
-        console.log("Looking for ingredients:", newIngredients.map(ing => ing.name));
+        console.log(
+          "Looking for ingredients:",
+          newIngredients.map((ing) => ing.name)
+        );
         return;
       }
 
@@ -1270,9 +1299,10 @@ export default function StockManagement() {
       // Parse recipe ingredients
       let recipeIngredients;
       try {
-        recipeIngredients = typeof matchingRecipe.ingredients === "string"
-          ? JSON.parse(matchingRecipe.ingredients)
-          : matchingRecipe.ingredients;
+        recipeIngredients =
+          typeof matchingRecipe.ingredients === "string"
+            ? JSON.parse(matchingRecipe.ingredients)
+            : matchingRecipe.ingredients;
       } catch (error) {
         console.error("Error parsing recipe ingredients:", error);
         return;
@@ -1280,7 +1310,9 @@ export default function StockManagement() {
 
       // Calculate differences and update availableStock
       const updatedIngredients = recipeIngredients.map((recipeIng: any) => {
-        const newIng = newIngredients.find(ing => ing.name === recipeIng.name);
+        const newIng = newIngredients.find(
+          (ing) => ing.name === recipeIng.name
+        );
         if (newIng) {
           const originalQuantity = originalQuantities[recipeIng.name] || 0;
           const newQuantity = newIng.requiredQuantity || 0;
@@ -1288,7 +1320,10 @@ export default function StockManagement() {
 
           // Calculate new availableStock: current - difference
           const currentAvailableStock = recipeIng.availableStock || 0;
-          const newAvailableStock = Math.max(0, currentAvailableStock - difference);
+          const newAvailableStock = Math.max(
+            0,
+            currentAvailableStock - difference
+          );
 
           console.log(`📊 ${recipeIng.name}:`);
           console.log(`   Original requiredQuantity: ${originalQuantity}`);
@@ -1323,7 +1358,9 @@ export default function StockManagement() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("❌ API response error:", errorText);
-        throw new Error(`Failed to update recipe ingredient stock: ${response.status}`);
+        throw new Error(
+          `Failed to update recipe ingredient stock: ${response.status}`
+        );
       }
 
       const responseData = await response.json();
@@ -1332,7 +1369,6 @@ export default function StockManagement() {
       // Refresh recipes data to reflect changes
       await fetchRecipes();
       console.log("✅ Recipes data refreshed");
-
     } catch (error) {
       console.error("❌ Error in stock deduction:", error);
       toast.error("Error al actualizar stock de ingredientes");
@@ -1594,14 +1630,18 @@ export default function StockManagement() {
       if (!response.ok) {
         const errorData = await response.text();
         console.error("❌ Recipe API error:", errorData);
-        throw new Error(`Failed to create recipe: ${response.status} - ${errorData}`);
+        throw new Error(
+          `Failed to create recipe: ${response.status} - ${errorData}`
+        );
       }
 
       const createdRecipeResponse = await response.json();
       console.log("✅ Recipe created successfully:", createdRecipeResponse);
 
       // The API returns an array, so get the first element
-      const createdRecipe = Array.isArray(createdRecipeResponse) ? createdRecipeResponse[0] : createdRecipeResponse;
+      const createdRecipe = Array.isArray(createdRecipeResponse)
+        ? createdRecipeResponse[0]
+        : createdRecipeResponse;
       console.log("✅ Extracted recipe object:", createdRecipe);
 
       console.log("🔄 Refreshing recipes list...");
@@ -1610,14 +1650,16 @@ export default function StockManagement() {
 
       console.log("🔄 Processing newly created recipe ingredients manually...");
       // Process the newly created recipe ingredients directly since we have the data
-      const processedIngredients = newRecipe.ingredients.map((ingredient: { name: string; quantity: string; unit: string }) => ({
-        name: ingredient.name,
-        quantity: ingredient.quantity.toString(),
-        unit: ingredient.unit,
-        requiredQuantity: editIngredientRequiredQuantity,
-        availableStock: createdRecipe.stock || 1,
-        stock: createdRecipe.stock || 1,
-      }));
+      const processedIngredients = newRecipe.ingredients.map(
+        (ingredient: { name: string; quantity: string; unit: string }) => ({
+          name: ingredient.name,
+          quantity: ingredient.quantity.toString(),
+          unit: ingredient.unit,
+          requiredQuantity: editIngredientRequiredQuantity,
+          availableStock: createdRecipe.stock || 1,
+          stock: createdRecipe.stock || 1,
+        })
+      );
 
       // Set the recipe selection and ingredients in the correct order
       console.log("🔄 Setting recipe ingredients...");
@@ -1635,17 +1677,29 @@ export default function StockManagement() {
       };
       setEditingProduct(updatedProduct);
 
-      console.log("✅ Recipe ingredients processed and set:", processedIngredients);
+      console.log(
+        "✅ Recipe ingredients processed and set:",
+        processedIngredients
+      );
       console.log("✅ Updated editingProduct:", updatedProduct);
       console.log("✅ Selected recipe ID:", createdRecipe.id.toString());
-      console.log("✅ editRecipeIngredients length:", processedIngredients.length);
+      console.log(
+        "✅ editRecipeIngredients length:",
+        processedIngredients.length
+      );
 
       // Force a re-render by updating a dummy state
       // This ensures React processes all state updates
       setTimeout(() => {
         console.log("🔍 Final state check:");
-        console.log("  - editRecipeIngredients.length:", editRecipeIngredients.length);
-        console.log("  - editingProduct.has_recipe:", editingProduct?.has_recipe);
+        console.log(
+          "  - editRecipeIngredients.length:",
+          editRecipeIngredients.length
+        );
+        console.log(
+          "  - editingProduct.has_recipe:",
+          editingProduct?.has_recipe
+        );
         console.log("  - selectedEditRecipeId:", selectedEditRecipeId);
 
         // Force component re-render if needed
@@ -1666,7 +1720,8 @@ export default function StockManagement() {
       toast.success("Receta creada exitosamente y vinculada al producto");
     } catch (error) {
       console.error("❌ Error creating recipe:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
       toast.error(`Error al crear la receta: ${errorMessage}`);
     } finally {
       setIsLoading(false);
@@ -1965,7 +2020,10 @@ export default function StockManagement() {
 
       console.log("🔍 DEBUG: Preparing ingredients data");
       console.log("editingProduct.has_recipe:", editingProduct.has_recipe);
-      console.log("editRecipeIngredients.length:", editRecipeIngredients.length);
+      console.log(
+        "editRecipeIngredients.length:",
+        editRecipeIngredients.length
+      );
       console.log("editRecipeIngredients:", editRecipeIngredients);
 
       if (editingProduct.has_recipe && editRecipeIngredients.length > 0) {
@@ -1983,7 +2041,10 @@ export default function StockManagement() {
         try {
           const parsedIngredients = JSON.parse(editingProduct.ingredients);
           ingredientsData = parsedIngredients;
-          console.log("📝 Parsed ingredients from editingProduct:", parsedIngredients);
+          console.log(
+            "📝 Parsed ingredients from editingProduct:",
+            parsedIngredients
+          );
         } catch (error) {
           console.error("Error parsing editingProduct.ingredients:", error);
         }
@@ -1998,13 +2059,20 @@ export default function StockManagement() {
 
       // FIRST: Handle stock deduction BEFORE updating the product
       // This ensures we use the correct data for calculations
-      if (editingProduct.has_recipe && ingredientsData && Object.keys(originalIngredientQuantities).length > 0) {
+      if (
+        editingProduct.has_recipe &&
+        ingredientsData &&
+        Object.keys(originalIngredientQuantities).length > 0
+      ) {
         try {
           console.log("=== STOCK DEDUCTION PROCESS ===");
           console.log("Original quantities:", originalIngredientQuantities);
           console.log("New ingredients data:", ingredientsData);
           console.log("editRecipeIngredients state:", editRecipeIngredients);
-          console.log("editingProduct.ingredients:", editingProduct.ingredients);
+          console.log(
+            "editingProduct.ingredients:",
+            editingProduct.ingredients
+          );
 
           await deductRecipeIngredientStockDifference(
             ingredientsData,
@@ -2015,13 +2083,16 @@ export default function StockManagement() {
         } catch (error) {
           console.error("❌ Error processing ingredient changes:", error);
           // Don't fail the entire update if stock deduction fails
-          toast.error("Error al actualizar stock de ingredientes, pero el producto se guardará");
+          toast.error(
+            "Error al actualizar stock de ingredientes, pero el producto se guardará"
+          );
         }
       } else {
         console.log("⚠️ Skipping stock deduction:", {
           hasRecipe: editingProduct.has_recipe,
           hasIngredientsData: !!ingredientsData,
-          hasOriginalQuantities: Object.keys(originalIngredientQuantities).length > 0
+          hasOriginalQuantities:
+            Object.keys(originalIngredientQuantities).length > 0,
         });
       }
 
@@ -2332,7 +2403,15 @@ export default function StockManagement() {
             )}
             Actualizar
           </Button>
-          <Button onClick={() => setShowAddProductModal(true)}>
+          <Button
+            onClick={() => {
+              if (user?.role === "barman" || user?.role === "client") {
+                toast.error("No tienes permiso para crear pedidos");
+                return;
+              }
+              setShowAddProductModal(true);
+            }}
+          >
             <Plus size={16} className="mr-2" />
             Añadir producto
           </Button>
@@ -2602,11 +2681,16 @@ export default function StockManagement() {
                                         setEditCustomIngredients([]);
 
                                         // Store original quantities for difference calculation
-                                        const originalQuantities: { [ingredientName: string]: number } = {};
+                                        const originalQuantities: {
+                                          [ingredientName: string]: number;
+                                        } = {};
                                         ingredients.forEach((ing: any) => {
-                                          originalQuantities[ing.name] = ing.requiredQuantity || 1;
+                                          originalQuantities[ing.name] =
+                                            ing.requiredQuantity || 1;
                                         });
-                                        setOriginalIngredientQuantities(originalQuantities);
+                                        setOriginalIngredientQuantities(
+                                          originalQuantities
+                                        );
 
                                         // Try to find matching recipe
                                         const matchingRecipe = recipesData.find(
@@ -3782,21 +3866,36 @@ export default function StockManagement() {
                       return ingredients.map(
                         (ingredient: any, index: number) => {
                           const realStock = (() => {
-                            const foundProduct = productsData.find((product) => {
-                              if(product.type === "product") return false;
-                              if (!product.ingredients) return false;
-                              try {
-                                const jsonIng = typeof product.ingredients === "string" ? JSON.parse(product.ingredients) : product.ingredients;
-                                return Array.isArray(jsonIng) && jsonIng.some((ing: any) => ing.name === ingredient.name);
-                              } catch (error) {
-                                return false;
+                            const foundProduct = productsData.find(
+                              (product) => {
+                                if (product.type === "product") return false;
+                                if (!product.ingredients) return false;
+                                try {
+                                  const jsonIng =
+                                    typeof product.ingredients === "string"
+                                      ? JSON.parse(product.ingredients)
+                                      : product.ingredients;
+                                  return (
+                                    Array.isArray(jsonIng) &&
+                                    jsonIng.some(
+                                      (ing: any) => ing.name === ingredient.name
+                                    )
+                                  );
+                                } catch (error) {
+                                  return false;
+                                }
                               }
-                            });
+                            );
 
                             if (foundProduct && foundProduct.ingredients) {
                               try {
-                                const jsonIng = typeof foundProduct.ingredients === "string" ? JSON.parse(foundProduct.ingredients) : foundProduct.ingredients;
-                                const foundIngredient = jsonIng.find((ing: any) => ing.name === ingredient.name);
+                                const jsonIng =
+                                  typeof foundProduct.ingredients === "string"
+                                    ? JSON.parse(foundProduct.ingredients)
+                                    : foundProduct.ingredients;
+                                const foundIngredient = jsonIng.find(
+                                  (ing: any) => ing.name === ingredient.name
+                                );
                                 return foundIngredient?.availableStock || 0;
                               } catch (error) {
                                 return 0;
@@ -3833,14 +3932,20 @@ export default function StockManagement() {
                                     Number(ingredient.requiredQuantity) || 0
                                   }
                                   onChange={(e) => {
-                                    const newQuantity = parseInt(e.target.value) || 0;
+                                    const newQuantity =
+                                      parseInt(e.target.value) || 0;
 
                                     if (editRecipeIngredients.length > 0) {
                                       // Update editRecipeIngredients state (preferred)
-                                      updateEditIngredientQuantity(index, newQuantity);
+                                      updateEditIngredientQuantity(
+                                        index,
+                                        newQuantity
+                                      );
                                     } else {
                                       // Fallback: update editingProduct.ingredients directly
-                                      const updatedIngredients = [...ingredients];
+                                      const updatedIngredients = [
+                                        ...ingredients,
+                                      ];
                                       updatedIngredients[index] = {
                                         ...updatedIngredients[index],
                                         requiredQuantity: newQuantity,
@@ -3877,10 +3982,13 @@ export default function StockManagement() {
                                   onClick={() => {
                                     if (editRecipeIngredients.length > 0) {
                                       // Remove from editRecipeIngredients state (preferred)
-                                      const updatedIngredients = editRecipeIngredients.filter(
-                                        (_, i: number) => i !== index
+                                      const updatedIngredients =
+                                        editRecipeIngredients.filter(
+                                          (_, i: number) => i !== index
+                                        );
+                                      setEditRecipeIngredients(
+                                        updatedIngredients
                                       );
-                                      setEditRecipeIngredients(updatedIngredients);
                                     } else {
                                       // Fallback: remove from editingProduct.ingredients directly
                                       const updatedIngredients =
@@ -4019,9 +4127,9 @@ export default function StockManagement() {
                           setEditRecipeIngredients(updatedIngredients);
 
                           // Store original quantity for the new ingredient (for stock deduction calculation)
-                          setOriginalIngredientQuantities(prev => ({
+                          setOriginalIngredientQuantities((prev) => ({
                             ...prev,
-                            [newIngredient.name]: 1 // Default original quantity
+                            [newIngredient.name]: 1, // Default original quantity
                           }));
 
                           // Enable recipe mode if not already enabled
@@ -4038,8 +4146,14 @@ export default function StockManagement() {
                           setEditIngredientUnit("ml");
                           setEditIngredientRequiredQuantity(0);
 
-                          console.log("✅ Custom ingredient added to editRecipeIngredients:", newIngredient);
-                          console.log("Updated editRecipeIngredients:", updatedIngredients);
+                          console.log(
+                            "✅ Custom ingredient added to editRecipeIngredients:",
+                            newIngredient
+                          );
+                          console.log(
+                            "Updated editRecipeIngredients:",
+                            updatedIngredients
+                          );
 
                           toast.success("Ingrediente agregado a la receta");
                         }}
@@ -4106,10 +4220,13 @@ export default function StockManagement() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setEditingProduct(null);
-              setOriginalIngredientQuantities({}); // Reset original quantities on cancel
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingProduct(null);
+                setOriginalIngredientQuantities({}); // Reset original quantities on cancel
+              }}
+            >
               Cancelar
             </Button>
             <Button onClick={handleUpdateProduct} disabled={isLoading}>
@@ -4534,7 +4651,9 @@ export default function StockManagement() {
               <div className="space-y-3">
                 <div className="grid grid-cols-12 gap-2">
                   <div className="col-span-5">
-                    <Label className="text-xs text-gray-600 mb-1 block">Ingrediente</Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      Ingrediente
+                    </Label>
                     <Select
                       value={newIngredient.name}
                       onValueChange={(value) =>
@@ -4558,7 +4677,9 @@ export default function StockManagement() {
                     </Select>
                   </div>
                   <div className="col-span-3">
-                    <Label className="text-xs text-gray-600 mb-1 block">Cantidad</Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      Cantidad
+                    </Label>
                     <Input
                       type="number"
                       placeholder="Cantidad"
@@ -4569,7 +4690,10 @@ export default function StockManagement() {
                           value === "" ||
                           (Number(value) >= 0 && !value.includes("-"))
                         ) {
-                          setNewIngredient({ ...newIngredient, quantity: value });
+                          setNewIngredient({
+                            ...newIngredient,
+                            quantity: value,
+                          });
                         }
                       }}
                       onKeyDown={(e) => {
@@ -4587,7 +4711,9 @@ export default function StockManagement() {
                     />
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-xs text-gray-600 mb-1 block">Unidad</Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      Unidad
+                    </Label>
                     <Select
                       value={newIngredient.unit}
                       onValueChange={(value) =>
@@ -4625,7 +4751,9 @@ export default function StockManagement() {
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   <div className="col-span-2">
-                    <Label className="text-xs text-gray-600 mb-1 block">Stock Disponible</Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      Stock Disponible
+                    </Label>
                     <Input
                       type="number"
                       placeholder="Stock disponible"
@@ -4636,7 +4764,10 @@ export default function StockManagement() {
                           value === "" ||
                           (Number(value) >= 0 && !value.includes("-"))
                         ) {
-                          setNewIngredient({ ...newIngredient, availableStock: value });
+                          setNewIngredient({
+                            ...newIngredient,
+                            availableStock: value,
+                          });
                         }
                       }}
                       onKeyDown={(e) => {
@@ -4663,7 +4794,12 @@ export default function StockManagement() {
               onClick={() => {
                 setShowCreateRecipeDialog(false);
                 setNewRecipe({ name: "", category: "bebida", ingredients: [] });
-                setNewIngredient({ name: "", quantity: "", unit: "ml", availableStock: "1" });
+                setNewIngredient({
+                  name: "",
+                  quantity: "",
+                  unit: "ml",
+                  availableStock: "1",
+                });
                 setIngredientValidation([]);
               }}
             >
@@ -4739,7 +4875,9 @@ export default function StockManagement() {
               <div className="space-y-3">
                 <div className="grid grid-cols-12 gap-2">
                   <div className="col-span-5">
-                    <Label className="text-xs text-gray-600 mb-1 block">Ingrediente</Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      Ingrediente
+                    </Label>
                     <Input
                       placeholder="Nombre del ingrediente"
                       value={newIngredient.name}
@@ -4752,7 +4890,9 @@ export default function StockManagement() {
                     />
                   </div>
                   <div className="col-span-3">
-                    <Label className="text-xs text-gray-600 mb-1 block">Cantidad</Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      Cantidad
+                    </Label>
                     <Input
                       type="number"
                       placeholder="Cantidad"
@@ -4784,7 +4924,9 @@ export default function StockManagement() {
                     />
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-xs text-gray-600 mb-1 block">Unidad</Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      Unidad
+                    </Label>
                     <Select
                       value={newIngredient.unit}
                       onValueChange={(value) =>
@@ -4822,7 +4964,9 @@ export default function StockManagement() {
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   <div className="col-span-2">
-                    <Label className="text-xs text-gray-600 mb-1 block">Stock Disponible</Label>
+                    <Label className="text-xs text-gray-600 mb-1 block">
+                      Stock Disponible
+                    </Label>
                     <Input
                       type="number"
                       placeholder="Stock disponible"
@@ -4833,7 +4977,10 @@ export default function StockManagement() {
                           value === "" ||
                           (Number(value) >= 0 && !value.includes("-"))
                         ) {
-                          setNewIngredient({ ...newIngredient, availableStock: value });
+                          setNewIngredient({
+                            ...newIngredient,
+                            availableStock: value,
+                          });
                         }
                       }}
                       onKeyDown={(e) => {
@@ -4899,7 +5046,12 @@ export default function StockManagement() {
               onClick={() => {
                 setShowCreateRecipeDialogEdit(false);
                 setNewRecipe({ name: "", category: "bebida", ingredients: [] });
-                setNewIngredient({ name: "", quantity: "", unit: "ml", availableStock: "1" });
+                setNewIngredient({
+                  name: "",
+                  quantity: "",
+                  unit: "ml",
+                  availableStock: "1",
+                });
                 setIngredientValidation([]);
               }}
             >

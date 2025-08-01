@@ -55,7 +55,8 @@ import { format } from "date-fns";
 import { Popover } from "radix-ui";
 import { MixerHorizontalIcon, Cross2Icon } from "@radix-ui/react-icons";
 import { QrScanner } from "(components)/qr-scanner";
-import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 type TabType = "clientes" | "equipoPublicas" | "clientesVIP" | "equipo";
 type SortDirection = "asc" | "desc";
@@ -78,12 +79,11 @@ export default function RoleManagement() {
   const [isGiftServiceOpen, setIsGiftServiceOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
-
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  console.log("selected user ------>", selectedUser);
+  const { user : currentUser } = useAuth();
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
@@ -131,9 +131,13 @@ export default function RoleManagement() {
   };
 
   const handleEditUser = (user: User) => {
-    setSelectedUser(user);
-    setTransfers([]);
-    setIsEditDialogOpen(true);
+    if(currentUser?.role === "admin" || currentUser?.role === "master") {
+      setSelectedUser(user);
+      setTransfers([]);
+      setIsEditDialogOpen(true);
+    } else {
+      toast.error("No tienes permiso para editar usuarios");
+    }
   };
 
   const handleSendGift = (user: User) => {

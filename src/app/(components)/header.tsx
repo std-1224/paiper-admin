@@ -12,6 +12,7 @@ import { DropdownMenu } from "radix-ui";
 import { ExitIcon } from "@radix-ui/react-icons";
 import { useRouter } from "next/navigation";
 import { useAppContext } from "@/context/AppContext";
+import { toast } from "sonner";
 
 interface HeaderProps {
   toggleTheme: () => void;
@@ -27,10 +28,9 @@ export default function Header({
   const { user, signOut } = useAuth();
   const router = useRouter();
   const { fetchNotifications, notificationsData } = useAppContext();
-
   useEffect(() => {
     fetchNotifications();
-  }, []);
+  }, [fetchNotifications]);
 
   const unreadNotifications = notificationsData.filter(
     (notification) => !notification.is_read
@@ -108,7 +108,13 @@ export default function Header({
       <div className="flex items-center space-x-4">
         <Button
           className="bg-black flex items-center"
-          onClick={() => router.push("/new-order")}
+          onClick={() => {
+            if (user?.role === "barman" || user?.role === "client") {
+              toast.error("No tienes permiso para crear pedidos");
+              return;
+            }
+            router.push("/new-order");
+          }}
         >
           <PlusIcon className="mr-2 h-4 w-4" />
           New Order

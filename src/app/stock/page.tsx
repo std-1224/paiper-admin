@@ -43,7 +43,10 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { StockTransfers } from "@/components/bars/StockTransfers";
 import { StockAdjustment } from "@/components/stock/StockAdjustment";
-import { StockAdjustmentHistory, StockAdjustmentHistoryRef } from "@/components/stock/StockAdjustmentHistory";
+import {
+  StockAdjustmentHistory,
+  StockAdjustmentHistoryRef,
+} from "@/components/stock/StockAdjustmentHistory";
 import { MultipleTransfer } from "@/components/stock/MultipleTransfer";
 import RecipeConfiguration from "../(components)/recipe-configuration";
 import {
@@ -73,6 +76,7 @@ import { Switch } from "@/components/ui/switch";
 import ImageUpload from "../(components)/image-upload";
 import { Textarea } from "@/components/ui/textarea";
 import { categoryList } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 // Mock data for stock
 const stockData = [
@@ -185,6 +189,7 @@ const Stock = () => {
   const [selectedUnredeemedItems, setSelectedUnredeemedItems] = useState<
     number[]
   >([]);
+  const {user} = useAuth()
   const [showCreateRecipeDialog, setShowCreateRecipeDialog] = useState(false);
   const { recipesData, fetchRecipes } = useAppContext();
   // Fetch recipes on component mount
@@ -194,13 +199,26 @@ const Stock = () => {
 
   // Recipe ingredient states for product modal
   const [selectedRecipeId, setSelectedRecipeId] = useState<string>("");
-  const [recipeIngredients, setRecipeIngredients] = useState<{ name: string; quantity: string; unit: string; requiredQuantity: number; availableStock: number; stock: number }[]>([]);
-  const [ingredientRequiredQuantity, setIngredientRequiredQuantity] = useState<number>(1);
+  const [recipeIngredients, setRecipeIngredients] = useState<
+    {
+      name: string;
+      quantity: string;
+      unit: string;
+      requiredQuantity: number;
+      availableStock: number;
+      stock: number;
+    }[]
+  >([]);
+  const [ingredientRequiredQuantity, setIngredientRequiredQuantity] =
+    useState<number>(1);
   // const [stockValidationErrors, setStockValidationErrors] = useState<string[]>([]);
 
   // Custom ingredient states for adding individual ingredients
-  const [useCustomIngredients, setUseCustomIngredients] = useState<boolean>(false);
-  const [customIngredients, setCustomIngredients] = useState<{ name: string; quantity: string; unit: string; productId?: string }[]>([]);
+  const [useCustomIngredients, setUseCustomIngredients] =
+    useState<boolean>(false);
+  const [customIngredients, setCustomIngredients] = useState<
+    { name: string; quantity: string; unit: string; productId?: string }[]
+  >([]);
   const [selectedIngredient, setSelectedIngredient] = useState<string>("none");
   const [customIngredientName, setCustomIngredientName] = useState<string>("");
   const [ingredientQuantity, setIngredientQuantity] = useState<string>("");
@@ -222,7 +240,9 @@ const Stock = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const { uploadImageToSupabase } = useAppContext();
   const [showUnredeemed, setShowUnredeemed] = useState(false);
-  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(
+    null
+  );
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [productDetailOpen, setProductDetailOpen] = useState(false);
@@ -265,43 +285,48 @@ const Stock = () => {
 
   // Calculate total purchase value
   const totalPurchaseValue = productsData.reduce(
-    (total, product) => total + (product.purchase_price * product.stock),
+    (total, product) => total + product.purchase_price * product.stock,
     0
   );
 
   // Calculate total sale value
   const totalSaleValue = productsData.reduce(
-    (total, product) => total + (product.sale_price * product.stock),
+    (total, product) => total + product.sale_price * product.stock,
     0
   );
 
   // Calculate transfers from stock movements
-  const totalTransfers = stocksData.filter(item =>
-    item.status === 'transferred' || item.status === 'in_transit'
+  const totalTransfers = stocksData.filter(
+    (item) => item.status === "transferred" || item.status === "in_transit"
   ).length;
 
   // Calculate low stock items (items with stock below 10)
-  const lowStockItems = productsData.filter(product => product.stock < 10 && product.stock > 0).length;
+  const lowStockItems = productsData.filter(
+    (product) => product.stock < 10 && product.stock > 0
+  ).length;
 
   // Calculate out of stock items
-  const outOfStockItems = productsData.filter(product => product.stock === 0).length;
+  const outOfStockItems = productsData.filter(
+    (product) => product.stock === 0
+  ).length;
 
   // Calculate pending items from stock data
-  const pendingItems = stocksData.filter(item =>
-    item.status === 'pending' || item.status === 'unredeemed'
+  const pendingItems = stocksData.filter(
+    (item) => item.status === "pending" || item.status === "unredeemed"
   ).length;
 
   // Calculate total products count
   const totalProducts = productsData.length;
 
   // Calculate average stock per product
-  const averageStock = totalProducts > 0 ? Math.round(totalStock / totalProducts) : 0;
+  const averageStock =
+    totalProducts > 0 ? Math.round(totalStock / totalProducts) : 0;
 
   useEffect(() => {
     fetchStocksOfBar();
     fetchProducts();
     fetchBars();
-  }, []);
+  }, [fetchBars, fetchProducts, fetchStocksOfBar]);
 
   // Validate stock whenever recipe ingredients change
   useEffect(() => {
@@ -366,11 +391,16 @@ const Stock = () => {
       // Validate custom ingredients if they are being used
       if (useCustomIngredients && customIngredients.length > 0) {
         for (const ingredient of customIngredients) {
-          const requiredQuantity = parseFloat(ingredient.quantity) * (newProduct.stock || 1);
-          const matchingProduct = productsData.find(p => p.id === ingredient.productId);
+          const requiredQuantity =
+            parseFloat(ingredient.quantity) * (newProduct.stock || 1);
+          const matchingProduct = productsData.find(
+            (p) => p.id === ingredient.productId
+          );
 
           if (matchingProduct && matchingProduct.stock < requiredQuantity) {
-            toast.error(`Stock insuficiente para ${ingredient.name}: Requerido ${requiredQuantity}, Disponible ${matchingProduct.stock}`);
+            toast.error(
+              `Stock insuficiente para ${ingredient.name}: Requerido ${requiredQuantity}, Disponible ${matchingProduct.stock}`
+            );
             setIsLoading(false);
             return;
           }
@@ -382,19 +412,19 @@ const Stock = () => {
       // Prepare ingredients data
       let ingredientsData = null;
       if (newProduct.has_recipe && recipeIngredients.length > 0) {
-        ingredientsData = recipeIngredients.map(ing => ({
+        ingredientsData = recipeIngredients.map((ing) => ({
           name: ing.name,
           quantity: ing.quantity,
           unit: ing.unit,
-          requiredQuantity: ing.requiredQuantity
+          requiredQuantity: ing.requiredQuantity,
           // Note: availableStock is NOT stored in product, only in recipe
         }));
       } else if (useCustomIngredients && customIngredients.length > 0) {
-        ingredientsData = customIngredients.map(ing => ({
+        ingredientsData = customIngredients.map((ing) => ({
           name: ing.name,
           quantity: ing.quantity,
           unit: ing.unit,
-          productId: ing.productId
+          productId: ing.productId,
         }));
       }
 
@@ -403,7 +433,9 @@ const Stock = () => {
         ...newProduct,
         image_url: uploadedUrl,
         updated_at: new Date().toISOString(),
-        has_recipe: (newProduct.has_recipe && recipeIngredients.length > 0) || (useCustomIngredients && customIngredients.length > 0),
+        has_recipe:
+          (newProduct.has_recipe && recipeIngredients.length > 0) ||
+          (useCustomIngredients && customIngredients.length > 0),
         ingredients: ingredientsData ? JSON.stringify(ingredientsData) : null,
       };
 
@@ -421,19 +453,30 @@ const Stock = () => {
       // Deduct ingredient stock based on product type
       if ((newProduct.stock || 0) > 0) {
         // Check if selected item is an ingredient (not a recipe)
-        const selectedIngredient = productsData.find(product =>
-          product.type === 'ingredient' && product.id.toString() === selectedRecipeId
+        const selectedIngredient = productsData.find(
+          (product) =>
+            product.type === "ingredient" &&
+            product.id.toString() === selectedRecipeId
         );
 
         if (selectedIngredient) {
           // For ingredient-type products: deduct from ingredient's stock
-          await deductIngredientTypeStock(selectedRecipeId, ingredientRequiredQuantity);
+          await deductIngredientTypeStock(
+            selectedRecipeId,
+            ingredientRequiredQuantity
+          );
         } else if (newProduct.has_recipe && recipeIngredients.length > 0) {
           // For recipe-type products: deduct from recipe ingredients' availableStock
-          await deductRecipeIngredientStock(recipeIngredients, newProduct.stock || 1);
+          await deductRecipeIngredientStock(
+            recipeIngredients,
+            newProduct.stock || 1
+          );
         } else if (useCustomIngredients && customIngredients.length > 0) {
           // For custom ingredients: existing logic
-          await deductCustomIngredientStock(customIngredients, newProduct.stock || 1);
+          await deductCustomIngredientStock(
+            customIngredients,
+            newProduct.stock || 1
+          );
         }
       }
 
@@ -482,8 +525,9 @@ const Stock = () => {
     }
 
     // Check if the selected item is an ingredient first (from productsData)
-    const selectedIngredient = productsData.find(product =>
-      product.type === 'ingredient' && product.id.toString() === recipeId
+    const selectedIngredient = productsData.find(
+      (product) =>
+        product.type === "ingredient" && product.id.toString() === recipeId
     );
 
     if (selectedIngredient) {
@@ -496,8 +540,8 @@ const Stock = () => {
     }
 
     // Find the selected recipe (only actual recipes, not ingredients)
-    const selectedRecipe = recipesData.find(recipe =>
-      recipe.id.toString() === recipeId && recipe.type === 'recipe'
+    const selectedRecipe = recipesData.find(
+      (recipe) => recipe.id.toString() === recipeId && recipe.type === "recipe"
     );
 
     if (!selectedRecipe) {
@@ -513,9 +557,10 @@ const Stock = () => {
     // Parse recipe ingredients
     let ingredients;
     try {
-      ingredients = typeof selectedRecipe.ingredients === 'string'
-        ? JSON.parse(selectedRecipe.ingredients)
-        : selectedRecipe.ingredients;
+      ingredients =
+        typeof selectedRecipe.ingredients === "string"
+          ? JSON.parse(selectedRecipe.ingredients)
+          : selectedRecipe.ingredients;
     } catch (error) {
       console.error("Error parsing recipe ingredients:", error);
       return;
@@ -564,10 +609,7 @@ const Stock = () => {
 
     setNewRecipe({
       ...newRecipe,
-      ingredients: [
-        ...newRecipe.ingredients,
-        { ...newIngredient }
-      ]
+      ingredients: [...newRecipe.ingredients, { ...newIngredient }],
     });
 
     setNewIngredient({
@@ -580,7 +622,7 @@ const Stock = () => {
   const handleRemoveIngredientFromRecipe = (index: number) => {
     setNewRecipe({
       ...newRecipe,
-      ingredients: newRecipe.ingredients.filter((_, i) => i !== index)
+      ingredients: newRecipe.ingredients.filter((_, i) => i !== index),
     });
   };
 
@@ -600,7 +642,9 @@ const Stock = () => {
       setIsLoading(true);
 
       // Get the current recipe
-      const currentRecipe = recipesData.find(recipe => recipe.id.toString() === selectedRecipeId);
+      const currentRecipe = recipesData.find(
+        (recipe) => recipe.id.toString() === selectedRecipeId
+      );
       console.log("Current Recipe Found:", currentRecipe);
 
       if (!currentRecipe) {
@@ -612,9 +656,10 @@ const Stock = () => {
       // Parse current ingredients
       let currentIngredients;
       try {
-        currentIngredients = typeof currentRecipe.ingredients === 'string'
-          ? JSON.parse(currentRecipe.ingredients)
-          : currentRecipe.ingredients || [];
+        currentIngredients =
+          typeof currentRecipe.ingredients === "string"
+            ? JSON.parse(currentRecipe.ingredients)
+            : currentRecipe.ingredients || [];
         console.log("Current Ingredients:", currentIngredients);
       } catch (error) {
         console.error("Error parsing current recipe ingredients:", error);
@@ -627,8 +672,8 @@ const Stock = () => {
         {
           name: newIngredient.name,
           quantity: parseFloat(newIngredient.quantity),
-          unit: newIngredient.unit
-        }
+          unit: newIngredient.unit,
+        },
       ];
       console.log("Updated Ingredients:", updatedIngredients);
 
@@ -638,7 +683,7 @@ const Stock = () => {
         name: currentRecipe.name,
         ingredients: JSON.stringify(updatedIngredients),
         amount: currentRecipe.stock,
-        category: currentRecipe.category
+        category: currentRecipe.category,
       };
       console.log("Update Payload:", updatePayload);
 
@@ -663,22 +708,33 @@ const Stock = () => {
       console.log("🔄 Updating local recipe ingredients display...");
 
       // Process the updated ingredients with recipe stock
-      const updatedRecipeIngredients = updatedIngredients.map((ingredient: any) => {
-        return {
-          name: ingredient.name,
-          quantity: ingredient.quantity.toString(),
-          unit: ingredient.unit,
-          requiredQuantity: 1, // Default quantity, user can modify
-          availableStock: currentRecipe.stock || 0, // Use recipe stock as available stock
-          stock: currentRecipe.stock || 0, // Recipe stock
-        };
-      });
+      const updatedRecipeIngredients = updatedIngredients.map(
+        (ingredient: any) => {
+          return {
+            name: ingredient.name,
+            quantity: ingredient.quantity.toString(),
+            unit: ingredient.unit,
+            requiredQuantity: 1, // Default quantity, user can modify
+            availableStock: currentRecipe.stock || 0, // Use recipe stock as available stock
+            stock: currentRecipe.stock || 0, // Recipe stock
+          };
+        }
+      );
 
       // Update the recipe ingredients state immediately
-      console.log("🔍 Current recipe ingredients before update:", recipeIngredients);
-      console.log("🔍 New recipe ingredients to set:", updatedRecipeIngredients);
+      console.log(
+        "🔍 Current recipe ingredients before update:",
+        recipeIngredients
+      );
+      console.log(
+        "🔍 New recipe ingredients to set:",
+        updatedRecipeIngredients
+      );
       setRecipeIngredients(updatedRecipeIngredients);
-      console.log("✅ Local recipe ingredients updated immediately:", updatedRecipeIngredients);
+      console.log(
+        "✅ Local recipe ingredients updated immediately:",
+        updatedRecipeIngredients
+      );
 
       // Also refresh recipes data in background for consistency
       console.log("🔄 Refreshing recipes data in background...");
@@ -692,10 +748,15 @@ const Stock = () => {
       });
 
       console.log("✅ Ingredient added successfully!");
-      toast.success(`Ingrediente "${newIngredient.name}" agregado a la receta exitosamente`);
+      toast.success(
+        `Ingrediente "${newIngredient.name}" agregado a la receta exitosamente`
+      );
     } catch (error) {
       console.error("❌ Error adding ingredient to recipe:", error);
-      toast.error("Error al agregar el ingrediente a la receta: " + (error as Error).message);
+      toast.error(
+        "Error al agregar el ingrediente a la receta: " +
+          (error as Error).message
+      );
     } finally {
       setIsLoading(false);
     }
@@ -765,14 +826,16 @@ const Stock = () => {
       });
 
       // Set recipe ingredients with recipe stock as available stock
-      const ingredientsWithStock = newRecipe.ingredients.map((ingredient: any) => {
-        return {
-          ...ingredient,
-          requiredQuantity: 1, // Default quantity, user can modify
-          availableStock: createdRecipe.stock || 1, // Use recipe stock as available stock
-          stock: createdRecipe.stock || 1, // Recipe stock
-        };
-      });
+      const ingredientsWithStock = newRecipe.ingredients.map(
+        (ingredient: any) => {
+          return {
+            ...ingredient,
+            requiredQuantity: 1, // Default quantity, user can modify
+            availableStock: createdRecipe.stock || 1, // Use recipe stock as available stock
+            stock: createdRecipe.stock || 1, // Recipe stock
+          };
+        }
+      );
       setRecipeIngredients(ingredientsWithStock);
 
       // Reset recipe form
@@ -801,16 +864,18 @@ const Stock = () => {
     if (selectedIngredient === "none") {
       ingredientName = customIngredientName;
       // Try to find matching product for custom ingredient
-      matchingProduct = productsData.find(product =>
-        product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
-        ingredientName.toLowerCase().includes(product.name.toLowerCase())
+      matchingProduct = productsData.find(
+        (product) =>
+          product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
+          ingredientName.toLowerCase().includes(product.name.toLowerCase())
       );
     } else if (selectedIngredient) {
       ingredientName = selectedIngredient;
       // Try to find matching product in stock
-      matchingProduct = productsData.find(product =>
-        product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
-        ingredientName.toLowerCase().includes(product.name.toLowerCase())
+      matchingProduct = productsData.find(
+        (product) =>
+          product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
+          ingredientName.toLowerCase().includes(product.name.toLowerCase())
       );
     } else {
       ingredientName = customIngredientName;
@@ -839,12 +904,16 @@ const Stock = () => {
 
     if (matchingProduct) {
       if (matchingProduct.stock < requiredQuantity) {
-        toast.error(`Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${ingredientUnit}\nDisponible: ${matchingProduct.stock}`);
+        toast.error(
+          `Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${ingredientUnit}\nDisponible: ${matchingProduct.stock}`
+        );
         return;
       }
     } else {
       // Warn if no matching product found
-      const confirmAdd = confirm(`No se encontró un producto en stock que coincida con "${ingredientName}".\n¿Deseas agregar este ingrediente de todas formas?`);
+      const confirmAdd = confirm(
+        `No se encontró un producto en stock que coincida con "${ingredientName}".\n¿Deseas agregar este ingrediente de todas formas?`
+      );
       if (!confirmAdd) {
         return;
       }
@@ -852,7 +921,12 @@ const Stock = () => {
 
     setCustomIngredients([
       ...customIngredients,
-      { name: ingredientName.trim(), quantity: ingredientQuantity, unit: ingredientUnit, productId: productId },
+      {
+        name: ingredientName.trim(),
+        quantity: ingredientQuantity,
+        unit: ingredientUnit,
+        productId: productId,
+      },
     ]);
     setSelectedIngredient("none");
     setCustomIngredientName("");
@@ -866,13 +940,23 @@ const Stock = () => {
   };
 
   // Function to deduct stock for custom ingredients
-  const deductCustomIngredientStock = async (ingredients: { name: string; quantity: string; unit: string; productId?: string }[], productAmount: number) => {
+  const deductCustomIngredientStock = async (
+    ingredients: {
+      name: string;
+      quantity: string;
+      unit: string;
+      productId?: string;
+    }[],
+    productAmount: number
+  ) => {
     for (const ingredient of ingredients) {
       const requiredQuantity = parseFloat(ingredient.quantity) * productAmount;
 
       // Skip if no linked product
       if (!ingredient.productId) {
-        console.warn(`No linked product for ingredient: ${ingredient.name}. Skipping stock deduction.`);
+        console.warn(
+          `No linked product for ingredient: ${ingredient.name}. Skipping stock deduction.`
+        );
         continue;
       }
 
@@ -883,15 +967,23 @@ const Stock = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: ingredient.productId,
-            stock: Math.max(0, (productsData.find(p => p.id === ingredient.productId)?.stock || 0) - requiredQuantity)
+            stock: Math.max(
+              0,
+              (productsData.find((p) => p.id === ingredient.productId)?.stock ||
+                0) - requiredQuantity
+            ),
           }),
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to deduct stock for ingredient: ${ingredient.name}`);
+          throw new Error(
+            `Failed to deduct stock for ingredient: ${ingredient.name}`
+          );
         }
 
-        console.log(`Deducted ${requiredQuantity} units of ${ingredient.name} from stock`);
+        console.log(
+          `Deducted ${requiredQuantity} units of ${ingredient.name} from stock`
+        );
       } catch (error) {
         console.error(`Error deducting stock for ${ingredient.name}:`, error);
         toast.error(`Error deducting stock for ${ingredient.name}`);
@@ -900,9 +992,20 @@ const Stock = () => {
   };
 
   // Function to deduct stock for recipe ingredients (from availableStock)
-  const deductRecipeIngredientStock = async (ingredients: { name: string; quantity: string; unit: string; requiredQuantity: number; availableStock: number }[], productAmount: number) => {
+  const deductRecipeIngredientStock = async (
+    ingredients: {
+      name: string;
+      quantity: string;
+      unit: string;
+      requiredQuantity: number;
+      availableStock: number;
+    }[],
+    productAmount: number
+  ) => {
     // Find the recipe to update its ingredients
-    const selectedRecipe = recipesData.find(recipe => recipe.id.toString() === selectedRecipeId);
+    const selectedRecipe = recipesData.find(
+      (recipe) => recipe.id.toString() === selectedRecipeId
+    );
     if (!selectedRecipe) {
       console.error("Selected recipe not found for stock deduction");
       return;
@@ -912,9 +1015,10 @@ const Stock = () => {
       // Get the original recipe ingredients from the database
       let originalIngredients = [];
       try {
-        originalIngredients = typeof selectedRecipe.ingredients === 'string'
-          ? JSON.parse(selectedRecipe.ingredients)
-          : selectedRecipe.ingredients || [];
+        originalIngredients =
+          typeof selectedRecipe.ingredients === "string"
+            ? JSON.parse(selectedRecipe.ingredients)
+            : selectedRecipe.ingredients || [];
       } catch (error) {
         console.error("Error parsing original recipe ingredients:", error);
         originalIngredients = [];
@@ -923,17 +1027,22 @@ const Stock = () => {
       // Update only the availableStock for matching ingredients
       const updatedIngredients = originalIngredients.map((originalIng: any) => {
         // Find the matching ingredient from the current ingredients (with requiredQuantity)
-        const matchingIngredient = ingredients.find(ing =>
-          ing.name === originalIng.name &&
-          ing.quantity === originalIng.quantity &&
-          ing.unit === originalIng.unit
+        const matchingIngredient = ingredients.find(
+          (ing) =>
+            ing.name === originalIng.name &&
+            ing.quantity === originalIng.quantity &&
+            ing.unit === originalIng.unit
         );
 
         if (matchingIngredient) {
           // Update only the availableStock, preserve all other properties
           return {
             ...originalIng,
-            availableStock: Math.max(0, matchingIngredient.availableStock - matchingIngredient.requiredQuantity)
+            availableStock: Math.max(
+              0,
+              matchingIngredient.availableStock -
+                matchingIngredient.requiredQuantity
+            ),
           };
         }
 
@@ -950,7 +1059,7 @@ const Stock = () => {
           name: selectedRecipe.name,
           category: selectedRecipe.category,
           amount: selectedRecipe.stock,
-          ingredients: updatedIngredients
+          ingredients: updatedIngredients,
         }),
       });
 
@@ -958,7 +1067,9 @@ const Stock = () => {
         throw new Error("Failed to update recipe ingredient stock");
       }
 
-      console.log(`Deducted stock from recipe ingredients for ${productAmount} units`);
+      console.log(
+        `Deducted stock from recipe ingredients for ${productAmount} units`
+      );
 
       // Refresh recipes data to reflect changes
       fetchRecipes();
@@ -969,11 +1080,16 @@ const Stock = () => {
   };
 
   // Function to deduct stock for ingredient-type products (from ingredient's stock)
-  const deductIngredientTypeStock = async (ingredientId: string, requiredQuantity: number) => {
+  const deductIngredientTypeStock = async (
+    ingredientId: string,
+    requiredQuantity: number
+  ) => {
     try {
       // Find the ingredient product
-      const ingredient = productsData.find(product =>
-        product.type === 'ingredient' && product.id.toString() === ingredientId
+      const ingredient = productsData.find(
+        (product) =>
+          product.type === "ingredient" &&
+          product.id.toString() === ingredientId
       );
 
       if (!ingredient) {
@@ -990,15 +1106,19 @@ const Stock = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: ingredient.id,
-          stock: newStock
+          stock: newStock,
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to deduct stock for ingredient: ${ingredient.name}`);
+        throw new Error(
+          `Failed to deduct stock for ingredient: ${ingredient.name}`
+        );
       }
 
-      console.log(`Deducted ${requiredQuantity} units from ingredient ${ingredient.name}`);
+      console.log(
+        `Deducted ${requiredQuantity} units from ingredient ${ingredient.name}`
+      );
 
       // Refresh products data to reflect changes
       fetchProducts();
@@ -1059,7 +1179,11 @@ const Stock = () => {
       setProductToDelete(null);
     } catch (error) {
       console.error("Error deleting product:", error);
-      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el producto");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo eliminar el producto"
+      );
     } finally {
       setDeletingProductId(null);
     }
@@ -1137,7 +1261,7 @@ const Stock = () => {
           type: "re-entry",
           reason: `Asignación a barra: ${destinationBarName}`,
           destinationBars: [destinationBarId],
-          observations: data.notes || ""
+          observations: data.notes || "",
         }),
       });
 
@@ -1151,9 +1275,10 @@ const Stock = () => {
       await fetchStocksOfBar();
 
       // Find the destination inventory item
-      const destinationInventory = stocksData.find((stock: any) =>
-        stock.productId === selectedProduct.id &&
-        stock.barId === destinationBarId
+      const destinationInventory = stocksData.find(
+        (stock: any) =>
+          stock.productId === selectedProduct.id &&
+          stock.barId === destinationBarId
       );
 
       if (destinationInventory) {
@@ -1167,12 +1292,14 @@ const Stock = () => {
             inventory_id: [destinationInventory.id],
             from_id: [null], // From general stock (null)
             to_id: [destinationBarId],
-            quantity: [data.quantity]
+            quantity: [data.quantity],
           }),
         });
 
         if (!transferResponse.ok) {
-          console.warn("Failed to create transfer record, but stock assignment was successful");
+          console.warn(
+            "Failed to create transfer record, but stock assignment was successful"
+          );
         }
       }
 
@@ -1189,7 +1316,9 @@ const Stock = () => {
       setSelectedProduct(null);
     } catch (error) {
       console.error("Error assigning stock:", error);
-      toast.error(error instanceof Error ? error.message : "Error al asignar stock");
+      toast.error(
+        error instanceof Error ? error.message : "Error al asignar stock"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -1207,7 +1336,8 @@ const Stock = () => {
 
     // Show success message with all selected bars
     toast.success(
-      `${data.quantity} unidades de ${data.product} transferidas de ${data.fromBar
+      `${data.quantity} unidades de ${data.product} transferidas de ${
+        data.fromBar
       } a ${selectedBars.join(", ")}`
     );
     // Aquí iría la lógica para crear la transferencia
@@ -1234,10 +1364,7 @@ const Stock = () => {
     );
 
     // Refresh data to show updated stock
-    await Promise.all([
-      fetchProducts(),
-      fetchStocksOfBar()
-    ]);
+    await Promise.all([fetchProducts(), fetchStocksOfBar()]);
 
     // Refresh adjustment history
     adjustmentHistoryRef.current?.refreshHistory();
@@ -1264,10 +1391,7 @@ const Stock = () => {
     );
 
     // Refresh data to show updated stock
-    await Promise.all([
-      fetchProducts(),
-      fetchStocksOfBar()
-    ]);
+    await Promise.all([fetchProducts(), fetchStocksOfBar()]);
 
     // Refresh adjustment history
     adjustmentHistoryRef.current?.refreshHistory();
@@ -1347,10 +1471,7 @@ const Stock = () => {
   const hasSelectedStockItems = selectedStockItems.length > 0;
   return (
     <>
-      <PageHeader
-        title=""
-        description="Control de inventario y transferencias"
-      >
+      <PageHeader title="" description="Control de inventario y transferencias">
         {/* <Button className="mr-2" onClick={handleMultipleTransfer}>
           <ArrowRightLeft className="mr-2 h-4 w-4" />
           Transferencia Múltiple
@@ -1379,7 +1500,9 @@ const Stock = () => {
             <CardDescription>Productos disponibles</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{totalStock.toLocaleString()}</div>
+            <div className="text-3xl font-bold">
+              {totalStock.toLocaleString()}
+            </div>
             <p className="text-sm text-gray-500">En todos los bares</p>
           </CardContent>
         </Card>
@@ -1394,7 +1517,11 @@ const Stock = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              ${totalPurchaseValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              $
+              {totalPurchaseValue.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </div>
             <p className="text-sm text-gray-500">Precio de compra total</p>
           </CardContent>
@@ -1410,10 +1537,18 @@ const Stock = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              ${totalSaleValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              $
+              {totalSaleValue.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </div>
             <p className="text-sm text-gray-500">
-              Margen: ${(totalSaleValue - totalPurchaseValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Margen: $
+              {(totalSaleValue - totalPurchaseValue).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </p>
           </CardContent>
         </Card>
@@ -1472,7 +1607,9 @@ const Stock = () => {
             <CardDescription>Productos con poco stock</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-orange-600">{lowStockItems}</div>
+            <div className="text-3xl font-bold text-orange-600">
+              {lowStockItems}
+            </div>
             <p className="text-sm text-gray-500">Menos de 10 unidades</p>
           </CardContent>
         </Card>
@@ -1486,7 +1623,9 @@ const Stock = () => {
             <CardDescription>Productos agotados</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-600">{outOfStockItems}</div>
+            <div className="text-3xl font-bold text-red-600">
+              {outOfStockItems}
+            </div>
             <p className="text-sm text-gray-500">Requieren reposición</p>
           </CardContent>
         </Card>
@@ -1545,7 +1684,15 @@ const Stock = () => {
                 <Filter className="h-4 w-4" />
                 Más filtros
               </Button>
-              <Button onClick={() => setShowAddProductModal(true)}>
+              <Button
+                onClick={() => {
+                  if (user?.role === "barman" || user?.role === "client") {
+                    toast.error("No tienes permiso para crear pedidos");
+                    return;
+                  }
+                  setShowAddProductModal(true);
+                }}
+              >
                 <Plus size={16} className="mr-2" />
                 Añadir producto
               </Button>
@@ -1558,7 +1705,6 @@ const Stock = () => {
                 <PackagePlus className="h-4 w-4" />
                 Ajustar Stock
               </Button>
-
             </div>
 
             {hasSelectedStockItems && (
@@ -1580,7 +1726,7 @@ const Stock = () => {
                   onClick={() => {
                     // For bulk adjustment, we'll open the adjustment modal for the first selected item
                     // In a real implementation, you might want a separate bulk adjustment modal
-                    const firstSelectedProduct = productsData.find(p =>
+                    const firstSelectedProduct = productsData.find((p) =>
                       selectedStockItems.includes(p.id?.toString() || "")
                     );
                     if (firstSelectedProduct) {
@@ -1638,7 +1784,7 @@ const Stock = () => {
                     const allItems: any[] = [];
 
                     // Add all products first
-                    productsData.forEach(item => {
+                    productsData.forEach((item) => {
                       if (!seenIds.has(item.id)) {
                         seenIds.add(item.id);
                         allItems.push(item);
@@ -1646,8 +1792,8 @@ const Stock = () => {
                     });
 
                     // Add only recipes from recipesData that aren't already added
-                    recipesData.forEach(item => {
-                      if (item.type === 'recipe' && !seenIds.has(item.id)) {
+                    recipesData.forEach((item) => {
+                      if (item.type === "recipe" && !seenIds.has(item.id)) {
                         seenIds.add(item.id);
                         allItems.push(item);
                       }
@@ -1655,33 +1801,44 @@ const Stock = () => {
 
                     return allItems;
                   })().map((item) => {
-                    const isProduct = 'purchase_price' in item;
+                    const isProduct = "purchase_price" in item;
                     const product = item as any; // Cast to access all properties
 
                     return (
                       <TableRow key={item.id}>
                         <TableCell>
                           <Checkbox
-                            checked={selectedStockItems.includes(item.id?.toString() || "")}
+                            checked={selectedStockItems.includes(
+                              item.id?.toString() || ""
+                            )}
                             onCheckedChange={() =>
-                              toggleStockItemSelection(item.id?.toString() || "")
+                              toggleStockItemSelection(
+                                item.id?.toString() || ""
+                              )
                             }
                           />
                         </TableCell>
                         <TableCell className="font-medium">
                           <Button
                             variant="link"
-                            onClick={() => isProduct && viewProductDetail(product)}
+                            onClick={() =>
+                              isProduct && viewProductDetail(product)
+                            }
                             className="p-0 h-auto font-medium text-orange-900"
                           >
-                            {item.name} {!isProduct && '(Receta)'}
+                            {item.name} {!isProduct && "(Receta)"}
                           </Button>
                         </TableCell>
                         <TableCell>
                           <Switch
                             checked={isProduct ? product.is_active : false}
                             onCheckedChange={(checked) =>
-                              isProduct && handleToggleActive(item.id?.toString(), checked, "is_active")
+                              isProduct &&
+                              handleToggleActive(
+                                item.id?.toString(),
+                                checked,
+                                "is_active"
+                              )
                             }
                           />
                         </TableCell>
@@ -1703,7 +1860,9 @@ const Stock = () => {
                                 <Button
                                   variant="link"
                                   className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800"
-                                  onClick={() => router.push(`/bars/${s.barId}`)}
+                                  onClick={() =>
+                                    router.push(`/bars/${s.barId}`)
+                                  }
                                 >
                                   {`${s.barName} (${s.quantity})`}
                                 </Button>
@@ -1725,7 +1884,7 @@ const Stock = () => {
                           </Badge>
                         </TableCell>
                         {showUnredeemed && "date" in item && (
-                          <TableCell>{product.created_at || 'N/A'}</TableCell>
+                          <TableCell>{product.created_at || "N/A"}</TableCell>
                         )}
                         {/* {showUnredeemed && "user" in item && (
                         // <TableCell>{item.user}</TableCell>
@@ -1822,7 +1981,12 @@ const Stock = () => {
                   max={selectedProduct?.stock}
                   onKeyDown={(e) => {
                     // Prevent minus key, plus key, and 'e' key
-                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                    if (
+                      e.key === "-" ||
+                      e.key === "+" ||
+                      e.key === "e" ||
+                      e.key === "E"
+                    ) {
                       e.preventDefault();
                     }
                   }}
@@ -1839,12 +2003,15 @@ const Stock = () => {
                     onChange: (e) => {
                       const value = e.target.value;
                       // Only allow positive numbers and empty string
-                      if (value === '' || (Number(value) >= 1 && !value.includes('-'))) {
+                      if (
+                        value === "" ||
+                        (Number(value) >= 1 && !value.includes("-"))
+                      ) {
                         return value;
                       }
                       // If invalid, set to 1
-                      e.target.value = '1';
-                      return '1';
+                      e.target.value = "1";
+                      return "1";
                     },
                   })}
                 />
@@ -1883,10 +2050,7 @@ const Stock = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button
-                type="submit"
-                disabled={isLoading}
-              >
+              <Button type="submit" disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1934,7 +2098,12 @@ const Stock = () => {
                   min={1}
                   onKeyDown={(e) => {
                     // Prevent minus key, plus key, and 'e' key
-                    if (e.key === '-' || e.key === '+' || e.key === 'e' || e.key === 'E') {
+                    if (
+                      e.key === "-" ||
+                      e.key === "+" ||
+                      e.key === "e" ||
+                      e.key === "E"
+                    ) {
                       e.preventDefault();
                     }
                   }}
@@ -1948,12 +2117,15 @@ const Stock = () => {
                     onChange: (e) => {
                       const value = e.target.value;
                       // Only allow positive numbers and empty string
-                      if (value === '' || (Number(value) >= 1 && !value.includes('-'))) {
+                      if (
+                        value === "" ||
+                        (Number(value) >= 1 && !value.includes("-"))
+                      ) {
                         return value;
                       }
                       // If invalid, set to 1
-                      e.target.value = '1';
-                      return '1';
+                      e.target.value = "1";
+                      return "1";
                     },
                   })}
                 />
@@ -2084,10 +2256,12 @@ const Stock = () => {
               Confirmar Eliminación
             </DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que deseas eliminar el producto "{productToDelete?.name}"?
+              ¿Estás seguro de que deseas eliminar el producto "
+              {productToDelete?.name}"?
               <br />
               <span className="text-red-600 font-medium">
-                Esta acción no se puede deshacer y eliminará permanentemente el producto del inventario.
+                Esta acción no se puede deshacer y eliminará permanentemente el
+                producto del inventario.
               </span>
             </DialogDescription>
           </DialogHeader>
@@ -2123,10 +2297,13 @@ const Stock = () => {
         </DialogContent>
       </Dialog>
       {/* Add Product Modal */}
-      <Dialog open={showAddProductModal} onOpenChange={(open) => {
-        setShowAddProductModal(open);
-        if (!open) resetProductModal();
-      }}>
+      <Dialog
+        open={showAddProductModal}
+        onOpenChange={(open) => {
+          setShowAddProductModal(open);
+          if (!open) resetProductModal();
+        }}
+      >
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Agregar Nuevo Producto</DialogTitle>
@@ -2177,7 +2354,9 @@ const Stock = () => {
             {/* Recipe/Ingredients Selection Field */}
             <div className="space-y-4 border rounded-lg p-4">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">Ingredientes (Opcional)</Label>
+                <Label className="text-base font-semibold">
+                  Ingredientes (Opcional)
+                </Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -2214,7 +2393,9 @@ const Stock = () => {
                       setRecipeIngredients([]);
                     }}
                   />
-                  <span className="text-sm">Agregar ingredientes individuales</span>
+                  <span className="text-sm">
+                    Agregar ingredientes individuales
+                  </span>
                 </label>
               </div>
 
@@ -2231,123 +2412,179 @@ const Stock = () => {
                       <SelectItem value="no-recipe">Sin receta</SelectItem>
                       {/* Show Recipes only (filter out ingredients from recipesData) */}
                       {recipesData
-                        .filter((recipe) => recipe.type === 'recipe')
+                        .filter((recipe) => recipe.type === "recipe")
                         .map((recipe) => (
-                          <SelectItem key={`recipe-${recipe.id}`} value={recipe.id.toString()}>
+                          <SelectItem
+                            key={`recipe-${recipe.id}`}
+                            value={recipe.id.toString()}
+                          >
                             {recipe.name} ({recipe.category}) - Receta
                           </SelectItem>
                         ))}
                       {/* Show Ingredients from productsData */}
                       {productsData
-                        .filter((product) => product.type === 'ingredient')
+                        .filter((product) => product.type === "ingredient")
                         .map((ingredient) => (
-                          <SelectItem key={`ingredient-${ingredient.id}`} value={ingredient.id.toString()}>
-                            {ingredient.name} ({ingredient.category}) - Ingrediente
+                          <SelectItem
+                            key={`ingredient-${ingredient.id}`}
+                            value={ingredient.id.toString()}
+                          >
+                            {ingredient.name} ({ingredient.category}) -
+                            Ingrediente
                           </SelectItem>
                         ))}
                     </SelectContent>
                   </Select>
 
                   {/* Show ingredient information if an ingredient is selected */}
-                  {selectedRecipeId && selectedRecipeId !== "no-recipe" && (() => {
-                    // Check if selected item is an ingredient
-                    const selectedIngredient = productsData.find(product =>
-                      product.type === 'ingredient' && product.id.toString() === selectedRecipeId
-                    );
+                  {selectedRecipeId &&
+                    selectedRecipeId !== "no-recipe" &&
+                    (() => {
+                      // Check if selected item is an ingredient
+                      const selectedIngredient = productsData.find(
+                        (product) =>
+                          product.type === "ingredient" &&
+                          product.id.toString() === selectedRecipeId
+                      );
 
-                    if (selectedIngredient) {
-                      const unit = extractUnitFromDescription(selectedIngredient.description || "");
-                      const conversionFactor = extractConversionFromDescription(selectedIngredient.description || "");
+                      if (selectedIngredient) {
+                        const unit = extractUnitFromDescription(
+                          selectedIngredient.description || ""
+                        );
+                        const conversionFactor =
+                          extractConversionFromDescription(
+                            selectedIngredient.description || ""
+                          );
 
-                      // Calculate amounts using conversion factor
-                      const totalAmount = (selectedIngredient.stock || 0) * conversionFactor;
-                      const totalRequired = ingredientRequiredQuantity * conversionFactor;
-                      const hasEnoughStock = totalAmount >= totalRequired;
+                        // Calculate amounts using conversion factor
+                        const totalAmount =
+                          (selectedIngredient.stock || 0) * conversionFactor;
+                        const totalRequired =
+                          ingredientRequiredQuantity * conversionFactor;
+                        const hasEnoughStock = totalAmount >= totalRequired;
 
-                      return (
-                        <div className="mt-4 space-y-4">
-                          <h3 className="font-medium text-gray-900">Ingredientes del producto:</h3>
-                          <p className="text-sm text-gray-600">
-                            Especifica cuántas unidades del producto vas a crear. Los ingredientes se descontarán automáticamente.
-                          </p>
+                        return (
+                          <div className="mt-4 space-y-4">
+                            <h3 className="font-medium text-gray-900">
+                              Ingredientes del producto:
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              Especifica cuántas unidades del producto vas a
+                              crear. Los ingredientes se descontarán
+                              automáticamente.
+                            </p>
 
-                          <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700">Ingrediente</Label>
-                              <p className="text-sm font-semibold text-gray-900">{selectedIngredient.name}</p>
-                              <p className="text-xs text-green-500">
-                                {conversionFactor} {unit} por unidad
-                              </p>
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700">Cantidad a crear</Label>
-                              <Input
-                                type="number"
-                                min="1"
-                                value={ingredientRequiredQuantity}
-                                onChange={(e) => setIngredientRequiredQuantity(parseInt(e.target.value) || 1)}
-                                className="h-10 text-center font-medium"
-                              />
-                              <p className="text-xs text-gray-500 mt-1">
-                                Total necesario: {totalRequired} {unit}
-                              </p>
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700">Stock disponible</Label>
-                              <p className={`text-lg font-bold ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
-                                {totalAmount} {unit}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Available: {selectedIngredient.stock || 0} units ({totalAmount} {unit})
-                              </p>
-                              {!hasEnoughStock && (
-                                <p className="text-xs text-red-600 font-medium">
-                                  {(totalRequired - totalAmount)} {unit} missing
+                            <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700">
+                                  Ingrediente
+                                </Label>
+                                <p className="text-sm font-semibold text-gray-900">
+                                  {selectedIngredient.name}
                                 </p>
-                              )}
+                                <p className="text-xs text-green-500">
+                                  {conversionFactor} {unit} por unidad
+                                </p>
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700">
+                                  Cantidad a crear
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={ingredientRequiredQuantity}
+                                  onChange={(e) =>
+                                    setIngredientRequiredQuantity(
+                                      parseInt(e.target.value) || 1
+                                    )
+                                  }
+                                  className="h-10 text-center font-medium"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Total necesario: {totalRequired} {unit}
+                                </p>
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700">
+                                  Stock disponible
+                                </Label>
+                                <p
+                                  className={`text-lg font-bold ${hasEnoughStock ? "text-green-600" : "text-red-600"}`}
+                                >
+                                  {totalAmount} {unit}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Available: {selectedIngredient.stock || 0}{" "}
+                                  units ({totalAmount} {unit})
+                                </p>
+                                {!hasEnoughStock && (
+                                  <p className="text-xs text-red-600 font-medium">
+                                    {totalRequired - totalAmount} {unit} missing
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                        );
+                      }
+                      return null;
+                    })()}
 
                   <p className="text-sm text-muted-foreground">
-                    Si seleccionas una receta, el stock de los ingredientes se descontará automáticamente cuando se haga un pedido.
+                    Si seleccionas una receta, el stock de los ingredientes se
+                    descontará automáticamente cuando se haga un pedido.
                   </p>
                 </>
               ) : (
                 <>
                   <div className="space-y-3">
-                    <Label className="text-sm font-medium">Agregar Ingredientes:</Label>
+                    <Label className="text-sm font-medium">
+                      Agregar Ingredientes:
+                    </Label>
 
                     {/* Ingredient Selection */}
                     <div className="grid grid-cols-12 gap-2 items-end">
                       <div className="col-span-4">
-                        <Label htmlFor="ingredient" className="sr-only">Ingrediente</Label>
+                        <Label htmlFor="ingredient" className="sr-only">
+                          Ingrediente
+                        </Label>
                         <Select
                           value={selectedIngredient}
-                          onValueChange={(value) => setSelectedIngredient(value)}
+                          onValueChange={(value) =>
+                            setSelectedIngredient(value)
+                          }
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Seleccionar ingrediente" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="none">Seleccionar ingrediente existente</SelectItem>
+                            <SelectItem value="none">
+                              Seleccionar ingrediente existente
+                            </SelectItem>
                             {productsData
-                              .filter((product) =>
-                                product.category === "ingrediente" && product.has_recipe === false
+                              .filter(
+                                (product) =>
+                                  product.category === "ingrediente" &&
+                                  product.has_recipe === false
                               )
                               .sort((a, b) => b.stock - a.stock)
                               .map((product) => (
-                                <SelectItem key={product.id} value={product.name}>
+                                <SelectItem
+                                  key={product.id}
+                                  value={product.name}
+                                >
                                   <div className="flex justify-between items-center w-full">
                                     <span>{product.name}</span>
-                                    <span className={`text-xs px-1 py-0.5 rounded ${product.stock > 10 ? 'bg-green-100 text-green-800' :
-                                        product.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
-                                          'bg-red-100 text-red-800'
-                                      }`}>
+                                    <span
+                                      className={`text-xs px-1 py-0.5 rounded ${
+                                        product.stock > 10
+                                          ? "bg-green-100 text-green-800"
+                                          : product.stock > 0
+                                            ? "bg-yellow-100 text-yellow-800"
+                                            : "bg-red-100 text-red-800"
+                                      }`}
+                                    >
                                       {product.stock}
                                     </span>
                                   </div>
@@ -2355,28 +2592,38 @@ const Stock = () => {
                               ))}
                           </SelectContent>
                         </Select>
-                        <div className="text-center text-sm text-muted-foreground mt-1">o</div>
+                        <div className="text-center text-sm text-muted-foreground mt-1">
+                          o
+                        </div>
                         <Input
                           disabled={selectedIngredient !== "none"}
                           placeholder="Escribir ingrediente personalizado"
                           value={customIngredientName}
-                          onChange={(e) => setCustomIngredientName(e.target.value)}
+                          onChange={(e) =>
+                            setCustomIngredientName(e.target.value)
+                          }
                           className="mt-1"
                         />
                       </div>
                       <div className="col-span-3">
-                        <Label htmlFor="quantity" className="sr-only">Cantidad</Label>
+                        <Label htmlFor="quantity" className="sr-only">
+                          Cantidad
+                        </Label>
                         <Input
                           placeholder="Cantidad"
                           value={ingredientQuantity}
-                          onChange={(e) => setIngredientQuantity(e.target.value)}
+                          onChange={(e) =>
+                            setIngredientQuantity(e.target.value)
+                          }
                           type="number"
                           min="0"
                           step="0.01"
                         />
                       </div>
                       <div className="col-span-3">
-                        <Label htmlFor="unit" className="sr-only">Unidad</Label>
+                        <Label htmlFor="unit" className="sr-only">
+                          Unidad
+                        </Label>
                         <Select
                           value={ingredientUnit}
                           onValueChange={(value) => setIngredientUnit(value)}
@@ -2406,8 +2653,10 @@ const Stock = () => {
                           onClick={addCustomIngredient}
                           disabled={
                             ingredientQuantity.trim() === "" ||
-                            (selectedIngredient === "none" && customIngredientName.trim() === "") ||
-                            (selectedIngredient !== "none" && selectedIngredient.trim() === "")
+                            (selectedIngredient === "none" &&
+                              customIngredientName.trim() === "") ||
+                            (selectedIngredient !== "none" &&
+                              selectedIngredient.trim() === "")
                           }
                         >
                           <Plus className="h-4 w-4" />
@@ -2418,11 +2667,17 @@ const Stock = () => {
                     {/* Display added custom ingredients */}
                     {customIngredients.length > 0 && (
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium">Ingredientes agregados:</Label>
+                        <Label className="text-sm font-medium">
+                          Ingredientes agregados:
+                        </Label>
                         {customIngredients.map((ingredient, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                          >
                             <span className="text-sm">
-                              {ingredient.name} - {ingredient.quantity} {ingredient.unit}
+                              {ingredient.name} - {ingredient.quantity}{" "}
+                              {ingredient.unit}
                             </span>
                             <Button
                               type="button"
@@ -2438,7 +2693,8 @@ const Stock = () => {
                     )}
 
                     <p className="text-sm text-muted-foreground">
-                      Los ingredientes agregados se descontarán del stock cuando crees el producto.
+                      Los ingredientes agregados se descontarán del stock cuando
+                      crees el producto.
                     </p>
                   </div>
                 </>
@@ -2448,47 +2704,78 @@ const Stock = () => {
             {/* Recipe Ingredients Display */}
             {recipeIngredients.length > 0 && (
               <div className="space-y-3">
-                <Label className="text-sm font-medium">Ingredientes de la receta:</Label>
+                <Label className="text-sm font-medium">
+                  Ingredientes de la receta:
+                </Label>
                 <p className="text-sm text-muted-foreground">
-                  Especifica cuántas unidades del producto vas a crear. Los ingredientes se descontarán automáticamente.
+                  Especifica cuántas unidades del producto vas a crear. Los
+                  ingredientes se descontarán automáticamente.
                 </p>
 
                 {recipeIngredients.map((ingredient, index) => {
-                  const totalAmount = parseFloat(ingredient.quantity) * ingredient.availableStock;
-                  const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
+                  const totalAmount =
+                    parseFloat(ingredient.quantity) * ingredient.availableStock;
+                  const totalRequired =
+                    parseFloat(ingredient.quantity) *
+                    ingredient.requiredQuantity;
                   const hasEnoughStock = totalAmount >= totalRequired;
 
                   return (
-                    <div key={index} className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg">
+                    <div
+                      key={index}
+                      className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg"
+                    >
                       <div>
-                        <Label className="text-sm font-medium text-gray-700">Ingrediente</Label>
-                        <p className="text-sm font-semibold text-gray-900">{ingredient.name}</p>
+                        <Label className="text-sm font-medium text-gray-700">
+                          Ingrediente
+                        </Label>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {ingredient.name}
+                        </p>
                         <p className="text-xs text-green-500">
                           {ingredient.quantity} {ingredient.unit} por unidad
                         </p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-700">Cantidad a crear</Label>
+                        <Label className="text-sm font-medium text-gray-700">
+                          Cantidad a crear
+                        </Label>
                         <Input
                           type="number"
                           min="1"
                           value={ingredient.requiredQuantity}
-                          onChange={(e) => updateIngredientQuantity(index, parseInt(e.target.value) || 1)}
+                          onChange={(e) =>
+                            updateIngredientQuantity(
+                              index,
+                              parseInt(e.target.value) || 1
+                            )
+                          }
                           className="h-10 text-center font-medium"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Total necesario: {totalRequired.toFixed(0)} {ingredient.unit}
+                          Total necesario: {totalRequired.toFixed(0)}{" "}
+                          {ingredient.unit}
                         </p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-700">Stock disponible</Label>
-                        <p className={`text-lg font-bold ${hasEnoughStock ? 'text-green-600' : 'text-red-600'}`}>
-                          {ingredient.availableStock * Number(ingredient?.quantity)} {ingredient.unit}
+                        <Label className="text-sm font-medium text-gray-700">
+                          Stock disponible
+                        </Label>
+                        <p
+                          className={`text-lg font-bold ${hasEnoughStock ? "text-green-600" : "text-red-600"}`}
+                        >
+                          {ingredient.availableStock *
+                            Number(ingredient?.quantity)}{" "}
+                          {ingredient.unit}
                         </p>
                         <p>Available: {ingredient.availableStock}</p>
                         {!hasEnoughStock && (
                           <p className="text-xs text-red-600 font-medium">
-                            {ingredient.availableStock * Number(ingredient?.quantity) - Number(ingredient.quantity) * ingredient.requiredQuantity} missing
+                            {ingredient.availableStock *
+                              Number(ingredient?.quantity) -
+                              Number(ingredient.quantity) *
+                                ingredient.requiredQuantity}{" "}
+                            missing
                           </p>
                         )}
                       </div>
@@ -2498,14 +2785,19 @@ const Stock = () => {
 
                 {/* Add New Ingredient to Existing Recipe */}
                 <div className="border-t pt-4 mt-4">
-                  <Label className="text-sm font-medium mb-3 block">Agregar nuevo ingrediente a esta receta:</Label>
+                  <Label className="text-sm font-medium mb-3 block">
+                    Agregar nuevo ingrediente a esta receta:
+                  </Label>
                   <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-5">
                       <Input
                         placeholder="Nombre del ingrediente"
                         value={newIngredient.name}
                         onChange={(e) =>
-                          setNewIngredient({ ...newIngredient, name: e.target.value })
+                          setNewIngredient({
+                            ...newIngredient,
+                            name: e.target.value,
+                          })
                         }
                       />
                     </div>
@@ -2515,7 +2807,10 @@ const Stock = () => {
                         placeholder="Cantidad"
                         value={newIngredient.quantity}
                         onChange={(e) =>
-                          setNewIngredient({ ...newIngredient, quantity: e.target.value })
+                          setNewIngredient({
+                            ...newIngredient,
+                            quantity: e.target.value,
+                          })
                         }
                       />
                     </div>
@@ -2549,14 +2844,17 @@ const Stock = () => {
                         variant="secondary"
                         className="w-full"
                         onClick={handleAddIngredientToExistingRecipe}
-                        disabled={!newIngredient.name || !newIngredient.quantity}
+                        disabled={
+                          !newIngredient.name || !newIngredient.quantity
+                        }
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Este ingrediente se agregará a la receta seleccionada y se guardará permanentemente.
+                    Este ingrediente se agregará a la receta seleccionada y se
+                    guardará permanentemente.
                   </p>
                 </div>
 
@@ -2590,12 +2888,17 @@ const Stock = () => {
                 <Input
                   id="purchase_price"
                   type="number"
-                  value={newProduct.purchase_price === 0 ? "" : newProduct.purchase_price}
+                  value={
+                    newProduct.purchase_price === 0
+                      ? ""
+                      : newProduct.purchase_price
+                  }
                   placeholder="0.00"
                   onChange={(e) =>
                     setNewProduct({
                       ...newProduct,
-                      purchase_price: e.target.value === "" ? 0 : Number(e.target.value),
+                      purchase_price:
+                        e.target.value === "" ? 0 : Number(e.target.value),
                     })
                   }
                 />
@@ -2605,12 +2908,15 @@ const Stock = () => {
                 <Input
                   id="sale_price"
                   type="number"
-                  value={newProduct.sale_price === 0 ? "" : newProduct.sale_price}
+                  value={
+                    newProduct.sale_price === 0 ? "" : newProduct.sale_price
+                  }
                   placeholder="0.00"
                   onChange={(e) =>
                     setNewProduct({
                       ...newProduct,
-                      sale_price: e.target.value === "" ? 0 : Number(e.target.value),
+                      sale_price:
+                        e.target.value === "" ? 0 : Number(e.target.value),
                     })
                   }
                 />
@@ -2654,7 +2960,10 @@ const Stock = () => {
       </Dialog>
 
       {/* Create Recipe Dialog */}
-      <Dialog open={showCreateRecipeDialog} onOpenChange={setShowCreateRecipeDialog}>
+      <Dialog
+        open={showCreateRecipeDialog}
+        onOpenChange={setShowCreateRecipeDialog}
+      >
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Crear Nueva Receta</DialogTitle>
@@ -2705,7 +3014,10 @@ const Stock = () => {
                     placeholder="Nombre del ingrediente"
                     value={newIngredient.name}
                     onChange={(e) =>
-                      setNewIngredient({ ...newIngredient, name: e.target.value })
+                      setNewIngredient({
+                        ...newIngredient,
+                        name: e.target.value,
+                      })
                     }
                   />
                 </div>
@@ -2715,7 +3027,10 @@ const Stock = () => {
                     placeholder="Cantidad"
                     value={newIngredient.quantity}
                     onChange={(e) =>
-                      setNewIngredient({ ...newIngredient, quantity: e.target.value })
+                      setNewIngredient({
+                        ...newIngredient,
+                        quantity: e.target.value,
+                      })
                     }
                   />
                 </div>
@@ -2754,10 +3069,15 @@ const Stock = () => {
             {/* Ingredients List */}
             {newRecipe.ingredients.length > 0 && (
               <div className="space-y-3">
-                <Label className="text-sm font-medium">Ingredientes de la Receta</Label>
+                <Label className="text-sm font-medium">
+                  Ingredientes de la Receta
+                </Label>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {newRecipe.ingredients.map((ingredient, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
                       <div className="flex items-center space-x-3">
                         <span className="font-medium">{ingredient.name}</span>
                         <span className="text-sm text-gray-600">
@@ -2792,7 +3112,11 @@ const Stock = () => {
             </Button>
             <Button
               onClick={handleCreateRecipe}
-              disabled={!newRecipe.name || newRecipe.ingredients.length === 0 || isLoading}
+              disabled={
+                !newRecipe.name ||
+                newRecipe.ingredients.length === 0 ||
+                isLoading
+              }
             >
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -2803,7 +3127,6 @@ const Stock = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </>
   );
 };

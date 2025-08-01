@@ -53,7 +53,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     fetchNotifications();
-  }, []);
+  }, [fetchNotifications]);
 
   React.useEffect(() => {
     document.documentElement.classList.add("light");
