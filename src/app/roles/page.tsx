@@ -56,7 +56,7 @@ import { Popover } from "radix-ui";
 import { MixerHorizontalIcon, Cross2Icon } from "@radix-ui/react-icons";
 import { QrScanner } from "(components)/qr-scanner";
 import { useAuth } from "@/context/AuthContext";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 
 type TabType = "clientes" | "equipoPublicas" | "clientesVIP" | "equipo";
 type SortDirection = "asc" | "desc";
@@ -84,6 +84,7 @@ export default function RoleManagement() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const { user : currentUser } = useAuth();
+  const { toast } = useToast();
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
@@ -136,7 +137,10 @@ export default function RoleManagement() {
       setTransfers([]);
       setIsEditDialogOpen(true);
     } else {
-      toast.error("No tienes permiso para editar usuarios");
+      toast({
+        title: "No tienes permiso para editar usuarios",
+        description: "Solo los administradores pueden editar usuarios",
+      })
     }
   };
 
@@ -232,10 +236,11 @@ export default function RoleManagement() {
       if (!response.ok) {
         throw new Error("Failed to update user");
       }
-      toast({
-        title: "QR Code Scanned",
-        description: `El regalo se ha canjeado exitosamente`,
-      });
+
+      toast(
+        {title: "QR Code Scanned",
+        description: `El regalo se ha canjeado exitosamente`,}
+      );
     } else {
       toast({
         title: "QR Code Scanned",
