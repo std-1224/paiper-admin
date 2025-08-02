@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { BarData, Product, InventoryData, Notification } from "@/types/types";
 import { QRCodeData } from "@/types/types";
 import { User, Staff } from "@/types/types";
@@ -171,7 +171,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       const response = await fetch("/api/notifications", {
         method: "GET",
@@ -190,7 +190,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (error: any) {
       console.error("Error fetching notifications:", error.message);
     }
-  };
+  },[]);
 
   const fetchOrders = async () => {
     try {
@@ -213,7 +213,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const fetchBars = async () => {
+  const fetchBars = useCallback(async () => {
     try {
       const response = await fetch("/api/bars", {
         method: "GET",
@@ -232,9 +232,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (error: any) {
       console.error("Error fetching bars:", error.message);
     }
-  };
+  }, []);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const response = await fetch("/api/products", {
         method: "GET",
@@ -253,7 +253,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (error: any) {
       console.error("Error fetching bars:", error.message);
     }
-  };
+  }, []);
 
   const fetchQRCodes = async () => {
     try {
@@ -276,7 +276,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const fetchStocksOfBar = async (barId?: number) => {
+  const fetchStocksOfBar = useCallback(async (barId?: number) => {
     try {
       const response = await fetch(`/api/inventory/${barId ?? ""}`, {
         method: "GET",
@@ -303,7 +303,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (error: any) {
       console.error("Error fetching Stocks:", error.message);
     }
-  };
+  }, []);
 
   const fetchStaff = async (barId?: number | null) => {
     try {
@@ -345,7 +345,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const fetchRecipes = async () => {
+  const fetchRecipes = useCallback(async () => {
     try {
       setRecipesLoading(true);
       const res = await fetch("/api/recipe");
@@ -370,7 +370,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     } finally {
       setRecipesLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchOrders();
