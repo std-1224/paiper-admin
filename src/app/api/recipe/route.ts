@@ -104,10 +104,11 @@ export const PUT = async (req: Request) => {
         const recipeAmount = amount !== undefined ? amount : currentRecipe.stock;
         const recipeCategory = category || currentRecipe.category;
 
-        // Add availableStock to ingredients based on recipe amount
+        // Preserve availableStock from the request, don't override it
         const ingredientsWithStock = ingredientValidation.validatedIngredients.map(ingredient => ({
             ...ingredient,
-            availableStock: ingredient.availableStock || recipeAmount || 1 // Preserve existing availableStock or use recipe amount
+            // If availableStock is explicitly provided (including 0), use it. Otherwise use recipe amount
+            availableStock: ingredient.availableStock !== undefined ? ingredient.availableStock : (recipeAmount || 1)
         }));
 
         // Update the recipe
