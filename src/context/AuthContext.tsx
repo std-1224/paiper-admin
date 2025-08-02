@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { ApprovalStatus } from "@/types/types";
 
-export type UserRole = "client" | "admin" | "master" | "barman";
+export type UserRole = "client" | "admin" | "master" | "barman" | "manager";
 
 interface UserWithRole {
   id: string;
