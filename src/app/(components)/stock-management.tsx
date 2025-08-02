@@ -1999,9 +1999,6 @@ export default function StockManagement() {
       setIngredientUnit("ml");
 
       fetchProducts();
-      alert(
-        "Producto agregado exitosamente y stock de ingredientes actualizado"
-      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error adding product");
     } finally {
