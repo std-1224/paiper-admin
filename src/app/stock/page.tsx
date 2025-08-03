@@ -587,10 +587,10 @@ const Stock = () => {
 
     // Create ingredient record
     const ingredientRecord = {
-      name: productName, // Use product name as ingredient name
+      name: selectedIngredient.name, // Use ingredient-type product name as ingredient name
       quantity: quantity,
       unit: unit,
-      requiredQuaantity: cantidadACrear // Set availableStock to the "Cantidad a crear" amount
+      requiredQuantity: cantidadACrear // Set requiredQuantity to the "Cantidad a crear" amount
     };
 
     return [ingredientRecord];

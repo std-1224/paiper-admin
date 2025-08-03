@@ -77,7 +77,7 @@ export default function StockManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const {user} = useAuth()
+  const { user } = useAuth()
   // Modal states
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showProductDetailModal, setShowProductDetailModal] = useState(false);
@@ -479,7 +479,7 @@ export default function StockManagement() {
 
     // Create ingredient record
     const ingredientRecord = {
-      name: productName, // Use product name as ingredient name
+      name: selectedIngredient.name, // Use ingredient-type product name as ingredient name
       quantity: quantity,
       unit: unit,
       requiredQuantity: cantidadACrear // Set availableStock to the "Cantidad a crear" amount
@@ -1951,12 +1951,12 @@ export default function StockManagement() {
     const averageMargin =
       productsData.length > 0
         ? productsData.reduce((sum, product) => {
-            const margin =
-              ((product.sale_price - product.purchase_price) /
-                product.purchase_price) *
-              100;
-            return sum + margin;
-          }, 0) / productsData.length
+          const margin =
+            ((product.sale_price - product.purchase_price) /
+              product.purchase_price) *
+            100;
+          return sum + margin;
+        }, 0) / productsData.length
         : 0;
 
     return {
@@ -2659,9 +2659,9 @@ export default function StockManagement() {
               variant="outline"
               onClick={() => {
                 if (user?.role === "barman" || user?.role === "client") {
-                    toast.error("No tienes permiso para ajustar stock");
-                    return;
-                  }
+                  toast.error("No tienes permiso para ajustar stock");
+                  return;
+                }
                 // Initialize quantities for selected products
                 const initialQuantities: { [key: string]: number } = {};
                 selectedProducts.forEach((productId) => {
@@ -2749,277 +2749,277 @@ export default function StockManagement() {
             <tbody>
               {isLoading
                 ? Array(6)
-                    .fill(0)
-                    .map((_, index) => (
-                      <tr key={index}>
-                        <td colSpan={9} className="p-3">
-                          <Skeleton className="h-10 w-full" />
-                        </td>
-                      </tr>
-                    ))
+                  .fill(0)
+                  .map((_, index) => (
+                    <tr key={index}>
+                      <td colSpan={9} className="p-3">
+                        <Skeleton className="h-10 w-full" />
+                      </td>
+                    </tr>
+                  ))
                 : filteredProducts.map((item) => {
-                    const product = item as any; // Cast to access all properties
-                    const isProduct = "purchase_price" in item;
+                  const product = item as any; // Cast to access all properties
+                  const isProduct = "purchase_price" in item;
 
-                    return (
-                      <tr
-                        key={product.id}
-                        className="border-t hover:bg-muted/50"
-                      >
-                        <td className="p-3">
-                          <Checkbox
-                            checked={selectedProducts.includes(
-                              product.id.toString()
-                            )}
-                            onCheckedChange={() =>
-                              toggleSelectProduct(product.id.toString())
+                  return (
+                    <tr
+                      key={product.id}
+                      className="border-t hover:bg-muted/50"
+                    >
+                      <td className="p-3">
+                        <Checkbox
+                          checked={selectedProducts.includes(
+                            product.id.toString()
+                          )}
+                          onCheckedChange={() =>
+                            toggleSelectProduct(product.id.toString())
+                          }
+                        />
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="flex items-center gap-2 cursor-pointer flex-1"
+                            onClick={() =>
+                              isProduct && viewProductDetails(product)
                             }
-                          />
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="flex items-center gap-2 cursor-pointer flex-1"
-                              onClick={() =>
-                                isProduct && viewProductDetails(product)
-                              }
-                            >
-                              {product.image_url ? (
-                                <img
-                                  src={product.image_url}
-                                  alt={product.name}
-                                  className="h-10 w-10 rounded object-cover"
-                                />
-                              ) : (
-                                <div className="bg-slate-100 p-2 rounded">
-                                  <Package className="h-5 w-5 text-slate-500" />
-                                </div>
-                              )}
-                              <div>
-                                <div className="font-medium">
-                                  {product.name}
-                                </div>
-                                <div className="text-xs text-muted-foreground line-clamp-1">
-                                  {product.description}{" "}
-                                  {!isProduct && "(Receta)"}
-                                </div>
+                          >
+                            {product.image_url ? (
+                              <img
+                                src={product.image_url}
+                                alt={product.name}
+                                className="h-10 w-10 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="bg-slate-100 p-2 rounded">
+                                <Package className="h-5 w-5 text-slate-500" />
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-medium">
+                                {product.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground line-clamp-1">
+                                {product.description}{" "}
+                                {!isProduct && "(Receta)"}
                               </div>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                handleShowTransactionHistory(product)
-                              }
-                              className="h-8 w-8 p-0"
-                            >
-                              <History className="h-4 w-4" />
-                            </Button>
                           </div>
-                        </td>
-
-                        <td className="p-3">
-                          <Switch
-                            checked={product.is_courtsey}
-                            onCheckedChange={(checked) =>
-                              handleToggleActive(
-                                product.id,
-                                checked,
-                                "is_courtsey"
-                              )
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleShowTransactionHistory(product)
                             }
-                          />
-                        </td>
-                        <td className="p-3">
-                          <Switch
-                            checked={product.is_pr}
-                            onCheckedChange={(checked) =>
-                              handleToggleActive(product.id, checked, "is_pr")
-                            }
-                          />
-                        </td>
-                        <td className="p-3">
-                          <Badge variant="outline">
-                            {categoryList.find(
-                              (c) => c.value === product.category
-                            )?.label || product.category}
-                          </Badge>
-                        </td>
-                        <td className="p-3">
-                          ${product.sale_price.toFixed(2)}
-                        </td>
-                        <td className="p-3">
-                          <Badge
-                            className={cn(
-                              "font-normal",
-                              calculateStatus(product.stock) === "sufficient" &&
-                                "bg-green-50 text-green-700",
-                              calculateStatus(product.stock) === "low" &&
-                                "bg-amber-50 text-amber-700",
-                              calculateStatus(product.stock) === "out" &&
-                                "bg-red-50 text-red-700"
-                            )}
+                            className="h-8 w-8 p-0"
                           >
-                            {product.stock}{" "}
-                            {calculateStatus(product.stock) === "sufficient"
-                              ? "✓"
-                              : calculateStatus(product.stock) === "low"
-                                ? "⚠"
-                                : "✕"}
-                          </Badge>
-                        </td>
-                        <td className="p-3">
-                          <div className="flex gap-2">
+                            <History className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+
+                      <td className="p-3">
+                        <Switch
+                          checked={product.is_courtsey}
+                          onCheckedChange={(checked) =>
+                            handleToggleActive(
+                              product.id,
+                              checked,
+                              "is_courtsey"
+                            )
+                          }
+                        />
+                      </td>
+                      <td className="p-3">
+                        <Switch
+                          checked={product.is_pr}
+                          onCheckedChange={(checked) =>
+                            handleToggleActive(product.id, checked, "is_pr")
+                          }
+                        />
+                      </td>
+                      <td className="p-3">
+                        <Badge variant="outline">
+                          {categoryList.find(
+                            (c) => c.value === product.category
+                          )?.label || product.category}
+                        </Badge>
+                      </td>
+                      <td className="p-3">
+                        ${product.sale_price.toFixed(2)}
+                      </td>
+                      <td className="p-3">
+                        <Badge
+                          className={cn(
+                            "font-normal",
+                            calculateStatus(product.stock) === "sufficient" &&
+                            "bg-green-50 text-green-700",
+                            calculateStatus(product.stock) === "low" &&
+                            "bg-amber-50 text-amber-700",
+                            calculateStatus(product.stock) === "out" &&
+                            "bg-red-50 text-red-700"
+                          )}
+                        >
+                          {product.stock}{" "}
+                          {calculateStatus(product.stock) === "sufficient"
+                            ? "✓"
+                            : calculateStatus(product.stock) === "low"
+                              ? "⚠"
+                              : "✕"}
+                        </Badge>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => viewProductDetails(product)}
+                          >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                          {product.type === "product" && (
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => viewProductDetails(product)}
-                            >
-                              <Info className="h-4 w-4" />
-                            </Button>
-                            {product.type === "product" && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setEditingProduct(product);
+                              onClick={() => {
+                                setEditingProduct(product);
 
-                                  // Initialize edit modal states based on product data
-                                  if (
-                                    product.has_recipe &&
-                                    product.ingredients
-                                  ) {
-                                    try {
-                                      const ingredients = JSON.parse(
-                                        product.ingredients
-                                      );
+                                // Initialize edit modal states based on product data
+                                if (
+                                  product.has_recipe &&
+                                  product.ingredients
+                                ) {
+                                  try {
+                                    const ingredients = JSON.parse(
+                                      product.ingredients
+                                    );
 
-                                      // Check if this is a recipe-based product or custom ingredients
-                                      if (
-                                        ingredients.length > 0 &&
-                                        ingredients[0].productId
-                                      ) {
-                                        // Custom ingredients
-                                        setEditUseCustomIngredients(true);
-                                        setEditCustomIngredients(ingredients);
-                                        setEditRecipeIngredients([]);
-                                      } else {
-                                        // Recipe ingredients - convert to the format expected by editRecipeIngredients
-                                        const processedIngredients =
-                                          ingredients.map((ing: any) => ({
-                                            name: ing.name,
-                                            quantity: ing.quantity.toString(),
-                                            unit: ing.unit,
-                                            requiredQuantity:
-                                              ing.requiredQuantity || 1,
-                                            availableStock:
-                                              ing.availableStock || 0,
-                                            stock: ing.stock || 0,
-                                          }));
-                                        setEditRecipeIngredients(
-                                          processedIngredients
-                                        );
-                                        setEditUseCustomIngredients(false);
-                                        setEditCustomIngredients([]);
-
-                                        // Store original quantities for difference calculation
-                                        const originalQuantities: {
-                                          [ingredientName: string]: number;
-                                        } = {};
-                                        ingredients.forEach((ing: any) => {
-                                          originalQuantities[ing.name] =
-                                            ing.requiredQuantity || 1;
-                                        });
-                                        setOriginalIngredientQuantities(
-                                          originalQuantities
-                                        );
-
-                                        // Try to find matching recipe
-                                        const matchingRecipe = recipesData.find(
-                                          (recipe) => {
-                                            try {
-                                              const recipeIngredients =
-                                                recipe.ingredients;
-                                              return (
-                                                JSON.stringify(ingredients) ===
-                                                JSON.stringify(
-                                                  recipeIngredients
-                                                )
-                                              );
-                                            } catch {
-                                              return false;
-                                            }
-                                          }
-                                        );
-                                        if (matchingRecipe) {
-                                          setSelectedEditRecipeId(
-                                            matchingRecipe.id.toString()
-                                          );
-                                        }
-                                      }
-                                    } catch (error) {
-                                      console.error(
-                                        "Error parsing product ingredients:",
-                                        error
-                                      );
-                                      // Reset states on error
+                                    // Check if this is a recipe-based product or custom ingredients
+                                    if (
+                                      ingredients.length > 0 &&
+                                      ingredients[0].productId
+                                    ) {
+                                      // Custom ingredients
+                                      setEditUseCustomIngredients(true);
+                                      setEditCustomIngredients(ingredients);
                                       setEditRecipeIngredients([]);
+                                    } else {
+                                      // Recipe ingredients - convert to the format expected by editRecipeIngredients
+                                      const processedIngredients =
+                                        ingredients.map((ing: any) => ({
+                                          name: ing.name,
+                                          quantity: ing.quantity.toString(),
+                                          unit: ing.unit,
+                                          requiredQuantity:
+                                            ing.requiredQuantity || 1,
+                                          availableStock:
+                                            ing.availableStock || 0,
+                                          stock: ing.stock || 0,
+                                        }));
+                                      setEditRecipeIngredients(
+                                        processedIngredients
+                                      );
                                       setEditUseCustomIngredients(false);
                                       setEditCustomIngredients([]);
+
+                                      // Store original quantities for difference calculation
+                                      const originalQuantities: {
+                                        [ingredientName: string]: number;
+                                      } = {};
+                                      ingredients.forEach((ing: any) => {
+                                        originalQuantities[ing.name] =
+                                          ing.requiredQuantity || 1;
+                                      });
+                                      setOriginalIngredientQuantities(
+                                        originalQuantities
+                                      );
+
+                                      // Try to find matching recipe
+                                      const matchingRecipe = recipesData.find(
+                                        (recipe) => {
+                                          try {
+                                            const recipeIngredients =
+                                              recipe.ingredients;
+                                            return (
+                                              JSON.stringify(ingredients) ===
+                                              JSON.stringify(
+                                                recipeIngredients
+                                              )
+                                            );
+                                          } catch {
+                                            return false;
+                                          }
+                                        }
+                                      );
+                                      if (matchingRecipe) {
+                                        setSelectedEditRecipeId(
+                                          matchingRecipe.id.toString()
+                                        );
+                                      }
                                     }
-                                  } else {
-                                    // Reset states for products without recipes
+                                  } catch (error) {
+                                    console.error(
+                                      "Error parsing product ingredients:",
+                                      error
+                                    );
+                                    // Reset states on error
                                     setEditRecipeIngredients([]);
                                     setEditUseCustomIngredients(false);
                                     setEditCustomIngredients([]);
-                                    setSelectedEditRecipeId("");
                                   }
+                                } else {
+                                  // Reset states for products without recipes
+                                  setEditRecipeIngredients([]);
+                                  setEditUseCustomIngredients(false);
+                                  setEditCustomIngredients([]);
+                                  setSelectedEditRecipeId("");
+                                }
 
-                                  // Reset other edit modal states
-                                  setEditCustomIngredientName("");
-                                  setEditIngredientQuantity("");
-                                  setEditIngredientUnit("ml");
-                                  setEditIngredientRequiredQuantity(1);
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
+                                // Reset other edit modal states
+                                setEditCustomIngredientName("");
+                                setEditIngredientQuantity("");
+                                setEditIngredientUnit("ml");
+                                setEditIngredientRequiredQuantity(1);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
-                            )}
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-64">
-                                <div className="space-y-2">
-                                  <p className="text-sm">
-                                    ¿Eliminar este producto?
-                                  </p>
-                                  <div className="flex justify-end gap-2">
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      onClick={() =>
-                                        deleteProductFromList(product.id)
-                                      }
-                                      disabled={isDeleting}
-                                    >
-                                      {isDeleting ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        "Eliminar"
-                                      )}
-                                    </Button>
-                                  </div>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64">
+                              <div className="space-y-2">
+                                <p className="text-sm">
+                                  ¿Eliminar este producto?
+                                </p>
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() =>
+                                      deleteProductFromList(product.id)
+                                    }
+                                    disabled={isDeleting}
+                                  >
+                                    {isDeleting ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      "Eliminar"
+                                    )}
+                                  </Button>
                                 </div>
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
@@ -3097,15 +3097,15 @@ export default function StockManagement() {
                           <Badge
                             className={cn(
                               calculateStatus(currentProduct.stock) ===
-                                "sufficient" && "bg-green-100 text-green-800",
+                              "sufficient" && "bg-green-100 text-green-800",
                               calculateStatus(currentProduct.stock) === "low" &&
-                                "bg-amber-100 text-amber-800",
+                              "bg-amber-100 text-amber-800",
                               calculateStatus(currentProduct.stock) === "out" &&
-                                "bg-red-100 text-red-800"
+                              "bg-red-100 text-red-800"
                             )}
                           >
                             {calculateStatus(currentProduct.stock) ===
-                            "sufficient"
+                              "sufficient"
                               ? "Suficiente"
                               : calculateStatus(currentProduct.stock) === "low"
                                 ? "Bajo"
@@ -3429,13 +3429,12 @@ export default function StockManagement() {
                                   <div className="flex justify-between items-center w-full">
                                     <span>{product.name}</span>
                                     <span
-                                      className={`text-xs px-1 py-0.5 rounded ${
-                                        product.stock > 10
+                                      className={`text-xs px-1 py-0.5 rounded ${product.stock > 10
                                           ? "bg-green-100 text-green-800"
                                           : product.stock > 0
                                             ? "bg-yellow-100 text-yellow-800"
                                             : "bg-red-100 text-red-800"
-                                      }`}
+                                        }`}
                                     >
                                       {product.stock}
                                     </span>
@@ -3603,11 +3602,10 @@ export default function StockManagement() {
                               )
                             }
                             disabled={ingredient.availableStock === 0}
-                            className={`h-10 text-center font-medium ${
-                              ingredient.availableStock === 0
+                            className={`h-10 text-center font-medium ${ingredient.availableStock === 0
                                 ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                                 : ""
-                            }`}
+                              }`}
                           />
                           <p className="text-xs text-gray-500 mt-1">
                             Total necesario: {totalRequired.toFixed(0)}{" "}
@@ -3634,7 +3632,7 @@ export default function StockManagement() {
                               {ingredient.availableStock *
                                 Number(ingredient?.quantity) -
                                 Number(ingredient.quantity) *
-                                  ingredient.requiredQuantity}{" "}
+                                ingredient.requiredQuantity}{" "}
                               missing
                             </p>
                           )}
@@ -4184,25 +4182,33 @@ export default function StockManagement() {
                             const foundProduct = productsData.find(
                               (product) => {
                                 if (product.type === "product") return false;
-                                if (!product.ingredients) return false;
-                                try {
-                                  const jsonIng =
-                                    typeof product.ingredients === "string"
-                                      ? JSON.parse(product.ingredients)
-                                      : product.ingredients;
-                                  return (
-                                    Array.isArray(jsonIng) &&
-                                    jsonIng.some(
-                                      (ing: any) => ing.name === ingredient.name
-                                    )
-                                  );
-                                } catch (error) {
-                                  return false;
+                                if (product.type === "recipe") {
+                                  try {
+                                    const jsonIng =
+                                      typeof product.ingredients === "string"
+                                        ? JSON.parse(product.ingredients)
+                                        : product.ingredients;
+                                    return (
+                                      Array.isArray(jsonIng) &&
+                                      jsonIng.some(
+                                        (ing: any) => ing.name === ingredient.name
+                                      )
+                                    );
+                                  } catch (error) {
+                                    return false;
+                                  }
+                                } else if (product.type === "ingredient") {
+                                  return product.name === ingredient.name;
                                 }
+                                return false;
                               }
                             );
 
-                            if (foundProduct && foundProduct.ingredients) {
+                            if (foundProduct && foundProduct.type === "ingredient") {
+                              return foundProduct.stock || 0;
+                            }
+
+                            if (foundProduct && foundProduct.ingredients && foundProduct.type === "recipe") {
                               try {
                                 const jsonIng =
                                   typeof foundProduct.ingredients === "string"
@@ -4739,11 +4745,11 @@ export default function StockManagement() {
                             className={cn(
                               "font-normal",
                               calculateStatus(product.stock) === "sufficient" &&
-                                "bg-green-50 text-green-700",
+                              "bg-green-50 text-green-700",
                               calculateStatus(product.stock) === "low" &&
-                                "bg-amber-50 text-amber-700",
+                              "bg-amber-50 text-amber-700",
                               calculateStatus(product.stock) === "out" &&
-                                "bg-red-50 text-red-700"
+                              "bg-red-50 text-red-700"
                             )}
                           >
                             {product.stock}{" "}
@@ -4969,13 +4975,12 @@ export default function StockManagement() {
                           )}
                           {validation && (
                             <div
-                              className={`text-xs mt-1 ${
-                                validation.status === "valid"
+                              className={`text-xs mt-1 ${validation.status === "valid"
                                   ? "text-green-600"
                                   : validation.status === "insufficient_stock"
                                     ? "text-orange-600"
                                     : "text-red-600"
-                              }`}
+                                }`}
                             >
                               {validation.message}
                             </div>
