@@ -426,6 +426,30 @@ const Stock = () => {
           unit: ing.unit,
           productId: ing.productId,
         }));
+      } else {
+        // Check if we're creating a product using an ingredient-type product
+        const selectedIngredient = productsData.find(
+          (product) =>
+            product.type === "ingredient" &&
+            product.id.toString() === selectedRecipeId
+        );
+
+        if (selectedIngredient && selectedRecipeId && selectedRecipeId !== "no-recipe") {
+          // Create ingredient records from ingredient-type product
+          const ingredientRecords = createIngredientRecordsFromIngredientProducts(
+            selectedRecipeId,
+            newProduct.name || "",
+            newProduct.description || "",
+            newProduct.stock || 1,
+            ingredientRequiredQuantity
+          );
+
+          if (ingredientRecords) {
+            ingredientsData = ingredientRecords;
+            // Set has_recipe to true so the product stores ingredient information
+            newProduct.has_recipe = true;
+          }
+        }
       }
 
       // Prepare product data
@@ -435,7 +459,8 @@ const Stock = () => {
         updated_at: new Date().toISOString(),
         has_recipe:
           (newProduct.has_recipe && recipeIngredients.length > 0) ||
-          (useCustomIngredients && customIngredients.length > 0),
+          (useCustomIngredients && customIngredients.length > 0) ||
+          (ingredientsData && ingredientsData.length > 0), // Include ingredient-type products
         ingredients: ingredientsData ? JSON.stringify(ingredientsData) : null,
       };
 
@@ -510,6 +535,65 @@ const Stock = () => {
       return parseFloat(conversionMatch[1]);
     }
     return 1; // Default conversion factor
+  };
+
+  // Helper function to extract quantity and unit from product description
+  const extractQuantityAndUnitFromDescription = (description: string): { quantity: string; unit: string } => {
+    // Try to extract patterns like "500ml", "2kg", "100g", "1.5L", etc.
+    const quantityUnitMatch = description.match(/(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/);
+    if (quantityUnitMatch) {
+      return {
+        quantity: quantityUnitMatch[1],
+        unit: quantityUnitMatch[2].toLowerCase()
+      };
+    }
+
+    // Fallback: try to extract just numbers and assume default unit
+    const quantityMatch = description.match(/(\d+(?:\.\d+)?)/);
+    if (quantityMatch) {
+      return {
+        quantity: quantityMatch[1],
+        unit: "ml" // Default unit
+      };
+    }
+
+    // Default values if nothing found
+    return {
+      quantity: "1",
+      unit: "unidad"
+    };
+  };
+
+  // Function to create ingredient records when using ingredient-type products
+  const createIngredientRecordsFromIngredientProducts = (
+    selectedIngredientId: string,
+    productName: string,
+    productDescription: string,
+    amountToCreate: number,
+    cantidadACrear: number
+  ) => {
+    const selectedIngredient = productsData.find(
+      (product) =>
+        product.type === "ingredient" &&
+        product.id.toString() === selectedIngredientId
+    );
+
+    if (!selectedIngredient) {
+      return null;
+    }
+
+    // Extract quantity and unit from product description
+    const { quantity, unit } = extractQuantityAndUnitFromDescription(productDescription || "");
+
+    // Create ingredient record
+    const ingredientRecord = {
+      name: productName, // Use product name as ingredient name
+      quantity: quantity,
+      unit: unit,
+      requiredQuaantity: cantidadACrear // Set availableStock to the "Cantidad a crear" amount
+    };
+
+    return [ingredientRecord];
   };
 
   // Recipe handling functions
