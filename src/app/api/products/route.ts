@@ -48,7 +48,8 @@ export const POST = async (req: Request) => {
                 type: body.type || 'product', // Default type is "product"
                 has_recipe: body.has_recipe || false,
                 ingredients: body.ingredients || null,
-                is_liquid: body.is_liquid || false
+                is_liquid: body.is_liquid || false,
+                total_amount: body.total_amount || null
             }])
         if (error) {
             throw error;
@@ -65,19 +66,59 @@ export const POST = async (req: Request) => {
 export const PUT = async (req: Request) => {
     try {
         // Parse the request body
-        const {id, ...body} = await req.json();
+        const {id, operation, stock, ...body} = await req.json();
+
+        let updateData = body;
+
+        // Handle stock deduction operation
+        if (operation === 'deduct' && stock !== undefined) {
+            // First, get the current product data including total_amount
+            const { data: currentProduct, error: fetchError } = await supabaseServerClient
+                .from('products')
+                .select('stock, total_amount, type, is_liquid')
+                .eq('id', id)
+                .single();
+
+            if (fetchError) {
+                throw fetchError;
+            }
+
+            // For ingredient-type liquid products, only deduct from total_amount (not stock)
+            // The stock represents containers/bottles, total_amount represents actual liquid volume
+            if (currentProduct.type === 'ingredient' && currentProduct.is_liquid && currentProduct.total_amount) {
+                const deductionAmount = Math.abs(stock); // Convert to positive for deduction
+                const newTotalAmount = currentProduct.total_amount - deductionAmount;
+
+                if (newTotalAmount < 0) {
+                    throw new Error(`Insufficient total amount. Available: ${currentProduct.total_amount}, Required: ${deductionAmount}`);
+                }
+
+                // For liquid ingredients, only update total_amount, keep stock (container count) unchanged
+                updateData = { ...body, total_amount: newTotalAmount };
+            } else {
+                // For regular products, deduct from stock as usual
+                const newStock = currentProduct.stock + stock;
+
+                if (newStock < 0) {
+                    throw new Error(`Insufficient stock. Available: ${currentProduct.stock}, Required: ${Math.abs(stock)}`);
+                }
+
+                updateData = { ...body, stock: newStock };
+            }
+        }
+
         const { data, error } = await supabaseServerClient
             .from('products')
-            .update(body)
+            .update(updateData)
             .eq('id', id);
 
         if (error) {
             throw error;
         }
 
-        return NextResponse.json(data, { status: 200 }); // Return the updated user
+        return NextResponse.json(data, { status: 200 }); // Return the updated product
     } catch (error: any) {
-        console.error('Error updating user:', error.message);
+        console.error('Error updating product:', error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 };

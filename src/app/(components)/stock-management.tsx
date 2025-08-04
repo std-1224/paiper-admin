@@ -67,6 +67,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+// import RecipeBuilder from "./recipe-builder";
 
 export default function StockManagement() {
   // State management
@@ -408,6 +409,7 @@ export default function StockManagement() {
     has_recipe: false,
     is_liquid: false,
   });
+  const [amountPerUnit, setAmountPerUnit] = useState<number>(0);
 
   const { productsData, fetchProducts, recipesData, fetchRecipes } =
     useAppContext();
@@ -1620,17 +1622,23 @@ export default function StockManagement() {
         );
 
         if (matchingIngredient) {
-          // Calculate total required quantity: requiredQuantity per unit * number of products
-          const totalRequiredQuantity = matchingIngredient.requiredQuantity * productAmount;
-
-          // Use the original ingredient's availableStock from database, not from UI state
+          // For recipe-type products: deduct requiredQuantity from availableStock
+          // requiredQuantity already represents the total amount needed for this ingredient
           const currentAvailableStock = originalIng.availableStock || 0;
+          const requiredQuantity = matchingIngredient.requiredQuantity || 1;
+
+          console.log(`🔄 Deducting for ingredient ${originalIng.name}:`, {
+            currentAvailableStock,
+            requiredQuantity,
+            newAvailableStock: Math.max(0, currentAvailableStock - requiredQuantity)
+          });
+
           // Update only the availableStock, preserve all other properties
           return {
             ...originalIng,
             availableStock: Math.max(
               0,
-              currentAvailableStock - totalRequiredQuantity
+              currentAvailableStock - requiredQuantity
             ),
           };
         }
@@ -2145,6 +2153,12 @@ export default function StockManagement() {
         }
       }
 
+      // Calculate total_amount for ingredient-type products
+      let totalAmount = null;
+      if (newProduct.type === "ingredient") {
+        totalAmount = (newProduct.stock || 0) * amountPerUnit;
+      }
+
       const response = await fetch(`/api/products`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2157,6 +2171,7 @@ export default function StockManagement() {
             (useCustomIngredients && customIngredients.length > 0) ||
             (ingredientsData && ingredientsData.length > 0), // Include ingredient-type products
           ingredients: ingredientsData ? JSON.stringify(ingredientsData) : null,
+          total_amount: totalAmount,
         }),
       });
 
@@ -2212,6 +2227,7 @@ export default function StockManagement() {
         has_recipe: false,
         is_liquid: false,
       });
+      setAmountPerUnit(0);
       setImageFile(null);
 
       // Reset recipe states
@@ -3844,8 +3860,57 @@ export default function StockManagement() {
                     }
                   />
                 </div>
-                {/* Show total amount for liquid products */}
-                {newProduct.is_liquid && (
+
+                {/* Total Amount Calculation Display - Show when ingredient type is enabled */}
+                {newProduct.type === "ingredient" && (
+                  <div className="rounded-lg border p-3 bg-blue-50">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-blue-900">
+                        Cálculo de Cantidad Total
+                      </Label>
+
+                      {/* Amount per unit input */}
+                      <div className="space-y-2">
+                        <Label htmlFor="amount_per_unit" className="text-sm">
+                          Cantidad por unidad {newProduct.is_liquid ? "(ml)" : ""}
+                        </Label>
+                        <Input
+                          id="amount_per_unit"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={amountPerUnit === 0 ? "" : amountPerUnit}
+                          placeholder="Ej: 500 ml por botella"
+                          onChange={(e) => setAmountPerUnit(parseFloat(e.target.value) || 0)}
+                          className="h-9"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Stock:</span>
+                          <span className="ml-2 font-medium">{newProduct.stock || 0} unidades</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Cantidad por unidad:</span>
+                          <span className="ml-2 font-medium">{amountPerUnit} {newProduct.is_liquid ? "ml" : ""}</span>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-blue-200">
+                        <span className="text-blue-900 font-semibold">
+                          Total Amount: {((newProduct.stock || 0) * amountPerUnit)}
+                          {newProduct.is_liquid ? " ml" : " unidades"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-blue-700">
+                        Este valor se guardará como total_amount en la base de datos
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show total amount for liquid products (existing recipe logic) */}
+                {newProduct.is_liquid && recipeIngredients.length > 0 && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -3936,7 +4001,10 @@ export default function StockManagement() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowAddProductModal(false)}
+              onClick={() => {
+                setShowAddProductModal(false);
+                setAmountPerUnit(0);
+              }}
             >
               Cancelar
             </Button>
@@ -4998,237 +5066,19 @@ export default function StockManagement() {
               Crea una receta que se puede vincular a productos del menú
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="recipe-name">Nombre de la Receta</Label>
-                <Input
-                  id="recipe-name"
-                  placeholder="Ej: Mojito, Margarita..."
-                  value={newRecipe.name}
-                  onChange={(e) =>
-                    setNewRecipe({ ...newRecipe, name: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="recipe-category">Categoría</Label>
-                <Select
-                  value={newRecipe.category}
-                  onValueChange={(value) =>
-                    setNewRecipe({ ...newRecipe, category: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bebida">Bebida</SelectItem>
-                    <SelectItem value="comida">Comida</SelectItem>
-                    <SelectItem value="postre">Postre</SelectItem>
-                    <SelectItem value="aperitivo">Aperitivo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+          {/* <div className="max-h-[60vh] overflow-y-auto">
+            <RecipeBuilder
+              recipeName={newRecipe.name}
+              setRecipeName={(name) => setNewRecipe({ ...newRecipe, name })}
+              category={newRecipe.category}
+              setCategory={(category) => setNewRecipe({ ...newRecipe, category })}
+              ingredients={newRecipe.ingredients}
+              setIngredients={(ingredients) => setNewRecipe({ ...newRecipe, ingredients })}
+              isLoading={isLoading}
+            />
+          </div> */}
 
-            {/* Ingredients List */}
-            <div className="space-y-2">
-              <Label>Ingredientes</Label>
-              {newRecipe.ingredients.length > 0 && (
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {newRecipe.ingredients.map((ingredient, index) => {
-                    const validation = ingredientValidation.find(
-                      (v) => v.ingredient === ingredient.name
-                    );
-                    return (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-2 bg-muted rounded"
-                      >
-                        <div className="flex-1">
-                          <span className="text-sm">
-                            {ingredient.name} - {ingredient.quantity}{" "}
-                            {ingredient.unit}
-                          </span>
-                          {ingredient?.availableStock && (
-                            <div className="text-xs text-gray-600 mt-1">
-                              Stock disponible: {ingredient.availableStock}
-                            </div>
-                          )}
-                          {validation && (
-                            <div
-                              className={`text-xs mt-1 ${validation.status === "valid"
-                                  ? "text-green-600"
-                                  : validation.status === "insufficient_stock"
-                                    ? "text-orange-600"
-                                    : "text-red-600"
-                                }`}
-                            >
-                              {validation.message}
-                            </div>
-                          )}
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            handleRemoveIngredientFromRecipe(index)
-                          }
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
 
-            {/* Add Ingredient Form */}
-            <div className="border-t pt-4">
-              <Label className="mb-2 block">Agregar Ingrediente</Label>
-              <div className="space-y-3">
-                <div className="grid grid-cols-12 gap-2">
-                  <div className="col-span-5">
-                    <Label className="text-xs text-gray-600 mb-1 block">
-                      Ingrediente
-                    </Label>
-                    <Select
-                      value={newIngredient.name}
-                      onValueChange={(value) =>
-                        setNewIngredient({ ...newIngredient, name: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar ingrediente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Ginebra">Ginebra</SelectItem>
-                        <SelectItem value="Vodka">Vodka</SelectItem>
-                        <SelectItem value="Tónica">Tónica</SelectItem>
-                        <SelectItem value="Ron">Ron</SelectItem>
-                        <SelectItem value="Tequila">Tequila</SelectItem>
-                        <SelectItem value="Limón">Limón</SelectItem>
-                        <SelectItem value="Azúcar">Azúcar</SelectItem>
-                        <SelectItem value="Menta">Menta</SelectItem>
-                        <SelectItem value="Hielo">Hielo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-3">
-                    <Label className="text-xs text-gray-600 mb-1 block">
-                      Cantidad
-                    </Label>
-                    <Input
-                      type="number"
-                      placeholder="Cantidad"
-                      value={newIngredient.quantity}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (
-                          value === "" ||
-                          (Number(value) >= 0 && !value.includes("-"))
-                        ) {
-                          setNewIngredient({
-                            ...newIngredient,
-                            quantity: value,
-                          });
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (
-                          e.key === "-" ||
-                          e.key === "+" ||
-                          e.key === "e" ||
-                          e.key === "E"
-                        ) {
-                          e.preventDefault();
-                        }
-                      }}
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs text-gray-600 mb-1 block">
-                      Unidad
-                    </Label>
-                    <Select
-                      value={newIngredient.unit}
-                      onValueChange={(value) =>
-                        setNewIngredient({ ...newIngredient, unit: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="g">Grams (g)</SelectItem>
-                        <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                        <SelectItem value="ml">Milliliters (mL)</SelectItem>
-                        <SelectItem value="L">Liters (L)</SelectItem>
-                        <SelectItem value="unidad">Units</SelectItem>
-                        <SelectItem value="parts">Parts</SelectItem>
-                        <SelectItem value="cups">Cups</SelectItem>
-                        <SelectItem value="tbsp">Tablespoons</SelectItem>
-                        <SelectItem value="tsp">Teaspoons</SelectItem>
-                        <SelectItem value="hojas">Leaves</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="w-full mt-5"
-                      onClick={handleAddIngredientToRecipe}
-                      disabled={!newIngredient.name || !newIngredient.quantity}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="col-span-2">
-                    <Label className="text-xs text-gray-600 mb-1 block">
-                      Stock Disponible
-                    </Label>
-                    <Input
-                      type="number"
-                      placeholder="Stock disponible"
-                      value={newIngredient.availableStock}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (
-                          value === "" ||
-                          (Number(value) >= 0 && !value.includes("-"))
-                        ) {
-                          setNewIngredient({
-                            ...newIngredient,
-                            availableStock: value,
-                          });
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (
-                          e.key === "-" ||
-                          e.key === "+" ||
-                          e.key === "e" ||
-                          e.key === "E"
-                        ) {
-                          e.preventDefault();
-                        }
-                      }}
-                      min="0"
-                      step="1"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
           <DialogFooter>
             <Button
               variant="outline"
@@ -5276,211 +5126,19 @@ export default function StockManagement() {
               Crea una receta que se vinculará al producto que estás editando
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="recipe-name-edit">Nombre de la Receta</Label>
-                <Input
-                  id="recipe-name-edit"
-                  placeholder="Ej: Mojito, Margarita..."
-                  value={newRecipe.name}
-                  onChange={(e) =>
-                    setNewRecipe({ ...newRecipe, name: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="recipe-category-edit">Categoría</Label>
-                <Select
-                  value={newRecipe.category}
-                  onValueChange={(value) =>
-                    setNewRecipe({ ...newRecipe, category: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bebida">Bebida</SelectItem>
-                    <SelectItem value="comida">Comida</SelectItem>
-                    <SelectItem value="postre">Postre</SelectItem>
-                    <SelectItem value="entrada">Entrada</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Add Ingredient Section */}
-            <div className="space-y-3 border rounded-lg p-4">
-              <Label className="text-sm font-medium">Agregar Ingrediente</Label>
-              <div className="space-y-3">
-                <div className="grid grid-cols-12 gap-2">
-                  <div className="col-span-5">
-                    <Label className="text-xs text-gray-600 mb-1 block">
-                      Ingrediente
-                    </Label>
-                    <Input
-                      placeholder="Nombre del ingrediente"
-                      value={newIngredient.name}
-                      onChange={(e) =>
-                        setNewIngredient({
-                          ...newIngredient,
-                          name: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <Label className="text-xs text-gray-600 mb-1 block">
-                      Cantidad
-                    </Label>
-                    <Input
-                      type="number"
-                      placeholder="Cantidad"
-                      value={newIngredient.quantity}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (
-                          value === "" ||
-                          (Number(value) >= 0 && !value.includes("-"))
-                        ) {
-                          setNewIngredient({
-                            ...newIngredient,
-                            quantity: value,
-                          });
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (
-                          e.key === "-" ||
-                          e.key === "+" ||
-                          e.key === "e" ||
-                          e.key === "E"
-                        ) {
-                          e.preventDefault();
-                        }
-                      }}
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs text-gray-600 mb-1 block">
-                      Unidad
-                    </Label>
-                    <Select
-                      value={newIngredient.unit}
-                      onValueChange={(value) =>
-                        setNewIngredient({ ...newIngredient, unit: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="g">Grams (g)</SelectItem>
-                        <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                        <SelectItem value="ml">Milliliters (mL)</SelectItem>
-                        <SelectItem value="L">Liters (L)</SelectItem>
-                        <SelectItem value="unidad">Units</SelectItem>
-                        <SelectItem value="parts">Parts</SelectItem>
-                        <SelectItem value="cups">Cups</SelectItem>
-                        <SelectItem value="tbsp">Tablespoons</SelectItem>
-                        <SelectItem value="tsp">Teaspoons</SelectItem>
-                        <SelectItem value="hojas">Leaves</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="w-full mt-5"
-                      onClick={handleAddIngredientToRecipe}
-                      disabled={!newIngredient.name || !newIngredient.quantity}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="col-span-2">
-                    <Label className="text-xs text-gray-600 mb-1 block">
-                      Stock Disponible
-                    </Label>
-                    <Input
-                      type="number"
-                      placeholder="Stock disponible"
-                      value={newIngredient.availableStock}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (
-                          value === "" ||
-                          (Number(value) >= 0 && !value.includes("-"))
-                        ) {
-                          setNewIngredient({
-                            ...newIngredient,
-                            availableStock: value,
-                          });
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (
-                          e.key === "-" ||
-                          e.key === "+" ||
-                          e.key === "e" ||
-                          e.key === "E"
-                        ) {
-                          e.preventDefault();
-                        }
-                      }}
-                      min="0"
-                      step="1"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Ingredients List */}
-            {newRecipe.ingredients.length > 0 && (
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">
-                  Ingredientes de la Receta
-                </Label>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {newRecipe.ingredients.map((ingredient, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <span className="font-medium">{ingredient.name}</span>
-                          <span className="text-sm text-gray-600">
-                            {ingredient.quantity} {ingredient.unit}
-                          </span>
-                        </div>
-                        {ingredient.availableStock && (
-                          <div className="text-xs text-gray-600 mt-1">
-                            Stock disponible: {ingredient.availableStock}
-                          </div>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveIngredientFromRecipe(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div className="max-h-[60vh] overflow-y-auto">
+            {/* <RecipeBuilder
+              recipeName={newRecipe.name}
+              setRecipeName={(name) => setNewRecipe({ ...newRecipe, name })}
+              category={newRecipe.category}
+              setCategory={(category) => setNewRecipe({ ...newRecipe, category })}
+              ingredients={newRecipe.ingredients}
+              setIngredients={(ingredients) => setNewRecipe({ ...newRecipe, ingredients })}
+              isLoading={isLoading}
+            /> */}
           </div>
+
+
           <DialogFooter>
             <Button
               variant="outline"

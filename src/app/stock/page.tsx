@@ -181,6 +181,7 @@ const Stock = () => {
     has_recipe: false,
     is_liquid: false,
   });
+  const [amountPerUnit, setAmountPerUnit] = useState<number>(0);
 
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
@@ -454,6 +455,12 @@ const Stock = () => {
         }
       }
 
+      // Calculate total_amount for ingredient-type products
+      let totalAmount = null;
+      if (newProduct.type === "ingredient") {
+        totalAmount = (newProduct.stock || 0) * amountPerUnit;
+      }
+
       // Prepare product data
       const productData = {
         ...newProduct,
@@ -464,6 +471,7 @@ const Stock = () => {
           (useCustomIngredients && customIngredients.length > 0) ||
           (ingredientsData && ingredientsData.length > 0), // Include ingredient-type products
         ingredients: ingredientsData ? JSON.stringify(ingredientsData) : null,
+        total_amount: totalAmount,
       };
 
       const response = await fetch(`/api/products`, {
@@ -1121,13 +1129,23 @@ const Stock = () => {
         );
 
         if (matchingIngredient) {
+          // For recipe-type products: deduct requiredQuantity from availableStock
+          // requiredQuantity already represents the total amount needed for this ingredient
+          const currentAvailableStock = originalIng.availableStock || 0;
+          const requiredQuantity = matchingIngredient.requiredQuantity || 1;
+
+          console.log(`🔄 Deducting for ingredient ${originalIng.name}:`, {
+            currentAvailableStock,
+            requiredQuantity,
+            newAvailableStock: Math.max(0, currentAvailableStock - requiredQuantity)
+          });
+
           // Update only the availableStock, preserve all other properties
           return {
             ...originalIng,
             availableStock: Math.max(
               0,
-              matchingIngredient.availableStock -
-                matchingIngredient.requiredQuantity
+              currentAvailableStock - requiredQuantity
             ),
           };
         }
@@ -1224,7 +1242,10 @@ const Stock = () => {
       purchase_price: 0,
       sale_price: 0,
       has_recipe: false,
+      type: "product",
+      is_liquid: false,
     });
+    setAmountPerUnit(0);
     setSelectedRecipeId("");
     setRecipeIngredients([]);
     setUseCustomIngredients(false);
@@ -2959,6 +2980,100 @@ const Stock = () => {
               </div>
             )}
 
+              {/* Toggle Fields */}
+            <div className="space-y-4 border rounded-lg p-4">
+              <div className="space-y-4">
+                <h3 className="text-base font-semibold">Configuración del Producto</h3>
+
+                {/* Liquid Product Toggle */}
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">
+                      ¿Es este un producto líquido?
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Los productos líquidos mostrarán el total de cantidad agregada como ingrediente
+                    </p>
+                  </div>
+                  <Switch
+                    checked={newProduct.is_liquid || false}
+                    onCheckedChange={(checked) =>
+                      setNewProduct({ ...newProduct, is_liquid: checked })
+                    }
+                  />
+                </div>
+
+                {/* Ingredient Type Toggle */}
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">
+                      ¿Usar este producto como ingrediente en recetas?
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Este producto estará disponible para seleccionar como ingrediente al crear recetas
+                    </p>
+                  </div>
+                  <Switch
+                    checked={newProduct.type === "ingredient"}
+                    onCheckedChange={(checked) =>
+                      setNewProduct({
+                        ...newProduct,
+                        type: checked ? "ingredient" : "product"
+                      })
+                    }
+                  />
+                </div>
+
+                {/* Total Amount Calculation Display - Show when ingredient type is enabled */}
+                {newProduct.type === "ingredient" && (
+                  <div className="rounded-lg border p-3 bg-blue-50">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-blue-900">
+                        Cálculo de Cantidad Total
+                      </Label>
+
+                      {/* Amount per unit input */}
+                      <div className="space-y-2">
+                        <Label htmlFor="amount_per_unit" className="text-sm">
+                          Cantidad por unidad {newProduct.is_liquid ? "(ml)" : ""}
+                        </Label>
+                        <Input
+                          id="amount_per_unit"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={amountPerUnit === 0 ? "" : amountPerUnit}
+                          placeholder="Ej: 500 ml por botella"
+                          onChange={(e) => setAmountPerUnit(parseFloat(e.target.value) || 0)}
+                          className="h-9"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Stock:</span>
+                          <span className="ml-2 font-medium">{newProduct.stock || 0} unidades</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Cantidad por unidad:</span>
+                          <span className="ml-2 font-medium">{amountPerUnit} {newProduct.is_liquid ? "ml" : ""}</span>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-blue-200">
+                        <span className="text-blue-900 font-semibold">
+                          Total Amount: {((newProduct.stock || 0) * amountPerUnit)}
+                          {newProduct.is_liquid ? " ml" : " unidades"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-blue-700">
+                        Este valor se guardará como total_amount en la base de datos
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="description">Descripción</Label>
               <Textarea
@@ -3025,53 +3140,6 @@ const Stock = () => {
               />
             </div>
 
-            {/* Toggle Fields */}
-            <div className="space-y-4 border rounded-lg p-4">
-              <div className="space-y-4">
-                <h3 className="text-base font-semibold">Configuración del Producto</h3>
-
-                {/* Liquid Product Toggle */}
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">
-                      ¿Es este un producto líquido?
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Los productos líquidos mostrarán el total de cantidad agregada como ingrediente
-                    </p>
-                  </div>
-                  <Switch
-                    checked={newProduct.is_liquid || false}
-                    onCheckedChange={(checked) =>
-                      setNewProduct({ ...newProduct, is_liquid: checked })
-                    }
-                  />
-                </div>
-
-                {/* Ingredient Type Toggle */}
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">
-                      ¿Usar este producto como ingrediente en recetas?
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Este producto estará disponible para seleccionar como ingrediente al crear recetas
-                    </p>
-                  </div>
-                  <Switch
-                    checked={newProduct.type === "ingredient"}
-                    onCheckedChange={(checked) =>
-                      setNewProduct({
-                        ...newProduct,
-                        type: checked ? "ingredient" : "product"
-                      })
-                    }
-                  />
-                </div>
-
-
-              </div>
-            </div>
           </div>
           <DialogFooter>
             <Button

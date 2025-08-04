@@ -261,6 +261,7 @@ export interface Product {
 	is_pr?: boolean;
 	is_courtsey?: boolean;
 	is_liquid?: boolean; // Toggle for liquid products
+	total_amount?: number; // Total amount calculated as (total amount * stock) for ingredient-type products
 }
 
 export interface CartItem extends Product {
