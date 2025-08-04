@@ -1327,22 +1327,22 @@ export default function StockManagement() {
       return;
     }
 
-    if (matchingProduct) {
-      if (matchingProduct.stock < requiredQuantity) {
-        toast.error(
-          `Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${ingredientUnit}\nDisponible: ${matchingProduct.stock}`
-        );
-        return;
-      }
-    } else {
-      // Warn if no matching product found
-      const confirmAdd = confirm(
-        `No se encontró un producto en stock que coincida con "${ingredientName}".\n¿Deseas agregar este ingrediente de todas formas?`
-      );
-      if (!confirmAdd) {
-        return;
-      }
-    }
+    // if (matchingProduct) {
+    //   if (matchingProduct.stock < requiredQuantity) {
+    //     toast.error(
+    //       `Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${ingredientUnit}\nDisponible: ${matchingProduct.stock}`
+    //     );
+    //     return;
+    //   }
+    // } else {
+    //   // Warn if no matching product found
+    //   const confirmAdd = confirm(
+    //     `No se encontró un producto en stock que coincida con "${ingredientName}".\n¿Deseas agregar este ingrediente de todas formas?`
+    //   );
+    //   if (!confirmAdd) {
+    //     return;
+    //   }
+    // }
 
     setCustomIngredients([
       ...customIngredients,
