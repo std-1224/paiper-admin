@@ -176,6 +176,8 @@ export default function StockManagement() {
   const [ingredientQuantity, setIngredientQuantity] = useState<string>("");
   const [ingredientUnit, setIngredientUnit] = useState<string>("ml");
 
+  let amountToCreate = 0;
+
   // Recipe selection states for edit modal
   const [selectedEditRecipeId, setSelectedEditRecipeId] = useState<string>("");
   const [showCreateRecipeDialogEdit, setShowCreateRecipeDialogEdit] =
@@ -404,6 +406,7 @@ export default function StockManagement() {
     sale_price: 0,
     type: "product", // Default type is "product"
     has_recipe: false,
+    is_liquid: false,
   });
 
   const { productsData, fetchProducts, recipesData, fetchRecipes } =
@@ -1103,8 +1106,6 @@ export default function StockManagement() {
       console.error("Error parsing recipe ingredients:", error);
       return;
     }
-
-    console.log("ingredients: ", ingredients);
 
     // Set recipe ingredients with their individual available stock
     const ingredientsWithStock = ingredients.map((ingredient: any) => {
@@ -2207,7 +2208,9 @@ export default function StockManagement() {
         image_url: "",
         purchase_price: 0,
         sale_price: 0,
+        type: "product",
         has_recipe: false,
+        is_liquid: false,
       });
       setImageFile(null);
 
@@ -3280,8 +3283,7 @@ export default function StockManagement() {
                             key={`ingredient-${ingredient.id}`}
                             value={ingredient.id.toString()}
                           >
-                            {ingredient.name} ({ingredient.category}) -
-                            Ingrediente
+                            {ingredient.name} ({ingredient.category}) - Ingrediente
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -3313,6 +3315,8 @@ export default function StockManagement() {
                         const totalRequired =
                           ingredientRequiredQuantity * conversionFactor;
                         const hasEnoughStock = totalAmount >= totalRequired;
+
+
 
                         return (
                           <div className="mt-4 space-y-4">
@@ -3562,6 +3566,15 @@ export default function StockManagement() {
                     ingredientes se descontarán automáticamente.
                   </p>
 
+                  {/* Calculate total amount needed across all ingredients */}
+                  {(() => {
+                    amountToCreate = recipeIngredients.reduce((total, ingredient) => {
+                      const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
+                      return total + totalRequired;
+                    }, 0);
+                    return null;
+                  })()}
+
                   {recipeIngredients.map((ingredient, index) => {
                     const totalAmount =
                       parseFloat(ingredient.quantity) *
@@ -3573,7 +3586,7 @@ export default function StockManagement() {
 
                     return (
                       <div
-                        key={index}
+                        key={`${ingredient.name}-${index}`}
                         className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border rounded-lg"
                       >
                         <div>
@@ -3782,6 +3795,76 @@ export default function StockManagement() {
                 Al agregar este producto, los ingredientes se descontarán
                 automáticamente del stock.
               </p>
+            </div>
+
+            {/* Toggle Fields */}
+            <div className="space-y-4 border rounded-lg p-4">
+              <div className="space-y-4">
+                <h3 className="text-base font-semibold">Configuración del Producto</h3>
+
+                {/* Liquid Product Toggle */}
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">
+                      ¿Es este un producto líquido?
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Los productos líquidos mostrarán el total de cantidad agregada como ingrediente
+                    </p>
+                  </div>
+                  <Switch
+                    checked={newProduct.is_liquid || false}
+                    onCheckedChange={(checked) =>
+                      setNewProduct({ ...newProduct, is_liquid: checked })
+                    }
+                  />
+                </div>
+
+
+
+
+
+                {/* Ingredient Type Toggle */}
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">
+                      ¿Usar este producto como ingrediente en recetas?
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Este producto estará disponible para seleccionar como ingrediente al crear recetas
+                    </p>
+                  </div>
+                  <Switch
+                    checked={newProduct.type === "ingredient"}
+                    onCheckedChange={(checked) =>
+                      setNewProduct({
+                        ...newProduct,
+                        type: checked ? "ingredient" : "product"
+                      })
+                    }
+                  />
+                </div>
+                {/* Show total amount for liquid products */}
+                {newProduct.is_liquid && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-medium text-blue-800">
+                         Total Liquid Product
+                        </h3>
+                        <p className="text-xs text-blue-600 mt-1">
+                          Suma total de todos los ingredientes requeridos
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-blue-900">
+                          {amountToCreate.toFixed(0)} ml
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">

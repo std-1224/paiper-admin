@@ -177,7 +177,9 @@ const Stock = () => {
     image_url: "",
     purchase_price: 0,
     sale_price: 0,
+    type: "product", // Default type is "product"
     has_recipe: false,
+    is_liquid: false,
   });
 
   const [showAddProductModal, setShowAddProductModal] = useState(false);
@@ -2514,7 +2516,7 @@ const Stock = () => {
                             value={ingredient.id.toString()}
                           >
                             {ingredient.name} ({ingredient.category}) -
-                            Ingrediente
+                            {ingredient.type === "ingredient" ? "Ingrediente" : "Ingrediente-Tipo"}
                           </SelectItem>
                         ))}
                     </SelectContent>
@@ -2649,8 +2651,9 @@ const Stock = () => {
                             {productsData
                               .filter(
                                 (product) =>
-                                  product.category === "ingrediente" &&
-                                  product.has_recipe === false
+                                  (product.category === "ingrediente" &&
+                                    product.has_recipe === false) ||
+                                  product.type === "ingredient"
                               )
                               .sort((a, b) => b.stock - a.stock)
                               .map((product) => (
@@ -3020,6 +3023,54 @@ const Stock = () => {
                   })
                 }
               />
+            </div>
+
+            {/* Toggle Fields */}
+            <div className="space-y-4 border rounded-lg p-4">
+              <div className="space-y-4">
+                <h3 className="text-base font-semibold">Configuración del Producto</h3>
+
+                {/* Liquid Product Toggle */}
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">
+                      ¿Es este un producto líquido?
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Los productos líquidos mostrarán el total de cantidad agregada como ingrediente
+                    </p>
+                  </div>
+                  <Switch
+                    checked={newProduct.is_liquid || false}
+                    onCheckedChange={(checked) =>
+                      setNewProduct({ ...newProduct, is_liquid: checked })
+                    }
+                  />
+                </div>
+
+                {/* Ingredient Type Toggle */}
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">
+                      ¿Usar este producto como ingrediente en recetas?
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Este producto estará disponible para seleccionar como ingrediente al crear recetas
+                    </p>
+                  </div>
+                  <Switch
+                    checked={newProduct.type === "ingredient"}
+                    onCheckedChange={(checked) =>
+                      setNewProduct({
+                        ...newProduct,
+                        type: checked ? "ingredient" : "product"
+                      })
+                    }
+                  />
+                </div>
+
+
+              </div>
             </div>
           </div>
           <DialogFooter>

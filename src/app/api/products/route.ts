@@ -47,7 +47,8 @@ export const POST = async (req: Request) => {
                 sale_price: body.sale_price,
                 type: body.type || 'product', // Default type is "product"
                 has_recipe: body.has_recipe || false,
-                ingredients: body.ingredients || null
+                ingredients: body.ingredients || null,
+                is_liquid: body.is_liquid || false
             }])
         if (error) {
             throw error;

@@ -260,6 +260,7 @@ export interface Product {
 	is_active?: boolean;
 	is_pr?: boolean;
 	is_courtsey?: boolean;
+	is_liquid?: boolean; // Toggle for liquid products
 }
 
 export interface CartItem extends Product {
