@@ -219,7 +219,7 @@ export default function RecipeConfiguration() {
       // For liquid ingredient-type products, check stock availability differently
       if (isLiquidIngredient) {
         // For liquid ingredients, the stock represents the total liquid amount available
-        if (matchingProduct?.total_amount < availableStock) {
+        if (matchingProduct?.total_amount && matchingProduct?.total_amount < Number(availableStock)) {
           alert(`Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${unit}\nDisponible: ${matchingProduct.stock} ${unit}`);
           return;
         }
