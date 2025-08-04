@@ -1171,6 +1171,18 @@ export default function StockManagement() {
 
   // Function to check if there's enough stock for all edit recipe ingredients
   const hasEnoughStockForAllEditIngredients = () => {
+    // Check custom ingredients if using custom ingredients
+    if (editUseCustomIngredients && editCustomIngredients.length > 0) {
+      return editCustomIngredients.every((ingredient) => {
+        const requiredQuantity = parseFloat(ingredient.quantity) * (editingProduct?.stock || 1);
+        const matchingProduct = productsData.find((p) => p.id === ingredient.productId);
+        if (!matchingProduct) return true; // If no matching product, assume it's okay
+        const availableStock = matchingProduct.is_liquid ? (matchingProduct.total_amount || 0) : (matchingProduct.stock || 0);
+        return availableStock >= requiredQuantity;
+      });
+    }
+
+    // Check recipe ingredients
     if (!editingProduct?.has_recipe || editRecipeIngredients.length === 0) {
       return true; // No recipe ingredients to check
     }
@@ -1796,6 +1808,103 @@ export default function StockManagement() {
     });
   };
 
+  // Add custom ingredient function for edit modal
+  const addEditCustomIngredient = () => {
+    let ingredientName = "";
+    let productId = undefined;
+    let matchingProduct = null;
+
+    if (selectedIngredient === "none") {
+      ingredientName = editCustomIngredientName;
+      // Try to find matching product for custom ingredient
+      matchingProduct = productsData.find(
+        (product) =>
+          product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
+          ingredientName.toLowerCase().includes(product.name.toLowerCase())
+      );
+    } else if (selectedIngredient && selectedIngredient !== "none") {
+      // selectedIngredient contains the product ID, find the product
+      matchingProduct = productsData.find(
+        (product) => product.id.toString() === selectedIngredient
+      );
+      if (matchingProduct) {
+        ingredientName = matchingProduct.name;
+        productId = matchingProduct.id;
+      } else {
+        // Fallback: treat selectedIngredient as product name
+        ingredientName = selectedIngredient;
+        matchingProduct = productsData.find(
+          (product) =>
+            product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
+            ingredientName.toLowerCase().includes(product.name.toLowerCase())
+        );
+        if (matchingProduct) {
+          productId = matchingProduct.id;
+        }
+      }
+    } else {
+      ingredientName = editCustomIngredientName;
+    }
+
+    if (matchingProduct && !productId) {
+      productId = matchingProduct.id;
+    }
+
+    // Validate that ingredient name and quantity are provided
+    if (!ingredientName.trim()) {
+      toast.error("Por favor ingresa el nombre del ingrediente");
+      return;
+    }
+    if (!editIngredientQuantity.trim()) {
+      toast.error("Por favor ingresa la cantidad del ingrediente");
+      return;
+    }
+
+    // Validate stock availability for this ingredient
+    const requiredQuantity = parseFloat(editIngredientQuantity);
+    if (isNaN(requiredQuantity) || requiredQuantity <= 0) {
+      toast.error("Por favor ingresa una cantidad válida");
+      return;
+    }
+
+    if (matchingProduct) {
+      const availableStock = matchingProduct.is_liquid ? (matchingProduct.total_amount || 0) : (matchingProduct.stock || 0);
+      if (availableStock < requiredQuantity) {
+        toast.error(
+          `Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${editIngredientUnit}\nDisponible: ${availableStock}`
+        );
+        return;
+      }
+    } else {
+      // Warn if no matching product found
+      const confirmAdd = confirm(
+        `No se encontró un producto en stock que coincida con "${ingredientName}".\n¿Deseas agregar este ingrediente de todas formas?`
+      );
+      if (!confirmAdd) {
+        return;
+      }
+    }
+
+    setEditCustomIngredients([
+      ...editCustomIngredients,
+      {
+        name: ingredientName.trim(),
+        quantity: editIngredientQuantity,
+        unit: editIngredientUnit,
+        productId: productId,
+      },
+    ]);
+    setSelectedIngredient("none");
+    setEditCustomIngredientName("");
+    setEditIngredientQuantity("");
+    setEditIngredientUnit("ml");
+  };
+
+  const removeEditCustomIngredient = (index: number) => {
+    const updatedIngredients = editCustomIngredients.filter((_, i) => i !== index);
+    setEditCustomIngredients(updatedIngredients);
+  };
+
   // Create recipe function for edit modal
   const handleCreateRecipeEdit = async () => {
     try {
@@ -2345,6 +2454,12 @@ export default function StockManagement() {
         });
       }
 
+      // Calculate total_amount for ingredient-type products
+      let totalAmount = null;
+      if (editingProduct.type === "ingredient") {
+        totalAmount = (editingProduct.stock || 0) * amountPerUnit;
+      }
+
       // SECOND: Update the product with new ingredient data
       const response = await fetch(`/api/products`, {
         method: "PUT",
@@ -2359,6 +2474,7 @@ export default function StockManagement() {
           ingredients: ingredientsData
             ? JSON.stringify(ingredientsData)
             : editingProduct.ingredients,
+          total_amount: totalAmount,
         }),
       });
 
@@ -2896,7 +3012,7 @@ export default function StockManagement() {
                           >
                             <Info className="h-4 w-4" />
                           </Button>
-                          {product.type === "product" && (
+                          {(product.type === "product" || (product.type === "ingredient" && product.is_liquid === true) )&& (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -2999,11 +3115,18 @@ export default function StockManagement() {
                                 setEditIngredientQuantity("");
                                 setEditIngredientUnit("ml");
                                 setEditIngredientRequiredQuantity(1);
+
+                                // Initialize amountPerUnit for ingredient-type products
+                                if (product.type === "ingredient" && product.total_amount && product.stock) {
+                                  setAmountPerUnit(product.total_amount / product.stock);
+                                } else {
+                                  setAmountPerUnit(0);
+                                }
                               }}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
-                          )}
+                           )}
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button variant="ghost" size="icon">
@@ -3909,7 +4032,7 @@ export default function StockManagement() {
                   </div>
                 )}
 
-                {/* Show total amount for liquid products (existing recipe logic) */}
+                {/* Show total amount for liquid products (existing recipe logic)
                 {newProduct.is_liquid && recipeIngredients.length > 0 && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
                     <div className="flex items-center justify-between">
@@ -3928,7 +4051,7 @@ export default function StockManagement() {
                       </div>
                     </div>
                   </div>
-                )}
+                )} */}
               </div>
             </div>
 
@@ -4093,9 +4216,11 @@ export default function StockManagement() {
                     <SelectValue placeholder="Seleccionar categoría" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="bebida">Bebida</SelectItem>
-                    <SelectItem value="comida">Comida</SelectItem>
-                    <SelectItem value="insumo">Insumo</SelectItem>
+                    {categoryList.map((category) => (
+                      <SelectItem key={category.value} value={category.value}>
+                        {category.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -4131,13 +4256,46 @@ export default function StockManagement() {
                 </Button>
               </div>
 
-              <Select
-                value={
-                  editingProduct?.has_recipe
-                    ? selectedEditRecipeId
-                    : "no-recipe"
-                }
-                onValueChange={handleEditRecipeSelection}
+              {/* Toggle between existing recipes and custom ingredients */}
+              <div className="flex gap-4">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="editIngredientType"
+                    checked={!editUseCustomIngredients}
+                    onChange={() => {
+                      setEditUseCustomIngredients(false);
+                      setEditCustomIngredients([]);
+                    }}
+                  />
+                  <span className="text-sm">Usar receta existente</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="editIngredientType"
+                    checked={editUseCustomIngredients}
+                    onChange={() => {
+                      setEditUseCustomIngredients(true);
+                      setSelectedEditRecipeId("");
+                      setEditRecipeIngredients([]);
+                    }}
+                  />
+                  <span className="text-sm">
+                    Agregar ingredientes individuales
+                  </span>
+                </label>
+              </div>
+
+              {!editUseCustomIngredients ? (
+                <>
+                  <Select
+                    value={
+                      editingProduct?.has_recipe
+                        ? selectedEditRecipeId
+                        : "no-recipe"
+                    }
+                    onValueChange={handleEditRecipeSelection}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar receta existente" />
@@ -4157,7 +4315,7 @@ export default function StockManagement() {
                     ))}
                   {/* Show Ingredients from productsData */}
                   {productsData
-                    .filter((product) => product.type === "ingredient")
+                    .filter((product) => product.type === "ingredient" && product.id.toString() !== editingProduct?.id.toString())
                     .map((ingredient) => (
                       <SelectItem
                         key={`ingredient-${ingredient.id}`}
@@ -4253,10 +4411,287 @@ export default function StockManagement() {
                   return null;
                 })()}
 
-              <p className="text-sm text-muted-foreground">
-                Si seleccionas una receta, el stock de los ingredientes se
-                descontará automáticamente cuando se haga un pedido.
-              </p>
+                  <p className="text-sm text-muted-foreground">
+                    Si seleccionas una receta, el stock de los ingredientes se
+                    descontará automáticamente cuando se haga un pedido.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">
+                      Agregar Ingredientes:
+                    </Label>
+
+                    {/* Ingredient Selection */}
+                    <div className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-4">
+                        <Label htmlFor="edit-ingredient" className="sr-only">
+                          Ingrediente
+                        </Label>
+                        <Select
+                          value={selectedIngredient}
+                          onValueChange={(value) =>
+                            setSelectedIngredient(value)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar ingrediente" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              Seleccionar ingrediente existente
+                            </SelectItem>
+                            {productsData
+                              .filter(
+                                (product) =>
+                                  (product.category === "ingrediente" &&
+                                    product.has_recipe === false) ||
+                                  product.type === "ingredient"
+                              )
+                              .sort((a, b) => b.stock - a.stock)
+                              .map((product) => (
+                                <SelectItem
+                                  key={product.id}
+                                  value={product.id.toString()}
+                                >
+                                  <div className="flex justify-between items-center w-full">
+                                    <span>{product.name}</span>
+                                    <span
+                                      className={`text-xs px-1 py-0.5 rounded ${
+                                        product.stock > 10
+                                          ? "bg-green-100 text-green-800"
+                                          : product.stock > 0
+                                            ? "bg-yellow-100 text-yellow-800"
+                                            : "bg-red-100 text-red-800"
+                                      }`}
+                                    >
+                                      {product.is_liquid ? product.total_amount : product.stock}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="text-center text-sm text-muted-foreground mt-1">
+                          o
+                        </div>
+                        <Input
+                          disabled={selectedIngredient !== "none"}
+                          placeholder="Escribir ingrediente personalizado"
+                          value={editCustomIngredientName}
+                          onChange={(e) =>
+                            setEditCustomIngredientName(e.target.value)
+                          }
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Label htmlFor="edit-quantity" className="sr-only">
+                          Cantidad
+                        </Label>
+                        <Input
+                          placeholder="Cantidad"
+                          value={editIngredientQuantity}
+                          onChange={(e) =>
+                            setEditIngredientQuantity(e.target.value)
+                          }
+                          type="number"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Label htmlFor="edit-unit" className="sr-only">
+                          Unidad
+                        </Label>
+                        <Select
+                          value={editIngredientUnit}
+                          onValueChange={(value) => setEditIngredientUnit(value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="g">Grams (g)</SelectItem>
+                            <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                            <SelectItem value="ml">Milliliters (mL)</SelectItem>
+                            <SelectItem value="L">Liters (L)</SelectItem>
+                            <SelectItem value="unidad">Units</SelectItem>
+                            <SelectItem value="parts">Parts</SelectItem>
+                            <SelectItem value="cups">Cups</SelectItem>
+                            <SelectItem value="tbsp">Tablespoons</SelectItem>
+                            <SelectItem value="tsp">Teaspoons</SelectItem>
+                            <SelectItem value="hojas">Leaves</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="w-full"
+                          onClick={addEditCustomIngredient}
+                          disabled={
+                            editIngredientQuantity.trim() === "" ||
+                            (selectedIngredient === "none" &&
+                              editCustomIngredientName.trim() === "") ||
+                            (selectedIngredient !== "none" &&
+                              selectedIngredient.trim() === "")
+                          }
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Display added custom ingredients */}
+                    {editCustomIngredients.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">
+                          Ingredientes agregados:
+                        </Label>
+                        {editCustomIngredients.map((ingredient, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                          >
+                            <span className="text-sm">
+                              {ingredient.name} - {ingredient.quantity}{" "}
+                              {ingredient.unit}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeEditCustomIngredient(index)}
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Toggle Fields for Edit Modal */}
+            <div className="space-y-4 border rounded-lg p-4">
+              <div className="space-y-4">
+                <h3 className="text-base font-semibold">Configuración del Producto</h3>
+
+                {/* Liquid Product Toggle */}
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">
+                      ¿Es este un producto líquido?
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Los productos líquidos mostrarán el total de cantidad agregada como ingrediente
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editingProduct?.is_liquid || false}
+                    onCheckedChange={(checked) =>
+                      setEditingProduct({ ...editingProduct!, is_liquid: checked })
+                    }
+                  />
+                </div>
+
+                {/* Ingredient Type Toggle */}
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">
+                      ¿Usar este producto como ingrediente en recetas?
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Este producto estará disponible para seleccionar como ingrediente al crear recetas
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editingProduct?.type === "ingredient"}
+                    onCheckedChange={(checked) =>
+                      setEditingProduct({
+                        ...editingProduct!,
+                        type: checked ? "ingredient" : "product"
+                      })
+                    }
+                  />
+                </div>
+
+                {/* Total Amount Calculation Display - Show when ingredient type is enabled */}
+                {editingProduct?.type === "ingredient" && (
+                  <div className="rounded-lg border p-3 bg-blue-50">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-blue-900">
+                        Cálculo de Cantidad Total
+                      </Label>
+
+                      {/* Amount per unit input */}
+                      <div className="space-y-2">
+                        <Label htmlFor="edit_amount_per_unit" className="text-sm">
+                          Cantidad por unidad {editingProduct?.is_liquid ? "(ml)" : ""}
+                        </Label>
+                        <Input
+                          id="edit_amount_per_unit"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={amountPerUnit === 0 ? "" : amountPerUnit}
+                          placeholder="Ej: 500 ml por botella"
+                          onChange={(e) => setAmountPerUnit(parseFloat(e.target.value) || 0)}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Stock:</span>
+                          <span className="ml-2 font-medium">{editingProduct?.stock || 0} unidades</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Cantidad por unidad:</span>
+                          <span className="ml-2 font-medium">{amountPerUnit} {editingProduct?.is_liquid ? "ml" : ""}</span>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-blue-200">
+                        <span className="text-blue-900 font-semibold">
+                          Total Amount: {((editingProduct?.stock || 0) * amountPerUnit)}
+                          {editingProduct?.is_liquid ? " ml" : " unidades"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-blue-700">
+                        Este valor se guardará como total_amount en la base de datos
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show total amount for liquid products (existing recipe logic) */}
+                {/* {editingProduct?.is_liquid && editRecipeIngredients.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-medium text-blue-800">
+                         Total Liquid Product
+                        </h3>
+                        <p className="text-xs text-blue-600 mt-1">
+                          Suma total de todos los ingredientes requeridos
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-blue-900">
+                          {editRecipeIngredients.reduce((total, ingredient) => {
+                            return total + (ingredient.requiredQuantity || 0);
+                          }, 0)} ml
+                        </p>
+                        <p className="text-xs text-blue-600">Total calculado</p>
+                      </div>
+                    </div>
+                  </div>
+                )} */}
+              </div>
             </div>
 
             {/* Recipe Ingredients Display for Edit */}
@@ -4685,11 +5120,17 @@ export default function StockManagement() {
                 <Input
                   id="edit-purchase_price"
                   type="number"
-                  value={editingProduct?.purchase_price || ""}
+                  value={
+                    editingProduct?.purchase_price === 0
+                      ? ""
+                      : editingProduct?.purchase_price
+                  }
+                  placeholder="0.00"
                   onChange={(e) =>
                     setEditingProduct({
                       ...editingProduct!,
-                      purchase_price: Number(e.target.value),
+                      purchase_price:
+                        e.target.value === "" ? 0 : Number(e.target.value),
                     })
                   }
                 />
@@ -4699,11 +5140,15 @@ export default function StockManagement() {
                 <Input
                   id="edit-sale_price"
                   type="number"
-                  value={editingProduct?.sale_price || ""}
+                  value={
+                    editingProduct?.sale_price === 0 ? "" : editingProduct?.sale_price
+                  }
+                  placeholder="0.00"
                   onChange={(e) =>
                     setEditingProduct({
                       ...editingProduct!,
-                      sale_price: Number(e.target.value),
+                      sale_price:
+                        e.target.value === "" ? 0 : Number(e.target.value),
                     })
                   }
                 />
