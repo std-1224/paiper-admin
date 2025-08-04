@@ -3799,7 +3799,7 @@ export default function StockManagement() {
                   })}
 
                   {/* Stock Warning Message */}
-                  {!hasEnoughStockForAllIngredients() && (
+                  {/* {!hasEnoughStockForAllIngredients() && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
                       <div className="flex items-start">
                         <div className="flex-shrink-0">
@@ -3829,7 +3829,7 @@ export default function StockManagement() {
                         </div>
                       </div>
                     </div>
-                  )}
+                  )} */}
 
                   {/* Add New Ingredient to Existing Recipe */}
                   <div className="border-t pt-4 mt-4">
@@ -4931,7 +4931,7 @@ export default function StockManagement() {
                 </div>
 
                 {/* Stock Warning Message for Edit */}
-                {!hasEnoughStockForAllEditIngredients() && (
+                {/* {!hasEnoughStockForAllEditIngredients() && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
                     <div className="flex items-start">
                       <div className="flex-shrink-0">
@@ -4961,7 +4961,7 @@ export default function StockManagement() {
                       </div>
                     </div>
                   </div>
-                )}
+                )} */}
 
                 {/* Add Custom Ingredient Button */}
                 <div className="border-t pt-4">
