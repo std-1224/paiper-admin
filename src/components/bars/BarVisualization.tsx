@@ -14,6 +14,8 @@ import { BarData } from "@/types/types";
 import { useAppContext } from "@/context/AppContext";
 import { TrashIcon } from "@radix-ui/react-icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 // Mock data para las barras
 // const barsData = [
@@ -41,6 +43,7 @@ interface BarVisualizationProps {
 }
 export function BarVisualization({ className }: BarVisualizationProps) {
   const router = useRouter();
+  const {user} = useAuth()
   const { barsData, qrCodesData, ordersData, staffData, stocksData, fetchBars, fetchQRCodes, fetchOrders, fetchStaff, fetchStocksOfBar } = useAppContext();
   const [statistics, setStatistics] = useState<Statistics[]>([]);
   const [selectedBarId, setSelectedBarId] = useState<string|null>(null);
@@ -170,6 +173,10 @@ export function BarVisualization({ className }: BarVisualizationProps) {
                   className="hover:text-red-600 absolute top-[2px] right-[2px] padding-0"
                   size="icon"
                   onClick={(e) => {
+                    if(user?.role === "client" || user?.role === "manager") {
+                      toast.error("No tienes permiso para eliminar barras");
+                      return;
+                    }
                     e.stopPropagation();
                     e.preventDefault();
                     handleDeleteOrder(bar?.id);
@@ -206,7 +213,13 @@ export function BarVisualization({ className }: BarVisualizationProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleViewBarDetail(bar?.id || "1")}
+                  onClick={() => {
+                    if(user?.role === "client" || user?.role === "manager") {
+                      toast.error("No tienes permiso para ver detalles de barras");
+                      return;
+                    }
+                    handleViewBarDetail(bar?.id || "1")
+                  }}
                 >
                   Ver Detalle
                 </Button>

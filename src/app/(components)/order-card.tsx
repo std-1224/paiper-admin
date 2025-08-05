@@ -40,6 +40,7 @@ import { shortenId } from "@/lib/utils";
 import Loading from "./loading";
 import { ProductSearchField } from "@/components/products/ProductSearchField";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 const STATUS_BADGE_CLASSES = {
   pending: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
@@ -289,7 +290,13 @@ export function OrderCard({
       ACTION_BUTTONS[order.status as keyof typeof ACTION_BUTTONS] || {};
     return (
       <Button
-        onClick={handleUpdateStatus}
+        onClick={() => {
+          if(user?.role === "barman" || user?.role === "client") {
+            toast.error("No tienes permiso para editar pedidos");
+            return;
+          }
+          handleUpdateStatus
+        }}
         className={`${config.className} w-[50%]`}
         disabled={
           isButtonDisabled ||
@@ -327,6 +334,10 @@ export function OrderCard({
               variant="ghost"
               size="icon"
               onClick={(e) => {
+                if(user?.role === "barman" || user?.role === "client") {
+                  toast.error("No tienes permiso para editar pedidos");
+                  return;
+                }
                 e.stopPropagation();
                 e.preventDefault();
                 setIsEditOpen(true);
@@ -339,6 +350,10 @@ export function OrderCard({
               className="hover:bg-red-600 hover:text-white"
               size="icon"
               onClick={(e) => {
+                if(user?.role === "barman" || user?.role === "client") {
+                  toast.error("No tienes permiso para editar pedidos");
+                  return;
+                }
                 e.stopPropagation();
                 e.preventDefault();
                 handleDeleteOrder(order.id);

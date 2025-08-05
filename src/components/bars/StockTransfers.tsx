@@ -33,6 +33,7 @@ import { ArrowRightLeft, AlertCircle, Info, Loader2 } from "lucide-react";
 import { MultiSelectBarsField } from "@/components/bars/MultiSelectBarsField";
 import { useAppContext } from "@/context/AppContext";
 import { StockControlInfo } from "@/components/stock/StockControlInfo";
+import { useAuth } from "@/context/AuthContext";
 
 // Mock data for bar stock items - would be replaced with real data from API
 const barStockItems = [
@@ -53,6 +54,7 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
   const [transferQuantities, setTransferQuantities] = useState<{
     [key: number]: number;
   }>({});
+  const {user} = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -359,7 +361,13 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
             variant="outline"
             size="sm"
             className="flex items-center gap-2"
-            onClick={handleSelectAll}
+            onClick={() => {
+              if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+                toast.error("No tienes permiso para transferir stock");
+                return;
+              }
+              handleSelectAll();
+            }}
           >
             <Checkbox
               checked={filteredStockItems.every(
@@ -489,7 +497,13 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
                     <Checkbox
                       checked={selectedItems[Number(item.id)] || false}
                       onCheckedChange={() =>
-                        handleSelectItem(Number(item.id), item.barId)
+                        {
+                          if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+                            toast.error("No tienes permiso para transferir stock");
+                            return;
+                          }
+                          handleSelectItem(Number(item.id), item.barId)
+                        }
                       }
                     />
                   </TableCell>

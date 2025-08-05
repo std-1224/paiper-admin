@@ -35,6 +35,7 @@ import { Recipe } from "@/types/types";
 import { useAppContext } from "@/context/AppContext";
 import { categoryList } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 export default function RecipeConfiguration() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -42,6 +43,7 @@ export default function RecipeConfiguration() {
   const [newIngredients, setNewIngredients] = useState<
     { name: string; quantity: string; unit: string; availableStock: number; productId?: string; isLiquid?: boolean }[]
   >([]);
+  const {user} = useAuth()
   const [recipeName, setRecipeName] = useState("");
   const [selectedIngredient, setSelectedIngredient] = useState("none");
   const [customIngredient, setCustomIngredient] = useState("");
@@ -438,6 +440,7 @@ export default function RecipeConfiguration() {
   };
 
   const updateRecipe = async () => {
+    console.log("updating")
     setLoading(true);
     // Convert amount to number, default to 0 if empty or invalid
     const numericAmount = amount === "" ? 0 : Number(amount);
@@ -572,12 +575,24 @@ export default function RecipeConfiguration() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => setShowAddIngredientModal(true)}
+            onClick={() => {
+              if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+                toast.error("No tienes permiso para agregar ingredientes");
+                return;
+              }
+              setShowAddIngredientModal(true)
+            }}
           >
             <Plus size={16} />
             Agregar Ingrediente
           </Button>
-          <Button className="gap-2" onClick={() => setShowAddRecipeModal(true)}>
+          <Button className="gap-2" onClick={() => {
+            if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+                toast.error("No tienes permiso para agregar ingredientes");
+                return;
+              }
+            setShowAddRecipeModal(true)
+            }}>
             <Cocktail size={16} />
             Añadir nueva receta
           </Button>
@@ -1210,7 +1225,13 @@ export default function RecipeConfiguration() {
             <Button variant="outline" onClick={handleInitRecipe}>
               Cancelar
             </Button>
-            <Button onClick={selectedRecipe ? updateRecipe : addNewRecipe}>
+            <Button onClick={() => {
+              if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+                toast.error("No tienes permiso para agregar ingredientes");
+                return;
+              }
+              selectedRecipe ? updateRecipe() : addNewRecipe()
+              }}>
               {loading ? (
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

@@ -1806,7 +1806,12 @@ const Stock = () => {
 
               <Button
                 variant="outline"
-                onClick={() => setStockAdjustmentOpen(true)}
+                onClick={() => {
+                  if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+                    toast.error("No tienes permiso para ajustar stock");
+                    return;
+                  }
+                  setStockAdjustmentOpen(true)}}
                 className="flex items-center gap-2"
               >
                 <PackagePlus className="h-4 w-4" />
@@ -2003,7 +2008,13 @@ const Stock = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleAssignStock(product)}
+                                  onClick={() => {
+                                    if (user?.role === "barman" || user?.role === "client") {
+                                      toast.error("No tienes permiso para ajustar stock");
+                                      return;
+                                    }
+                                    handleAssignStock(product)
+                                  }}
                                 >
                                   <ArrowRightLeft className="mr-2 h-4 w-4" />
                                   Asignar
@@ -2012,8 +2023,14 @@ const Stock = () => {
                                   variant="outline"
                                   size="sm"
                                   className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                                  onClick={() => handleAdjustStock(product)}
-                                >
+                                  onClick={() => {
+                                    if (user?.role === "barman" || user?.role === "client") {
+                                      toast.error("No tienes permiso para ajustar stock");
+                                      return;
+                                    }
+                                    handleAdjustStock(product)
+                                  }}
+                                >         
                                   <PackagePlus className="mr-2 h-4 w-4" />
                                   Ajustar
                                 </Button>
@@ -2021,7 +2038,13 @@ const Stock = () => {
                                   variant="outline"
                                   size="sm"
                                   className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                                  onClick={() => handleDeleteClick(product)}
+                                  onClick={() => {
+                                    if (user?.role === "barman" || user?.role === "manager" || user?.role === "client") {
+                                      toast.error("No tienes permiso para eliminar productos");
+                                      return;
+                                    }
+                                    handleDeleteClick(product)
+                                  }}
                                   disabled={deletingProductId === item.id}
                                 >
                                   {deletingProductId === item.id ? (

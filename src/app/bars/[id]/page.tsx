@@ -47,6 +47,8 @@ import { useAppContext } from "@/context/AppContext";
 import { format } from "date-fns";
 import { PAYMENT_BADGE_CLASSES } from "@/app/(components)/order-card";
 import { get } from "http";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 // Mock data for bars
 const sampleBar = {
@@ -73,7 +75,7 @@ const BarDetail = () => {
   const [productToAdd, setProductToAdd] = useState<Product | null>(null);
 
   const [stockAddOpen, setStockAddOpen] = useState(false);
-
+  const {user} = useAuth();
 
 
   const {
@@ -243,7 +245,12 @@ const BarDetail = () => {
             Volver
           </Link>
         </Button>
-        <Button className="mr-2" onClick={() => handleAdjustStock()}>
+        <Button className="mr-2" onClick={() =>{ 
+          if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+            toast.error("No tienes permiso para ajustar stock");
+            return;
+          }
+          handleAdjustStock()}}>
           <PackagePlus className="mr-2 h-4 w-4" />
           Ajustar Stock
         </Button>
@@ -550,7 +557,13 @@ const BarDetail = () => {
                               <Button
                                 variant="destructive"
                                 size="sm"
-                                onClick={() => handleDeleteQr(qr.id)}
+                                onClick={() => {
+                                  if (user?.role === "client" || user?.role === "manager") {
+                                    toast.error("No tienes permiso para eliminar códigos QR");
+                                    return;
+                                  }
+                                  handleDeleteQr(qr.id)
+                                }}
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Eliminar
@@ -576,7 +589,12 @@ const BarDetail = () => {
                 <Button
                   size="sm"
                   className="ml-auto"
-                  onClick={() => handleAdjustStock()}
+                  onClick={() => {
+                    if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+                      toast.error("No tienes permiso para ajustar stock");
+                      return;
+                    }
+                    handleAdjustStock()}}
                 >
                   <PackagePlus className="mr-2 h-4 w-4" />
                   Ajustar Stock

@@ -890,6 +890,10 @@ export default function QrTracking() {
                   key={qr.id}
                   className="cursor-pointer hover:bg-muted/50 dark:hover:bg-gray-800/50"
                   onClick={(e) => {
+                    if (user?.role === "client") {
+                      return;
+                    }
+                    e.stopPropagation();
                     if (!(e.target instanceof HTMLButtonElement)) {
                       handleQrClick(qr);
                     }
@@ -1018,6 +1022,14 @@ export default function QrTracking() {
                                 className="text-xs"
                                 disabled={deletingQrId === qr.id}
                                 onClick={(e) => {
+                                  if(user?.role === "client" || user?.role === "manager") {
+                                    toast({
+                                      title: "Error",
+                                      description: "No tienes permiso para eliminar códigos QR.",
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
                                   e.stopPropagation();
                                   handleDeleteQr(qr.id);
                                 }}
