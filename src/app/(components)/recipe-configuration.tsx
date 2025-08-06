@@ -62,8 +62,6 @@ export default function RecipeConfiguration() {
   const [newIngredientUnit, setNewIngredientUnit] = useState("");
   const [newIngredientConversionFactor, setNewIngredientConversionFactor] = useState("");
   const [newIngredientDefaultStock, setNewIngredientDefaultStock] = useState("");
-  const [newIngredientMinimumAlert, setNewIngredientMinimumAlert] = useState("");
-  const [newIngredientActive, setNewIngredientActive] = useState(true);
   const [addingIngredient, setAddingIngredient] = useState(false);
 
   const filteredRecipes = recipesData.filter((recipe) =>
@@ -425,8 +423,6 @@ export default function RecipeConfiguration() {
       setNewIngredientUnit("");
       setNewIngredientConversionFactor("");
       setNewIngredientDefaultStock("");
-      setNewIngredientMinimumAlert("");
-      setNewIngredientActive(true);
       setShowAddIngredientModal(false);
 
       // Refresh products data
@@ -1321,33 +1317,6 @@ export default function RecipeConfiguration() {
                 onChange={(e) => setNewIngredientDefaultStock(e.target.value)}
                 type="number"
                 className="w-full"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="minimumAlert" className="text-sm font-medium">
-                Minimum Stock Alert
-              </Label>
-              <Input
-                id="minimumAlert"
-                placeholder="Enter the minimum alert amount"
-                value={newIngredientMinimumAlert}
-                onChange={(e) => setNewIngredientMinimumAlert(e.target.value)}
-                type="number"
-                className="w-full"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label className="text-sm font-medium">Active Ingredient</Label>
-                <p className="text-xs text-gray-500">
-                  Activate to mark this ingredient as active in your inventory
-                </p>
-              </div>
-              <Switch
-                checked={newIngredientActive}
-                onCheckedChange={setNewIngredientActive}
               />
             </div>
           </div>
