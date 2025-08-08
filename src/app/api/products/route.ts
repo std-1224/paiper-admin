@@ -66,12 +66,15 @@ export const POST = async (req: Request) => {
 export const PUT = async (req: Request) => {
     try {
         // Parse the request body
-        const {id, operation, stock, ...body} = await req.json();
+        const requestData = await req.json();
+        const {id, operation, ...body} = requestData;
+
+        console.log('PUT /api/products - Request data:', requestData);
 
         let updateData = body;
 
         // Handle stock deduction operation
-        if (operation === 'deduct' && stock !== undefined) {
+        if (operation === 'deduct' && body.stock !== undefined) {
             // First, get the current product data including total_amount
             const { data: currentProduct, error: fetchError } = await supabaseServerClient
                 .from('products')
@@ -86,7 +89,7 @@ export const PUT = async (req: Request) => {
             // For ingredient-type liquid products, only deduct from total_amount (not stock)
             // The stock represents containers/bottles, total_amount represents actual liquid volume
             if (currentProduct.type === 'ingredient' && currentProduct.is_liquid && currentProduct.total_amount) {
-                const deductionAmount = Math.abs(stock); // Convert to positive for deduction
+                const deductionAmount = Math.abs(body.stock); // Convert to positive for deduction
                 const newTotalAmount = currentProduct.total_amount - deductionAmount;
 
                 if (newTotalAmount < 0) {
@@ -97,20 +100,25 @@ export const PUT = async (req: Request) => {
                 updateData = { ...body, total_amount: newTotalAmount };
             } else {
                 // For regular products, deduct from stock as usual
-                const newStock = currentProduct.stock + stock;
+                const newStock = currentProduct.stock + body.stock;
 
                 if (newStock < 0) {
-                    throw new Error(`Insufficient stock. Available: ${currentProduct.stock}, Required: ${Math.abs(stock)}`);
+                    throw new Error(`Insufficient stock. Available: ${currentProduct.stock}, Required: ${Math.abs(body.stock)}`);
                 }
 
                 updateData = { ...body, stock: newStock };
             }
         }
 
+        console.log('PUT /api/products - Update data:', updateData);
+
         const { data, error } = await supabaseServerClient
             .from('products')
             .update(updateData)
-            .eq('id', id);
+            .eq('id', id)
+            .select(); // Add select() to return the updated data
+
+        console.log('PUT /api/products - Supabase response:', {data, error});
 
         if (error) {
             throw error;

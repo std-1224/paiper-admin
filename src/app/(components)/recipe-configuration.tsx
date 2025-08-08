@@ -41,9 +41,26 @@ export default function RecipeConfiguration() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddRecipeModal, setShowAddRecipeModal] = useState(false);
   const [newIngredients, setNewIngredients] = useState<
-    { name: string; quantity: string; unit: string; availableStock: number; productId?: string; isLiquid?: boolean }[]
+    {
+      name: string;
+      productId?: string | null; // Allow null for custom ingredients
+      // Standard Ingredient fields
+      quantity?: string; // ingredient amount (extracted from description)
+      unit?: string;
+      from_available_stock?: number; // ingredient stock
+      deduct_stock?: number; // value set in "Stock Disponible" field
+      stock?: number; // calculated stock after deduction (for standard ingredients) or custom stock
+      // Product Ingredient fields
+      from_total_amount?: number; // product ingredient total_amount
+      deduct_amount?: number; // value set in "Cantidad" field
+      // Custom Ingredient fields
+      amount?: string; // custom ingredient amount
+      // Type flags
+      isStandardIngredient?: boolean;
+      isProductIngredient?: boolean;
+    }[]
   >([]);
-  const {user} = useAuth()
+  const { user } = useAuth()
   const [recipeName, setRecipeName] = useState("");
   const [selectedIngredient, setSelectedIngredient] = useState("none");
   const [customIngredient, setCustomIngredient] = useState("");
@@ -97,12 +114,22 @@ export default function RecipeConfiguration() {
 
   // Helper function to extract unit from description
   const extractUnitFromDescription = (description: string): string => {
-    // Extract unit from description like "Unit: L, Conversion: 500g per unit"
+    // Extract unit from description like "Unit: g, Conversion: 700g per unit"
     const unitMatch = description.match(/Unit:\s*([^,]+)/i);
     if (unitMatch) {
       return unitMatch[1].trim();
     }
     return "unidad"; // Default unit
+  };
+
+  // Helper function to extract conversion amount from description
+  const extractConversionAmountFromDescription = (description: string): string => {
+    // Extract conversion amount from description like "Unit: g, Conversion: 700g per unit"
+    const conversionMatch = description.match(/Conversion:\s*(\d+(?:\.\d+)?)[a-zA-Z]*\s*per\s*unit/i);
+    if (conversionMatch) {
+      return conversionMatch[1].trim();
+    }
+    return "1"; // Default amount
   };
 
   useEffect(() => {
@@ -197,39 +224,43 @@ export default function RecipeConfiguration() {
       return;
     }
 
-    // Check if this is a liquid ingredient-type product
-    // Only mark as liquid if explicitly set to true (not null or undefined)
-    const isLiquidIngredient = matchingProduct &&
-      (matchingProduct.type === 'ingredient' || matchingProduct.category === 'ingrediente') &&
+    // Check if this is a standard ingredient (type=ingredient AND is_liquid=false)
+    const isStandardIngredient = matchingProduct &&
+      matchingProduct.type === 'ingredient' &&
+      matchingProduct.is_liquid === false;
+
+    // Check if this is a product ingredient (type=ingredient AND is_liquid=true)
+    const isProductIngredient = matchingProduct &&
+      matchingProduct.type === 'ingredient' &&
       matchingProduct.is_liquid === true;
-    console.log("matchingProduct: ", matchingProduct)
-    console.log(`Adding ingredient:`, {
-      ingredientName,
-      matchingProduct: matchingProduct ? {
-        id: matchingProduct.id,
-        name: matchingProduct.name,
-        type: matchingProduct.type,
-        category: matchingProduct.category,
-        is_liquid: matchingProduct.is_liquid
-      } : null,
-      isLiquidIngredient
-    });
 
     if (matchingProduct) {
-      // For liquid ingredient-type products, check stock availability differently
-      if (isLiquidIngredient) {
-        // For liquid ingredients, the stock represents the total liquid amount available
-        if (matchingProduct?.total_amount && matchingProduct?.total_amount < Number(availableStock)) {
-          alert(`Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${unit}\nDisponible: ${matchingProduct.stock} ${unit}`);
+      // Check stock availability based on ingredient type
+      if (isProductIngredient) {
+        // For product ingredients, check against total_amount
+        const availableAmount = matchingProduct.total_amount || 0;
+        if (availableAmount < requiredQuantity) {
+          alert(`Stock insuficiente para ${ingredientName} (Product Ingredient):\nRequerido: ${requiredQuantity} ${unit}\nDisponible: ${availableAmount} ${unit}`);
           return;
         }
-      } else {
-        // For regular ingredients, use existing logic
-        if (matchingProduct.stock < requiredQuantity) {
-          alert(`Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${unit}\nDisponible: ${matchingProduct.stock}`);
+      } if (isStandardIngredient) {
+        // For standard ingredients, the quantity represents the amount per unit from description
+        // Since the quantity field is auto-populated and disabled, we just need 1 unit
+        const unitsNeeded = 1; // Always 1 unit for standard ingredients
+
+        if (matchingProduct.stock < Number(availableStock)) {
+          alert(`Stock insuficiente para ${ingredientName} (Standard Ingredient):\nRequerido: ${unitsNeeded} unidad (${requiredQuantity} ${unit})\nDisponible: ${matchingProduct.stock} unidades`);
           return;
         }
-      }
+      } 
+      // else {
+      //   console.log("t")
+      //   // For other types, use existing logic
+      //   if (matchingProduct.stock < requiredQuantity) {
+      //     alert(`Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${unit}\nDisponible: ${matchingProduct.stock}`);
+      //     return;
+      //   }
+      // }
     } else {
       // Warn if no matching product found
       const confirmAdd = confirm(`No se encontró un producto en stock que coincida con "${ingredientName}".\n¿Deseas agregar este ingrediente de todas formas?`);
@@ -238,23 +269,63 @@ export default function RecipeConfiguration() {
       }
     }
 
-    // For liquid ingredient-type products, use the total_amount instead of stock
+    // Set the final available stock based on ingredient type
     let finalAvailableStock = parseInt(availableStock) || 1;
-    if (isLiquidIngredient && matchingProduct) {
-      // For liquid ingredients, use total_amount if available, otherwise fall back to stock
-      finalAvailableStock = matchingProduct.total_amount || matchingProduct.stock;
+    if (matchingProduct) {
+      if (isProductIngredient) {
+        // For product ingredients, use total_amount
+        finalAvailableStock = matchingProduct.total_amount || 0;
+      } else if (isStandardIngredient) {
+        // finalQuantity = String(availableStock);
+        // For standard ingredients, use stock
+        finalAvailableStock = matchingProduct.stock;
+      } else {
+        // For other types, use stock
+        finalAvailableStock = matchingProduct.stock;
+      }
+    }
+
+    // Create ingredient object based on type
+    let newIngredient;
+
+    if (isStandardIngredient) {
+      newIngredient = {
+        productId: productId,
+        name: ingredientName.trim(),
+        quantity, // ingredient amount (extracted from description)
+        unit: unit, // extracted from description
+        from_available_stock: matchingProduct?.stock || 0, // ingredient stock
+        deduct_stock: parseInt(availableStock) || 0, // value set in "Stock Disponible" field
+        stock: (matchingProduct?.stock || 0) - (parseInt(availableStock) || 0), // calculated stock after deduction
+        isProductIngredient: false,
+        isStandardIngredient: true
+      };
+    } else if (isProductIngredient) {
+      newIngredient = {
+        productId: productId,
+        name: ingredientName.trim(),
+        from_total_amount: matchingProduct?.total_amount || 0, // product ingredient total_amount
+        deduct_amount: parseFloat(quantity) || 0, // value set in "Cantidad" field
+        unit: unit,
+        isProductIngredient: true,
+        isStandardIngredient: false
+      };
+    } else {
+      // Custom ingredient
+      newIngredient = {
+        productId: null, // Custom ingredients don't have a productId
+        name: ingredientName.trim(),
+        amount: quantity, // custom ingredient amount
+        unit: unit,
+        stock: finalAvailableStock, // custom ingredient stock
+        isProductIngredient: false,
+        isStandardIngredient: false
+      };
     }
 
     setNewIngredients([
       ...newIngredients,
-      {
-        name: ingredientName.trim(),
-        quantity: quantity,
-        unit: unit,
-        availableStock: finalAvailableStock,
-        productId: productId,
-        isLiquid: !!isLiquidIngredient // Add flag to track liquid ingredients
-      },
+      newIngredient,
     ]);
     setSelectedIngredient("none");
     setCustomIngredient("");
@@ -263,47 +334,99 @@ export default function RecipeConfiguration() {
     setAvailableStock("1");
   };
 
-  // Helper function to deduct stock for liquid ingredients
-  const deductLiquidIngredientStock = async (ingredient: any, multiplier: number = 1) => {
-    if (!ingredient.productId || !ingredient.isLiquid) return;
+  // Helper function to deduct stock for ingredients based on their type
+  const deductIngredientStock = async (ingredient: any, multiplier: number = 1) => {
+    // Custom ingredients don't need deduction system - skip them
+    if (!ingredient.productId || (!ingredient.isStandardIngredient && !ingredient.isProductIngredient)) {
+      console.log(`Skipping deduction for custom ingredient: ${ingredient.name}`);
+      return;
+    }
 
     try {
-      // For liquid ingredient-type products, deduct the portion used in the recipe
-      // multiplied by the multiplier (for recipe amount increases)
-      const quantityUsedInRecipe = parseFloat(ingredient.quantity) || 1;
-      const deductionAmount = quantityUsedInRecipe * multiplier;
+      let newValue;
+      let deductionField;
+      let currentValue;
 
-      console.log(`Attempting to deduct stock for liquid ingredient:`, {
+      // Determine the deduction logic based on ingredient type
+      if (ingredient.isStandardIngredient) {
+        // Standard Ingredient: Find the product by productId and get current stock
+        const product = productsData.find(p => p.id === ingredient.productId);
+        if (!product) {
+          throw new Error(`Product not found for ingredient: ${ingredient.name}`);
+        }
+
+        currentValue = product.stock || 0; // Use current product stock from database
+        newValue = currentValue - (ingredient.deduct_stock * multiplier);
+        deductionField = "stock";
+
+        console.log(`Standard ingredient deduction:`, {
+          productId: ingredient.productId,
+          productName: product.name,
+          currentProductStock: currentValue,
+          deductAmount: ingredient.deduct_stock,
+          multiplier,
+          newStock: newValue
+        });
+
+        // Update the ingredient's stock field as well
+        ingredient.stock = newValue;
+      } else if (ingredient.isProductIngredient) {
+        // Product Ingredient: Find the product by productId and get current total_amount
+        const product = productsData.find(p => p.id === ingredient.productId);
+        if (!product) {
+          throw new Error(`Product not found for ingredient: ${ingredient.name}`);
+        }
+
+        currentValue = product.total_amount || 0; // Use current product total_amount from database
+        newValue = currentValue - (ingredient.deduct_amount * multiplier);
+        deductionField = "total_amount";
+      }
+
+      console.log(`Deducting ${deductionField} for ingredient:`, {
         name: ingredient.name,
         productId: ingredient.productId,
-        isLiquid: ingredient.isLiquid,
-        quantityUsedInRecipe,
+        isProductIngredient: ingredient.isProductIngredient,
+        isStandardIngredient: ingredient.isStandardIngredient,
+        currentValue,
+        deductAmount: ingredient.isStandardIngredient ? ingredient.deduct_stock : ingredient.deduct_amount,
         multiplier,
-        deductionAmount,
-        note: `Deducting ${quantityUsedInRecipe} × ${multiplier} = ${deductionAmount}`
+        newValue,
+        deductionField,
+        calculation: `${currentValue} - (${ingredient.isStandardIngredient ? ingredient.deduct_stock : ingredient.deduct_amount} × ${multiplier}) = ${newValue}`
       });
+
+      // Prepare the request body with the new calculated value
+      const requestBody: any = {
+        id: ingredient.productId
+      };
+
+      // Set the appropriate field with the new calculated value
+      if (deductionField === "total_amount") {
+        requestBody.total_amount = newValue;
+      } else {
+        requestBody.stock = newValue;
+      }
+
+      console.log("Sending API request:", requestBody);
 
       const response = await fetch("/api/products", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          id: ingredient.productId,
-          stock: -deductionAmount, // Negative value to deduct
-          operation: "deduct"
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
         console.error("API Error Response:", errorData);
-        throw new Error(`Failed to deduct stock for liquid ingredient: ${ingredient.name}. ${errorData.error || 'Unknown error'}`);
+        throw new Error(`Failed to update ${deductionField} for ingredient: ${ingredient.name}. ${errorData.error || 'Unknown error'}`);
       }
 
-      console.log(`Successfully deducted ${deductionAmount} units from liquid ingredient ${ingredient.name}`);
+      const responseData = await response.json();
+      console.log("API Response data:", responseData);
     } catch (error) {
-      console.error("Error deducting liquid ingredient stock:", error);
+      console.error("Error deducting ingredient stock:", error);
       throw error;
     }
   };
@@ -312,7 +435,6 @@ export default function RecipeConfiguration() {
     setLoading(true);
     // Convert amount to number, default to 0 if empty or invalid
     const numericAmount = amount === "" ? 0 : Number(amount);
-
     try {
       // First, create the recipe
       const res = await fetch("/api/recipe", {
@@ -332,25 +454,29 @@ export default function RecipeConfiguration() {
 
       // Then, deduct stock for liquid ingredients
       if (numericAmount > 0) {
-        console.log(`Processing ${newIngredients.length} ingredients for stock deduction`);
-
-        // Check if there are any liquid ingredients that need stock deduction
-        const liquidIngredients = newIngredients.filter(ingredient =>
-          ingredient.isLiquid && ingredient.productId
+        // Check if there are any ingredients that need stock deduction
+        const ingredientsWithProducts = newIngredients.filter(ingredient =>
+          ingredient.productId && (ingredient.isProductIngredient || ingredient.isStandardIngredient)
         );
 
-        if (liquidIngredients.length > 0) {
-          const liquidIngredientNames = liquidIngredients.map(ing => ing.name).join(', ');
-          const confirmDeduction = confirm(
-            `Se detectaron ingredientes líquidos: ${liquidIngredientNames}\n\n` +
-            `¿Deseas deducir automáticamente el stock de estos ingredientes líquidos?\n` +
-            `Cantidad de receta: ${numericAmount}`
-          );
+        if (ingredientsWithProducts.length > 0) {
+          const productIngredients = ingredientsWithProducts.filter(ing => ing.isProductIngredient);
+          const standardIngredients = ingredientsWithProducts.filter(ing => ing.isStandardIngredient);
+
+          let confirmationMessage = "Se detectaron ingredientes:\n";
+          if (productIngredients.length > 0) {
+            confirmationMessage += `• Ingredientes de producto: ${productIngredients.map(ing => ing.name).join(', ')} (deducir de total_amount)\n`;
+          }
+          if (standardIngredients.length > 0) {
+            confirmationMessage += `• Ingredientes estándar: ${standardIngredients.map(ing => ing.name).join(', ')} (deducir de stock)\n`;
+          }
+          confirmationMessage += `\n¿Deseas deducir automáticamente el stock de estos ingredientes?\nCantidad de receta: ${numericAmount}`;
+
+          const confirmDeduction = confirm(confirmationMessage);
 
           if (confirmDeduction) {
-            for (const ingredient of liquidIngredients) {
-              console.log(`Deducting stock for liquid ingredient: ${ingredient.name}`);
-              await deductLiquidIngredientStock(ingredient);
+            for (const ingredient of ingredientsWithProducts) {
+              await deductIngredientStock(ingredient);
             }
 
             // Refresh products data to reflect stock changes
@@ -382,8 +508,6 @@ export default function RecipeConfiguration() {
     setSelectedIngredient("none");
     setCustomIngredient("");
   };
-
-  console.log("ingredients; ", newIngredients)
 
   const addNewIngredientToStock = async () => {
     if (!newIngredientName.trim()) {
@@ -463,23 +587,30 @@ export default function RecipeConfiguration() {
         throw new Error(errorData.error || "Failed to update recipe");
       }
 
-      // If amount increased, deduct additional stock for liquid ingredients
+      // If amount increased, deduct additional stock for ingredients
       if (amountDifference > 0) {
-        const liquidIngredients = newIngredients.filter(ingredient =>
-          ingredient.isLiquid && ingredient.productId
+        const ingredientsWithProducts = newIngredients.filter(ingredient =>
+          ingredient.productId && (ingredient.isProductIngredient || ingredient.isStandardIngredient)
         );
 
-        if (liquidIngredients.length > 0) {
-          const liquidIngredientNames = liquidIngredients.map(ing => ing.name).join(', ');
-          const confirmDeduction = confirm(
-            `Se detectaron ingredientes líquidos: ${liquidIngredientNames}\n\n` +
-            `¿Deseas deducir automáticamente el stock adicional de estos ingredientes líquidos?\n` +
-            `Cantidad adicional: ${amountDifference}`
-          );
+        if (ingredientsWithProducts.length > 0) {
+          const productIngredients = ingredientsWithProducts.filter(ing => ing.isProductIngredient);
+          const standardIngredients = ingredientsWithProducts.filter(ing => ing.isStandardIngredient);
+
+          let confirmationMessage = "Se detectaron ingredientes para deducción adicional:\n";
+          if (productIngredients.length > 0) {
+            confirmationMessage += `• Ingredientes de producto: ${productIngredients.map(ing => ing.name).join(', ')} (deducir de total_amount)\n`;
+          }
+          if (standardIngredients.length > 0) {
+            confirmationMessage += `• Ingredientes estándar: ${standardIngredients.map(ing => ing.name).join(', ')} (deducir de stock)\n`;
+          }
+          confirmationMessage += `\n¿Deseas deducir automáticamente el stock adicional?\nCantidad adicional: ${amountDifference}`;
+
+          const confirmDeduction = confirm(confirmationMessage);
 
           if (confirmDeduction) {
-            for (const ingredient of liquidIngredients) {
-              await deductLiquidIngredientStock(ingredient, amountDifference);
+            for (const ingredient of ingredientsWithProducts) {
+              await deductIngredientStock(ingredient, amountDifference);
             }
 
             // Refresh products data to reflect stock changes
@@ -584,11 +715,11 @@ export default function RecipeConfiguration() {
           </Button>
           <Button className="gap-2" onClick={() => {
             if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
-                toast.error("No tienes permiso para agregar ingredientes");
-                return;
-              }
+              toast.error("No tienes permiso para agregar ingredientes");
+              return;
+            }
             setShowAddRecipeModal(true)
-            }}>
+          }}>
             <Cocktail size={16} />
             Añadir nueva receta
           </Button>
@@ -911,14 +1042,14 @@ export default function RecipeConfiguration() {
                     <div>
                       <span className="font-medium text-blue-800">Stock disponible</span>
                       <div className={`text-lg font-semibold ${(selectedIngredient?.stock || 0) >= (Number(amount) || 1)
-                          ? 'text-green-600'
-                          : 'text-red-600'
+                        ? 'text-green-600'
+                        : 'text-red-600'
                         }`}>
                         {selectedIngredient?.stock || 0} {extractUnitFromDescription(selectedIngredient?.description || "")}
                       </div>
                       <div className={`text-xs ${(selectedIngredient?.stock || 0) >= (Number(amount) || 1)
-                          ? 'text-green-600'
-                          : 'text-red-600'
+                        ? 'text-green-600'
+                        : 'text-red-600'
                         }`}>
                         {(selectedIngredient?.stock || 0) >= (Number(amount) || 1)
                           ? `Suficiente stock`
@@ -941,46 +1072,80 @@ export default function RecipeConfiguration() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {newIngredients.map((ingredient, index) => (
-                        <div key={index} className="grid grid-cols-4 gap-3 items-center p-3 bg-gray-50 rounded-lg border">
-                          <div>
-                            <span className="font-medium text-sm">{ingredient.name || "Ingrediente sin nombre"}</span>
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {ingredient.quantity} {ingredient.unit}
-                          </div>
-                          {!ingredient.isLiquid && (
-                            <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">Stock:</span>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={ingredient.availableStock}
-                              onChange={(e) => {
-                                const newValue = parseInt(e.target.value) || 0;
-                                const updatedIngredients = [...newIngredients];
-                                updatedIngredients[index].availableStock = newValue;
-                                setNewIngredients(updatedIngredients);
-                              }}
-                              className="h-8 w-20 text-center text-sm"
-                            />
-                          </div>
-                          )}
-                          
-                          <div className="flex justify-end">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setNewIngredients(
-                                newIngredients.filter((_, i) => i !== index)
+                      {newIngredients.map((ingredient, index) => {
+                        // Find the matching product to get additional info
+                        const matchingProduct = productsData.find(product =>
+                          product.id === ingredient.productId ||
+                          product.name.toLowerCase().includes(ingredient.name.toLowerCase()) ||
+                          ingredient.name.toLowerCase().includes(product.name.toLowerCase())
+                        );
+
+                        return (
+                          <div key={index} className="grid grid-cols-4 gap-3 items-center p-3 bg-gray-50 rounded-lg border">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm">{ingredient.name || "Ingrediente sin nombre"}</span>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {ingredient.isStandardIngredient ? (
+                                // For standard ingredients, show the deduct_stock value
+                                `${ingredient.deduct_stock} unidades`
+                              ) : ingredient.isProductIngredient ? (
+                                // For product ingredients, show the deduct_amount
+                                `${ingredient.deduct_amount} ${ingredient.unit}`
+                              ) : (
+                                // For custom ingredients, show the amount
+                                `${ingredient.amount} ${ingredient.unit}`
                               )}
-                              className="h-8 w-8"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                            </div>
+                            {ingredient.isProductIngredient ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs px-1 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                  Total:
+                                </span>
+                                <span className="text-sm text-gray-600">
+                                  {selectedRecipe ? ingredient.deduct_amount : ingredient.from_total_amount}
+                                </span>
+                              </div>
+                            ) : ingredient.isStandardIngredient ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs px-1 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">Stock:</span>
+                                <span className="text-sm text-gray-600 px-2 py-1 bg-gray-100 rounded border">
+                                  {selectedRecipe ? ingredient.deduct_stock : ingredient.from_available_stock}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500">Stock:</span>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={ingredient.stock || 0}
+                                  onChange={(e) => {
+                                    const newValue = parseInt(e.target.value) || 0;
+                                    const updatedIngredients = [...newIngredients];
+                                    updatedIngredients[index].stock = newValue;
+                                    setNewIngredients(updatedIngredients);
+                                  }}
+                                  className="h-8 w-20 text-center text-sm"
+                                />
+                              </div>
+                            )}
+
+                            <div className="flex justify-end">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setNewIngredients(
+                                  newIngredients.filter((_, i) => i !== index)
+                                )}
+                                className="h-8 w-8"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -998,26 +1163,28 @@ export default function RecipeConfiguration() {
                         onValueChange={(value) => {
                           setSelectedIngredient(value);
 
-                          // Auto-set quantity and unit for liquid/individual ingredients
+                          // Auto-set fields based on ingredient type
                           if (value !== "none") {
                             const matchingProduct = productsData.find(product =>
                               product.name.toLowerCase().includes(value.toLowerCase()) ||
                               value.toLowerCase().includes(product.name.toLowerCase())
                             );
 
-                            if (matchingProduct &&
-                                (matchingProduct.type === 'ingredient' || matchingProduct.category === 'ingrediente')) {
-                              if (matchingProduct.is_liquid) {
-                                // For liquid ingredients, user can set quantity and unit freely
-                                // Don't auto-set quantity and unit - let user decide
-                                // Set available stock to the total_amount for liquid ingredients, fallback to stock
-                                setAvailableStock((matchingProduct.total_amount || matchingProduct.stock).toString());
+                            if (matchingProduct && matchingProduct.type === 'ingredient') {
+                              // Check if this is a product ingredient (type=ingredient AND is_liquid=true)
+                              const isProductIngredient = matchingProduct.is_liquid === true;
+
+                              if (isProductIngredient) {
+                                // For product ingredients: Available Stock field disabled, shows total_amount
+                                setAvailableStock((matchingProduct.total_amount || 0).toString());
                               } else {
-                                // For individual ingredients, set quantity to 1 and unit to "unidad"
-                                setQuantity("1");
-                                setUnit("unidad");
-                                // Set available stock to the actual product stock
-                                setAvailableStock(matchingProduct.stock.toString());
+                                // For standard ingredients: Amount and Unit fields disabled, set from description
+                                const extractedUnit = extractUnitFromDescription(matchingProduct.description || "");
+                                const extractedAmount = extractConversionAmountFromDescription(matchingProduct.description || "");
+                                setQuantity(extractedAmount);
+                                setUnit(extractedUnit);
+                                // For standard ingredients, don't auto-set availableStock - let user set it manually
+                                // setAvailableStock(matchingProduct.stock.toString());
                               }
                             }
                           }
@@ -1029,191 +1196,218 @@ export default function RecipeConfiguration() {
                         <SelectContent>
                           <SelectItem value="none">Seleccionar ingrediente existente</SelectItem>
 
-                            {/* Available products in stock */}
-                            {productsData
-                              .filter((product) => (product.category === "ingrediente" && product.has_recipe === false) ||
-                                product.type === 'ingredient'
-                              )
-                              .sort((a, b) => b.stock - a.stock) // Sort by stock level (highest first)
-                              .map((product) => (
+                          {/* Available ingredients in stock */}
+                          {productsData
+                            .filter((product) =>
+                              // Include ingredients with type=ingredient (both standard and product ingredients)
+                              product.type === 'ingredient'
+                            )
+                            .sort((a, b) => {
+                              // Sort by stock level (highest first), considering different types
+                              const aIsProductIngredient = a.type === 'ingredient' && a.is_liquid === true;
+                              const bIsProductIngredient = b.type === 'ingredient' && b.is_liquid === true;
+                              const aStock = aIsProductIngredient ? (a.total_amount || 0) : a.stock;
+                              const bStock = bIsProductIngredient ? (b.total_amount || 0) : b.stock;
+                              return bStock - aStock;
+                            })
+                            .map((product) => {
+                              // Determine if this is a product ingredient (type=ingredient AND is_liquid=true)
+                              const isProductIngredient = product.type === 'ingredient' && product.is_liquid === true;
+                              // Standard ingredients use stock, product ingredients use total_amount
+                              const displayValue = isProductIngredient ? (product.total_amount || 0) : product.stock;
+
+                              return (
                                 <SelectItem key={product.id} value={product.name}>
-                                  <div className="flex justify-between items-center w-full">
-                                    <span>{product.name}</span>
-                                    <span className={`text-xs px-1 py-0.5 rounded ${product.stock > 10 ? 'bg-green-100 text-green-800' :
-                                        product.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
-                                          'bg-red-100 text-red-800'}`}>
-                                      {product.is_liquid ? product.total_amount : product.stock}
-                                    </span>
+                                  <div className="flex justify-between items-center w-full gap-2">
+                                    <span className="flex-1">{product.name}</span>
+                                    <div className="flex items-center gap-1">
+                                      {!isProductIngredient && (
+                                        <span className="text-xs px-1 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                          Stock
+                                        </span>
+                                      )}
+                                      <span className={`text-xs px-1 py-0.5 rounded ${displayValue > 10 ? 'bg-green-100 text-green-800' :
+                                          displayValue > 0 ? 'bg-yellow-100 text-yellow-800' :
+                                            'bg-red-100 text-red-800'
+                                        }`}>
+                                        {displayValue}
+                                      </span>
+                                    </div>
                                   </div>
                                 </SelectItem>
-                              ))}
+                              );
+                            })}
 
-                            {/* Products with recipes - show calculated ingredient requirements (grouped) */}
-                            {(() => {
-                              // Collect all ingredient requirements from all recipes
-                              const allIngredientRequirements: { [key: string]: { totalAmount: number; unit: string; sources: string[]; }; } = {};
+                          {/* Products with recipes - show calculated ingredient requirements (grouped) */}
+                          {(() => {
+                            // Collect all ingredient requirements from all recipes
+                            const allIngredientRequirements: { [key: string]: { totalAmount: number; unit: string; sources: string[]; }; } = {};
 
-                              productsData
-                                .filter((product) => product.has_recipe === true && product.ingredients)
-                                .forEach((product) => {
-                                  const ingredientRequirements = calculateIngredientRequirements(product, 1);
-                                  ingredientRequirements.forEach((req: { name: string; totalRequired: number; unit: string; originalQuantity: string; }) => {
-                                    const key = req.name?.toLowerCase();
-                                    if (!allIngredientRequirements[key]) {
-                                      allIngredientRequirements[key] = {
-                                        totalAmount: 0,
-                                        unit: req.unit,
-                                        sources: []
-                                      };
-                                    }
-                                    allIngredientRequirements[key].totalAmount += req.totalRequired;
-                                    allIngredientRequirements[key].sources.push(product.name);
-                                  });
+                            productsData
+                              .filter((product) => product.has_recipe === true && product.ingredients)
+                              .forEach((product) => {
+                                const ingredientRequirements = calculateIngredientRequirements(product, 1);
+                                ingredientRequirements.forEach((req: { name: string; totalRequired: number; unit: string; originalQuantity: string; }) => {
+                                  const key = req.name?.toLowerCase();
+                                  if (!allIngredientRequirements[key]) {
+                                    allIngredientRequirements[key] = {
+                                      totalAmount: 0,
+                                      unit: req.unit,
+                                      sources: []
+                                    };
+                                  }
+                                  allIngredientRequirements[key].totalAmount += req.totalRequired;
+                                  allIngredientRequirements[key].sources.push(product.name);
                                 });
+                              });
 
-                              // Convert to array and render
-                              return Object.entries(allIngredientRequirements).map(([ingredientName, data]) => (
-                                <SelectItem
-                                  key={`recipe-ingredient-${ingredientName}`}
-                                  value={`${ingredientName} (from recipes)`}
-                                >
-                                  {ingredientName} - {data.totalAmount} {data.unit} (from {data.sources.length} recipe{data.sources.length > 1 ? 's' : ''})
-                                </SelectItem>
-                              ));
-                            })()}
-                          </SelectContent>
-                        </Select>
-                        <div className="text-center text-sm text-muted-foreground">o</div>
-                        <Input
-                          disabled={selectedIngredient !== "none" ? true : false}
-                          placeholder="Escribir ingrediente personalizado"
-                          value={customIngredient}
-                          onChange={(e) => setCustomIngredient(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              addNewIngredient();
-                            }
-                          } } />
-                      </div>
-                    </div>
-
-                    {/* Quantity, Unit, and Available Stock in horizontal layout */}
-                    <div className="grid grid-cols-4 gap-2 items-end">
-                      <div>
-                        <Label className="text-xs text-gray-600 mb-1 block">Cantidad</Label>
-                        <Input
-                          type="number"
-                          placeholder="Cantidad"
-                          value={quantity}
-                          // disabled={isSelectedIngredientIndividual()}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Only allow positive numbers and empty string
-                            if (value === "" ||
-                              (Number(value) >= 0 && !value.includes("-"))) {
-                              setQuantity(value);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            // Prevent minus key, plus key, and 'e' key
-                            if (e.key === "-" ||
-                              e.key === "+" ||
-                              e.key === "e" ||
-                              e.key === "E") {
-                              e.preventDefault();
-                            }
-                            // Allow Enter to add ingredient
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              addNewIngredient();
-                            }
-                          }}
-                          min="0"
-                          step="0.01"
-                          className="h-10"
-                        />
-                        {/* {(isSelectedIngredientLiquid() || isSelectedIngredientIndividual()) && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Cantidad automática para ingredientes líquidos/individuales
-                          </p>
-                        )} */}
-                      </div>
-                      <div>
-                        <Label className="text-xs text-gray-600 mb-1 block">Unidad</Label>
-                        <Select
-                          value={unit}
-                          // disabled={isSelectedIngredientIndividual()}
-                          onValueChange={(value) => setUnit(value)}
-                        >
-                          <SelectTrigger className="h-10">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ml">ml</SelectItem>
-                            <SelectItem value="L">L</SelectItem>
-                            <SelectItem value="g">g</SelectItem>
-                            <SelectItem value="kg">kg</SelectItem>
-                            <SelectItem value="unidad">unidad</SelectItem>
-                            <SelectItem value="parts">parts</SelectItem>
-                            <SelectItem value="cups">cups</SelectItem>
-                            <SelectItem value="tbsp">tbsp</SelectItem>
-                            <SelectItem value="tsp">tsp</SelectItem>
-                            <SelectItem value="hojas">hojas</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {/* {(isSelectedIngredientLiquid() || isSelectedIngredientIndividual()) && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Unidad automática
-                          </p>
-                        )} */}
-                      </div>
-                      <div>
-                        <Label className="text-xs text-gray-600 mb-1 block">Stock Disponible</Label>
-                        <Input
-                          type="number"
-                          placeholder="Stock"
-                          value={availableStock}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            console.log("value: ", value)
-                            // Only allow positive numbers and empty string
-                            if (value === "" ||
-                              (Number(value) >= 0 && !value.includes("-"))) {
-                              setAvailableStock(value);
-                            }
-                          }}
-                          min="0"
-                          step="1"
-                          className="h-10"
-                          disabled={(() => {
-                            // Disable for liquid ingredient-type products
-                            const matchingProduct = productsData?.find(product =>
-                              product.name.toLowerCase() === selectedIngredient.toLowerCase() ||
-                              selectedIngredient.toLowerCase().includes(product.name.toLowerCase()) ||
-                              product.name.toLowerCase().includes(selectedIngredient.toLowerCase())
-                            );
-                            return matchingProduct?.is_liquid &&
-                                   (matchingProduct?.type === 'ingredient' || matchingProduct?.category === 'ingrediente');
+                            // Convert to array and render
+                            return Object.entries(allIngredientRequirements).map(([ingredientName, data]) => (
+                              <SelectItem
+                                key={`recipe-ingredient-${ingredientName}`}
+                                value={`${ingredientName} (from recipes)`}
+                              >
+                                {ingredientName} - {data.totalAmount} {data.unit} (from {data.sources.length} recipe{data.sources.length > 1 ? 's' : ''})
+                              </SelectItem>
+                            ));
                           })()}
-                        />
-                      </div>
-                      <div>
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          onClick={addNewIngredient}
-                          disabled={quantity.trim() === "" ||
-                            (selectedIngredient === "none" && customIngredient.trim() === "") ||
-                            (selectedIngredient !== "none" && selectedIngredient.trim() === "")}
-                          className="h-10 w-10"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
+                        </SelectContent>
+                      </Select>
+                      <div className="text-center text-sm text-muted-foreground">o</div>
+                      <Input
+                        disabled={selectedIngredient !== "none" ? true : false}
+                        placeholder="Escribir ingrediente personalizado"
+                        value={customIngredient}
+                        onChange={(e) => setCustomIngredient(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addNewIngredient();
+                          }
+                        }} />
+                    </div>
+                  </div>
+
+                  {/* Quantity, Unit, and Available Stock in horizontal layout */}
+                  <div className="grid grid-cols-4 gap-2 items-end">
+                    <div>
+                      <Label className="text-xs text-gray-600 mb-1 block">Cantidad</Label>
+                      <Input
+                        type="number"
+                        placeholder="Cantidad"
+                        value={quantity}
+                        disabled={(() => {
+                          // Disable for standard ingredients (type=ingredient AND is_liquid=false)
+                          const matchingProduct = productsData?.find(product =>
+                            product.name.toLowerCase() === selectedIngredient.toLowerCase() ||
+                            selectedIngredient.toLowerCase().includes(product.name.toLowerCase()) ||
+                            product.name.toLowerCase().includes(selectedIngredient.toLowerCase())
+                          );
+                          return matchingProduct?.type === 'ingredient' && matchingProduct?.is_liquid === false;
+                        })()}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Only allow positive numbers and empty string
+                          if (value === "" ||
+                            (Number(value) >= 0 && !value.includes("-"))) {
+                            setQuantity(value);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Prevent minus key, plus key, and 'e' key
+                          if (e.key === "-" ||
+                            e.key === "+" ||
+                            e.key === "e" ||
+                            e.key === "E") {
+                            e.preventDefault();
+                          }
+                          // Allow Enter to add ingredient
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addNewIngredient();
+                          }
+                        }}
+                        min="0"
+                        step="0.01"
+                        className="h-10"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-600 mb-1 block">Unidad</Label>
+                      <Select
+                        value={unit}
+                        disabled={(() => {
+                          // Disable for standard ingredients (type=ingredient AND is_liquid=false)
+                          const matchingProduct = productsData?.find(product =>
+                            product.name.toLowerCase() === selectedIngredient.toLowerCase() ||
+                            selectedIngredient.toLowerCase().includes(product.name.toLowerCase()) ||
+                            product.name.toLowerCase().includes(selectedIngredient.toLowerCase())
+                          );
+                          return matchingProduct?.type === 'ingredient' && matchingProduct?.is_liquid === false;
+                        })()}
+                        onValueChange={(value) => setUnit(value)}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ml">ml</SelectItem>
+                          <SelectItem value="L">L</SelectItem>
+                          <SelectItem value="g">g</SelectItem>
+                          <SelectItem value="kg">kg</SelectItem>
+                          <SelectItem value="unidad">unidad</SelectItem>
+                          <SelectItem value="parts">parts</SelectItem>
+                          <SelectItem value="cups">cups</SelectItem>
+                          <SelectItem value="tbsp">tbsp</SelectItem>
+                          <SelectItem value="tsp">tsp</SelectItem>
+                          <SelectItem value="hojas">hojas</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-600 mb-1 block">Stock Disponible</Label>
+                      <Input
+                        type="number"
+                        placeholder="Stock"
+                        value={availableStock}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Only allow positive numbers and empty string
+                          if (value === "" ||
+                            (Number(value) >= 0 && !value.includes("-"))) {
+                            setAvailableStock(value);
+                          }
+                        }}
+                        min="0"
+                        step="1"
+                        className="h-10"
+                        disabled={(() => {
+                          // Disable for product ingredients (type=ingredient AND is_liquid=true)
+                          const matchingProduct = productsData?.find(product =>
+                            product.name.toLowerCase() === selectedIngredient.toLowerCase() ||
+                            selectedIngredient.toLowerCase().includes(product.name.toLowerCase()) ||
+                            product.name.toLowerCase().includes(selectedIngredient.toLowerCase())
+                          );
+                          return matchingProduct?.type === 'ingredient' && matchingProduct?.is_liquid === true;
+                        })()}
+                      />
+                    </div>
+                    <div>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={addNewIngredient}
+                        disabled={quantity.trim() === "" ||
+                          (selectedIngredient === "none" && customIngredient.trim() === "") ||
+                          (selectedIngredient !== "none" && selectedIngredient.trim() === "")}
+                        className="h-10 w-10"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </div>
+              </div>
             )}
           </div>
 
@@ -1227,7 +1421,7 @@ export default function RecipeConfiguration() {
                 return;
               }
               selectedRecipe ? updateRecipe() : addNewRecipe()
-              }}>
+            }}>
               {loading ? (
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -1341,7 +1535,5 @@ export default function RecipeConfiguration() {
         </DialogContent>
       </Dialog>
     </div>
-
-    // ---------------------
   );
 }
