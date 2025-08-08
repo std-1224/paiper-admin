@@ -78,58 +78,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { categoryList } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
-// Mock data for stock
-const stockData = [
-  {
-    id: 1,
-    product: "Agua Mineral 500ml",
-    category: "No Alcoholico",
-    quantity: 250,
-    bar: "Bar Central",
-    status: "En Stock",
-  },
-  {
-    id: 2,
-    product: "Red Bull 250ml",
-    category: "Energéticas",
-    quantity: 180,
-    bar: "Bar Central",
-    status: "En Stock",
-  },
-  {
-    id: 3,
-    product: "Vodka Absolut 750ml",
-    category: "Alcoholico",
-    quantity: 45,
-    bar: "Bar Norte",
-    status: "En Stock",
-  },
-  {
-    id: 4,
-    product: "Gin Beefeater 750ml",
-    category: "Alcoholico",
-    quantity: 38,
-    bar: "Bar Sur",
-    status: "En Stock",
-  },
-  {
-    id: 5,
-    product: "Whisky Johnnie Walker 750ml",
-    category: "Alcoholico",
-    quantity: 20,
-    bar: "El Alamo",
-    status: "En Stock",
-  },
-  {
-    id: 6,
-    product: "Champagne Moët & Chandon",
-    category: "Alcoholico",
-    quantity: 15,
-    bar: "Bar Central",
-    status: "Falta Stock",
-  },
-];
-
 // Mock data for unredeemed
 const unredeemedStockData = [
   {
@@ -165,9 +113,6 @@ const Stock = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("stock");
   const [assignStockDialogOpen, setAssignStockDialogOpen] = useState(false);
-  const [selectedStock, setSelectedStock] = useState<number | undefined>(
-    undefined
-  );
   // Form states
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
     name: "",
@@ -186,12 +131,8 @@ const Stock = () => {
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [stockAdjustmentOpen, setStockAdjustmentOpen] = useState(false);
-  const [productToAdjust, setProductToAdjust] = useState("");
   const [multipleTransferOpen, setMultipleTransferOpen] = useState(false);
   const [selectedStockItems, setSelectedStockItems] = useState<string[]>([]);
-  const [selectedUnredeemedItems, setSelectedUnredeemedItems] = useState<
-    number[]
-  >([]);
   const { user } = useAuth()
   const [showCreateRecipeDialog, setShowCreateRecipeDialog] = useState(false);
   const { recipesData, fetchRecipes } = useAppContext();
@@ -403,16 +344,6 @@ const Stock = () => {
     try {
       setIsLoading(true);
 
-      // Validate recipe ingredients if recipe is selected
-      if (newProduct.has_recipe && recipeIngredients.length > 0) {
-        // Check for stock validation errors
-        // if (stockValidationErrors.length > 0) {
-        //   toast.error("Hay errores de stock en los ingredientes. Por favor corrígelos antes de continuar");
-        //   setIsLoading(false);
-        //   return;
-        // }
-      }
-
       // Validate custom ingredients if they are being used
       if (useCustomIngredients && customIngredients.length > 0) {
         for (const ingredient of customIngredients) {
@@ -435,7 +366,7 @@ const Stock = () => {
       const uploadedUrl = await handleImageUpload();
 
       // Prepare ingredients data
-      let ingredientsData = null;
+      let ingredientsData: any = null;
       if (newProduct.has_recipe && recipeIngredients.length > 0) {
         // Map recipeIngredients to the proper format for product ingredients
         ingredientsData = recipeIngredients.map((ing) => {
@@ -487,78 +418,103 @@ const Stock = () => {
           }
         });
 
-        // Update source ingredients in the database
-        for (const ing of recipeIngredients) {
-          try {
-            if (ing.isProductIngredient && ing.productId) {
-              // Update product ingredient's total_amount
-              const deductAmount = ing.requiredQuantity || 1;
-              const newTotalAmount = (ing.from_total_amount || 0) - deductAmount;
-
-              await fetch(`/api/products/${ing.productId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  total_amount: newTotalAmount
-                })
-              });
-
-            } else if (ing.isStandardIngredient && ing.productId) {
-              // Update standard ingredient's stock
-              const deductAmount = ing.requiredQuantity || 1;
-              const newStock = (ing.from_available_stock || 0) - deductAmount;
-
-              await fetch(`/api/products/${ing.productId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  stock: newStock
-                })
-              });
-            }
-          } catch (error) {
-            console.error(`Error updating ingredient ${ing.name}:`, error);
-            // Continue with other ingredients even if one fails
-          }
-        }
-
-      } else if (useCustomIngredients && customIngredients.length > 0) {
-        ingredientsData = customIngredients.map((ing) => ({
-          name: ing.name,
-          quantity: ing.quantity,
-          unit: ing.unit,
-          productId: ing.productId,
-        }));
-      } else {
-        // Check if we're creating a product using an ingredient-type product
-        const selectedIngredient = productsData.find(
-          (product) =>
-            product.type === "ingredient" &&
-            product.id.toString() === selectedRecipeId
+        const selectedRecipe = recipesData.find(
+          (recipe) => recipe.id.toString() === selectedRecipeId
         );
+        if (selectedRecipe && selectedRecipe.ingredients) {
+          // Recipe-type Product
+          const updatedIngredients = selectedRecipe.ingredients.map((recipeIng) => {
+            const matchingIng = ingredientsData.find((ing: any) => ing.name === recipeIng.name);
 
-        if (selectedIngredient && selectedRecipeId && selectedRecipeId !== "no-recipe") {
-          // Create ingredient records from ingredient-type product
-          const ingredientRecords = createIngredientRecordsFromIngredientProducts(
-            selectedRecipeId,
-            newProduct.name || "",
-            newProduct.description || "",
-            newProduct.stock || 1,
-            ingredientRequiredQuantity
-          );
+            if (!matchingIng) return recipeIng;
 
-          if (ingredientRecords) {
-            ingredientsData = ingredientRecords;
-            // Set has_recipe to true so the product stores ingredient information
-            newProduct.has_recipe = true;
+            if (matchingIng.isProductIngredient) {
+              return {
+                ...recipeIng,
+                deduct_amount: matchingIng.from_total_amount,
+              };
+            } else if (matchingIng.isStandardIngredient) {
+              return {
+                ...recipeIng,
+                deduct_stock: matchingIng.from_available_stock,
+              };
+            } else {
+              return {
+                ...recipeIng,
+                stock: matchingIng.stock,
+              };
+            }
+          });
+
+          selectedRecipe.ingredients = updatedIngredients;
+          try {
+            const response = await fetch(`/api/recipe`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...selectedRecipe,
+                amount: selectedRecipe?.stock,
+                ingredients: selectedRecipe?.ingredients,
+              }),
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error(`❌ Failed to update recipe ingredients:`, errorData);
+              throw new Error(`Failed to update recipe: ${errorData.error || 'Unknown error'}`);
+            }
+            // Refresh recipes data to show updated amounts
+            await fetchRecipes();
+          } catch (error) {
+            console.error("❌ Error updating recipe ingredients:", error);
+          }
+        } else if (selectedRecipe && !selectedRecipe.ingredients && !selectedRecipe?.total_amount) {
+          // Ingredient-type Product
+          const temp = ingredientsData.find((ing: any) => ing.name === selectedRecipe.name);
+          const updatedRecipe = { ...selectedRecipe, stock: temp.from_available_stock };
+          try {
+            const response = await fetch(`/api/recipe`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...updatedRecipe,
+              }),
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error(`❌ Failed to update recipe ingredients:`, errorData);
+              throw new Error(`Failed to update recipe: ${errorData.error || 'Unknown error'}`);
+            }
+            // Refresh recipes data to show updated amounts
+            await fetchRecipes();
+          } catch (error) {
+            console.error("❌ Error updating recipe ingredients:", error);
+          }
+        } else if (selectedRecipe && !selectedRecipe.ingredients && selectedRecipe?.total_amount) {
+          const temp = ingredientsData.find((ing: any) => ing.name === selectedRecipe.name);
+          // Liquid-type Product
+          const updatedRecipe = { ...selectedRecipe, stock: temp.from_available_stock};
+          try {
+            const response = await fetch(`/api/recipe`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...updatedRecipe,
+              }),
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error(`❌ Failed to update recipe ingredients:`, errorData);
+              throw new Error(`Failed to update recipe: ${errorData.error || 'Unknown error'}`);
+            }
+            // Refresh recipes data to show updated amounts
+            await fetchRecipes();
+          } catch (error) {
+            console.error("❌ Error updating recipe ingredients:", error);
           }
         }
-      }
-
-      // Calculate total_amount for ingredient-type products
-      let totalAmount = null;
-      if (newProduct.type === "ingredient") {
-        totalAmount = (newProduct.stock || 0) * amountPerUnit;
       }
 
       // Prepare product data
@@ -571,56 +527,24 @@ const Stock = () => {
           (useCustomIngredients && customIngredients.length > 0) ||
           (ingredientsData && ingredientsData.length > 0), // Include ingredient-type products
         ingredients: ingredientsData ? JSON.stringify(ingredientsData) : null,
-        total_amount: totalAmount,
+        total_amount: newProduct.is_liquid ?? newProduct.total_amount,
       };
 
-      console.log("productData ====> ", ingredientsData)
+      const response = await fetch(`/api/products`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productData),
+      });
 
-      // const response = await fetch(`/api/products`, {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify(productData),
-      // });
-
-      // if (!response.ok) {
-      //   const errorData = await response.json();
-      //   throw new Error(errorData.error || "Failed to add product");
-      // }
-
-      // Deduct ingredient stock based on product type
-      if ((newProduct.stock || 0) > 0) {
-        // Check if selected item is an ingredient (not a recipe)
-        const selectedIngredient = productsData.find(
-          (product) =>
-            product.type === "ingredient" &&
-            product.id.toString() === selectedRecipeId
-        );
-
-        if (selectedIngredient) {
-          // For ingredient-type products: deduct from ingredient's stock
-          await deductIngredientTypeStock(
-            selectedRecipeId,
-            ingredientRequiredQuantity
-          );
-        } else if (newProduct.has_recipe && recipeIngredients.length > 0) {
-          // For recipe-type products: deduct from recipe ingredients' availableStock
-          await deductRecipeIngredientStock(
-            recipeIngredients,
-            newProduct.stock || 1
-          );
-        } else if (useCustomIngredients && customIngredients.length > 0) {
-          // For custom ingredients: existing logic
-          await deductCustomIngredientStock(
-            customIngredients,
-            newProduct.stock || 1
-          );
-        }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to add product");
       }
 
-      // toast.success("Producto creado exitosamente");
-      // setShowAddProductModal(false);
-      // resetProductModal();
-      // fetchProducts();
+      toast.success("Producto creado exitosamente");
+      setShowAddProductModal(false);
+      resetProductModal();
+      fetchProducts();
     } catch (err) {
       console.error("Error adding product:", err);
       toast.error(err instanceof Error ? err.message : "Error adding product");
@@ -647,65 +571,6 @@ const Stock = () => {
       return parseFloat(conversionMatch[1]);
     }
     return 1; // Default conversion factor
-  };
-
-  // Helper function to extract quantity and unit from product description
-  const extractQuantityAndUnitFromDescription = (description: string): { quantity: string; unit: string } => {
-    // Try to extract patterns like "500ml", "2kg", "100g", "1.5L", etc.
-    const quantityUnitMatch = description.match(/(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/);
-    if (quantityUnitMatch) {
-      return {
-        quantity: quantityUnitMatch[1],
-        unit: quantityUnitMatch[2].toLowerCase()
-      };
-    }
-
-    // Fallback: try to extract just numbers and assume default unit
-    const quantityMatch = description.match(/(\d+(?:\.\d+)?)/);
-    if (quantityMatch) {
-      return {
-        quantity: quantityMatch[1],
-        unit: "ml" // Default unit
-      };
-    }
-
-    // Default values if nothing found
-    return {
-      quantity: "1",
-      unit: "unidad"
-    };
-  };
-
-  // Function to create ingredient records when using ingredient-type products
-  const createIngredientRecordsFromIngredientProducts = (
-    selectedIngredientId: string,
-    productName: string,
-    productDescription: string,
-    amountToCreate: number,
-    cantidadACrear: number
-  ) => {
-    const selectedIngredient = productsData.find(
-      (product) =>
-        product.type === "ingredient" &&
-        product.id.toString() === selectedIngredientId
-    );
-
-    if (!selectedIngredient) {
-      return null;
-    }
-
-    // Extract quantity and unit from product description
-    const { quantity, unit } = extractQuantityAndUnitFromDescription(productDescription || "");
-
-    // Create ingredient record
-    const ingredientRecord = {
-      name: selectedIngredient.name, // Use ingredient-type product name as ingredient name
-      quantity: quantity,
-      unit: unit,
-      requiredQuantity: cantidadACrear // Set requiredQuantity to the "Cantidad a crear" amount
-    };
-
-    return [ingredientRecord];
   };
 
   // Recipe handling functions
@@ -851,73 +716,6 @@ const Stock = () => {
     setRecipeIngredients(updatedIngredients);
   };
 
-  // Deduction logic for when product is used
-  const deductIngredientsStock = async (productIngredients: any[], quantityUsed: number = 1) => {
-    try {
-      for (const ingredient of productIngredients) {
-        if (ingredient.isProductIngredient) {
-          // For product ingredients: deduct from total_amount using deduct_amount * quantityUsed
-          const deductionAmount = ingredient.deduct_amount * quantityUsed;
-
-          // Find the product and update its total_amount
-          const response = await fetch(`/api/products/${ingredient.productId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              total_amount: ingredient.from_total_amount - deductionAmount
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to deduct stock for product ingredient: ${ingredient.name}`);
-          }
-
-        } else if (ingredient.isStandardIngredient) {
-          // For standard ingredients: deduct from stock using deduct_stock * quantityUsed
-          const deductionAmount = ingredient.deduct_stock * quantityUsed;
-
-          // Find the product and update its stock
-          const response = await fetch(`/api/products/${ingredient.productId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              stock: ingredient.from_available_stock - deductionAmount
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to deduct stock for standard ingredient: ${ingredient.name}`);
-          }
-
-        } else {
-          // For custom ingredients: deduct from stock using stock * quantityUsed
-          // Custom ingredients don't have a productId, so they're handled differently
-          // This would typically be tracked in a separate custom ingredients table
-          console.log(`Custom ingredient ${ingredient.name}: would deduct ${ingredient.stock * quantityUsed} units`);
-        }
-      }
-
-      console.log(`Successfully deducted ingredients for ${quantityUsed} units of product`);
-
-    } catch (error) {
-      console.error('Error deducting ingredients stock:', error);
-      throw error;
-    }
-  };
-
-  // const validateIngredientStock = () => {
-  //   const errors: string[] = [];
-
-  //   recipeIngredients.forEach((ingredient) => {
-  //     const totalRequired = parseFloat(ingredient.quantity) * ingredient.requiredQuantity;
-  //     if (totalRequired > ingredient.availableStock) {
-  //       errors.push(`${ingredient.name}: Necesitas ${totalRequired}${ingredient.unit}, pero solo hay ${ingredient.availableStock}${ingredient.unit} disponible`);
-  //     }
-  //   });
-
-  //   setStockValidationErrors(errors);
-  // };
-
   // Recipe creation functions
   const handleAddIngredientToRecipe = () => {
     if (!newIngredient.name || !newIngredient.quantity) return;
@@ -941,181 +739,9 @@ const Stock = () => {
     });
   };
 
-  // Add ingredient to existing selected recipe
-  const handleAddIngredientToExistingRecipe = async () => {
-    console.log("🔧 Adding ingredient to existing recipe...");
-    console.log("Selected Recipe ID:", selectedRecipeId);
-    console.log("New Ingredient:", newIngredient);
-
-    if (!selectedRecipeId || !newIngredient.name || !newIngredient.quantity) {
-      console.log("❌ Missing required fields");
-      toast.error("Por favor completa todos los campos requeridos");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // Get the current recipe
-      const currentRecipe = recipesData.find(
-        (recipe) => recipe.id.toString() === selectedRecipeId
-      );
-      console.log("Current Recipe Found:", currentRecipe);
-
-      if (!currentRecipe) {
-        console.log("❌ Recipe not found");
-        toast.error("No se pudo encontrar la receta seleccionada");
-        return;
-      }
-
-      // Parse current ingredients
-      let currentIngredients;
-      try {
-        currentIngredients =
-          typeof currentRecipe.ingredients === "string"
-            ? JSON.parse(currentRecipe.ingredients)
-            : currentRecipe.ingredients || [];
-        console.log("Current Ingredients:", currentIngredients);
-      } catch (error) {
-        console.error("Error parsing current recipe ingredients:", error);
-        currentIngredients = [];
-      }
-
-      // Add new ingredient
-      const updatedIngredients = [
-        ...currentIngredients,
-        {
-          name: newIngredient.name,
-          quantity: parseFloat(newIngredient.quantity),
-          unit: newIngredient.unit,
-        },
-      ];
-      console.log("Updated Ingredients:", updatedIngredients);
-
-      // Update the recipe in the database
-      const updatePayload = {
-        id: selectedRecipeId,
-        name: currentRecipe.name,
-        ingredients: JSON.stringify(updatedIngredients),
-        amount: currentRecipe.stock,
-        category: currentRecipe.category,
-      };
-      console.log("Update Payload:", updatePayload);
-
-      const response = await fetch(`/api/recipe`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatePayload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("API Error:", errorData);
-        throw new Error(errorData.error || "Failed to update recipe");
-      }
-
-      const responseData = await response.json();
-      console.log("API Response Data:", responseData);
-
-      // Update local recipe ingredients display immediately
-      console.log("🔄 Updating local recipe ingredients display...");
-
-      // Process the updated ingredients with recipe stock
-      const updatedRecipeIngredients = updatedIngredients.map(
-        (ingredient: any) => {
-          return {
-            name: ingredient.name,
-            quantity: ingredient.quantity.toString(),
-            unit: ingredient.unit,
-            requiredQuantity: 1, // Default quantity, user can modify
-            availableStock: currentRecipe.stock || 0, // Use recipe stock as available stock
-            stock: currentRecipe.stock || 0, // Recipe stock
-          };
-        }
-      );
-
-      // Update the recipe ingredients state immediately
-      console.log(
-        "🔍 Current recipe ingredients before update:",
-        recipeIngredients
-      );
-      console.log(
-        "🔍 New recipe ingredients to set:",
-        updatedRecipeIngredients
-      );
-      setRecipeIngredients(updatedRecipeIngredients);
-      console.log(
-        "✅ Local recipe ingredients updated immediately:",
-        updatedRecipeIngredients
-      );
-
-      // Also refresh recipes data in background for consistency
-      console.log("🔄 Refreshing recipes data in background...");
-      fetchRecipes();
-
-      // Reset ingredient form
-      setNewIngredient({
-        name: "",
-        quantity: "",
-        unit: "ml",
-      });
-
-      console.log("✅ Ingredient added successfully!");
-      toast.success(
-        `Ingrediente "${newIngredient.name}" agregado a la receta exitosamente`
-      );
-    } catch (error) {
-      console.error("❌ Error adding ingredient to recipe:", error);
-      toast.error(
-        "Error al agregar el ingrediente a la receta: " +
-        (error as Error).message
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // const validateRecipeIngredients = async (ingredients: { name: string; quantity: string; unit: string }[]) => {
-  //   const validationResults = [];
-
-  //   for (const ingredient of ingredients) {
-  //     if (!ingredient.name || !ingredient.quantity) {
-  //       validationResults.push({
-  //         ingredient: ingredient.name || 'Sin nombre',
-  //         status: 'invalid',
-  //         message: `Ingrediente "${ingredient.name || 'Sin nombre'}" tiene datos incompletos`,
-  //       });
-  //     } else {
-  //       validationResults.push({
-  //         ingredient: ingredient.name,
-  //         status: 'valid',
-  //         message: `✓ "${ingredient.name}" es válido`,
-  //       });
-  //     }
-  //   }
-
-  //   setIngredientValidation(validationResults);
-  //   return validationResults;
-  // };
-
   const handleCreateRecipe = async () => {
     try {
       setIsLoading(true);
-
-      // Validate ingredients before creating recipe
-      // const validationResults = await validateRecipeIngredients(newRecipe.ingredients);
-      // const hasErrors = validationResults.some(result => result.status !== 'valid');
-
-      // if (hasErrors) {
-      //   const errorMessages = validationResults
-      //     .filter(result => result.status !== 'valid')
-      //     .map(result => result.message)
-      //     .join('\n');
-
-      //   toast.error(`Errores de validación:\n${errorMessages}`);
-      //   return;
-      // }
-
       const response = await fetch(`/api/recipes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1165,303 +791,6 @@ const Stock = () => {
       toast.error("Error al crear la receta");
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // Add custom ingredient function
-  const addCustomIngredient = () => {
-    let ingredientName = "";
-    let productId = undefined;
-    let matchingProduct = null;
-
-    if (selectedIngredient === "none") {
-      ingredientName = customIngredientName;
-      // Try to find matching product for custom ingredient
-      matchingProduct = productsData.find(
-        (product) =>
-          product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
-          ingredientName.toLowerCase().includes(product.name.toLowerCase())
-      );
-    } else if (selectedIngredient) {
-      ingredientName = selectedIngredient;
-      // Try to find matching product in stock
-      matchingProduct = productsData.find(
-        (product) =>
-          product.name.toLowerCase().includes(ingredientName.toLowerCase()) ||
-          ingredientName.toLowerCase().includes(product.name.toLowerCase())
-      );
-    } else {
-      ingredientName = customIngredientName;
-    }
-
-    if (matchingProduct) {
-      productId = matchingProduct.id;
-    }
-
-    // Validate that ingredient name and quantity are provided
-    if (!ingredientName.trim()) {
-      toast.error("Por favor ingresa el nombre del ingrediente");
-      return;
-    }
-    if (!ingredientQuantity.trim()) {
-      toast.error("Por favor ingresa la cantidad del ingrediente");
-      return;
-    }
-
-    // Validate stock availability for this ingredient
-    const requiredQuantity = parseFloat(ingredientQuantity);
-    if (isNaN(requiredQuantity) || requiredQuantity <= 0) {
-      toast.error("Por favor ingresa una cantidad válida");
-      return;
-    }
-
-    // if (matchingProduct) {
-    //   if (matchingProduct.stock < requiredQuantity) {
-    //     toast.error(
-    //       `Stock insuficiente para ${ingredientName}:\nRequerido: ${requiredQuantity} ${ingredientUnit}\nDisponible: ${matchingProduct.stock}`
-    //     );
-    //     return;
-    //   }
-    // } else {
-    //   // Warn if no matching product found
-    //   const confirmAdd = confirm(
-    //     `No se encontró un producto en stock que coincida con "${ingredientName}".\n¿Deseas agregar este ingrediente de todas formas?`
-    //   );
-    //   if (!confirmAdd) {
-    //     return;
-    //   }
-    // }
-
-    setCustomIngredients([
-      ...customIngredients,
-      {
-        name: ingredientName.trim(),
-        quantity: ingredientQuantity,
-        unit: ingredientUnit,
-        productId: productId,
-      },
-    ]);
-    setSelectedIngredient("none");
-    setCustomIngredientName("");
-    setIngredientQuantity("");
-    setIngredientUnit("ml");
-  };
-
-  const removeCustomIngredient = (index: number) => {
-    const updatedIngredients = customIngredients.filter((_, i) => i !== index);
-    setCustomIngredients(updatedIngredients);
-  };
-
-  // Function to deduct stock for custom ingredients
-  const deductCustomIngredientStock = async (
-    ingredients: {
-      name: string;
-      quantity: string;
-      unit: string;
-      productId?: string;
-    }[],
-    productAmount: number
-  ) => {
-    for (const ingredient of ingredients) {
-      const requiredQuantity = parseFloat(ingredient.quantity) * productAmount;
-
-      // Skip if no linked product
-      if (!ingredient.productId) {
-        console.warn(
-          `No linked product for ingredient: ${ingredient.name}. Skipping stock deduction.`
-        );
-        continue;
-      }
-
-      try {
-        // Deduct stock from the linked product
-        const response = await fetch(`/api/products`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: ingredient.productId,
-            stock: Math.max(
-              0,
-              (productsData.find((p) => p.id === ingredient.productId)?.stock ||
-                0) - requiredQuantity
-            ),
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to deduct stock for ingredient: ${ingredient.name}`
-          );
-        }
-
-        console.log(
-          `Deducted ${requiredQuantity} units of ${ingredient.name} from stock`
-        );
-      } catch (error) {
-        console.error(`Error deducting stock for ${ingredient.name}:`, error);
-        toast.error(`Error deducting stock for ${ingredient.name}`);
-      }
-    }
-  };
-
-  // Function to deduct stock for recipe ingredients (from availableStock)
-  const deductRecipeIngredientStock = async (
-    ingredients: {
-      name: string;
-      productId?: string | null;
-      // Standard Ingredient fields
-      quantity?: string;
-      unit?: string;
-      from_available_stock?: number;
-      deduct_stock?: number;
-      stock?: number;
-      // Product Ingredient fields
-      from_total_amount?: number;
-      deduct_amount?: number;
-      // Custom Ingredient fields
-      amount?: string;
-      // Type flags
-      isStandardIngredient?: boolean;
-      isProductIngredient?: boolean;
-      // Legacy fields for compatibility
-      requiredQuantity?: number;
-      availableStock?: number;
-    }[],
-    productAmount: number
-  ) => {
-    // Find the recipe to update its ingredients
-    const selectedRecipe = recipesData.find(
-      (recipe) => recipe.id.toString() === selectedRecipeId
-    );
-    if (!selectedRecipe) {
-      console.error("Selected recipe not found for stock deduction");
-      return;
-    }
-
-    try {
-      // Get the original recipe ingredients from the database
-      let originalIngredients = [];
-      try {
-        originalIngredients =
-          typeof selectedRecipe.ingredients === "string"
-            ? JSON.parse(selectedRecipe.ingredients)
-            : selectedRecipe.ingredients || [];
-      } catch (error) {
-        console.error("Error parsing original recipe ingredients:", error);
-        originalIngredients = [];
-      }
-
-      // Update only the availableStock for matching ingredients
-      const updatedIngredients = originalIngredients.map((originalIng: any) => {
-        // Find the matching ingredient from the current ingredients (with requiredQuantity)
-        const matchingIngredient = ingredients.find(
-          (ing) =>
-            ing.name === originalIng.name &&
-            ing.quantity === originalIng.quantity &&
-            ing.unit === originalIng.unit
-        );
-
-        if (matchingIngredient) {
-          // For recipe-type products: deduct requiredQuantity from availableStock
-          // requiredQuantity already represents the total amount needed for this ingredient
-          const currentAvailableStock = originalIng.availableStock || 0;
-          const requiredQuantity = matchingIngredient.requiredQuantity || 1;
-
-          console.log(`🔄 Deducting for ingredient ${originalIng.name}:`, {
-            currentAvailableStock,
-            requiredQuantity,
-            newAvailableStock: Math.max(0, currentAvailableStock - requiredQuantity)
-          });
-
-          // Update only the availableStock, preserve all other properties
-          return {
-            ...originalIng,
-            availableStock: Math.max(
-              0,
-              currentAvailableStock - requiredQuantity
-            ),
-          };
-        }
-
-        // If no match found, return original ingredient unchanged
-        return originalIng;
-      });
-
-      // Update the recipe with new ingredient availableStock values
-      const response = await fetch(`/api/recipe`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: selectedRecipe.id,
-          name: selectedRecipe.name,
-          category: selectedRecipe.category,
-          amount: selectedRecipe.stock,
-          ingredients: updatedIngredients,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update recipe ingredient stock");
-      }
-
-      console.log(
-        `Deducted stock from recipe ingredients for ${productAmount} units`
-      );
-
-      // Refresh recipes data to reflect changes
-      fetchRecipes();
-    } catch (error) {
-      console.error("Error deducting recipe ingredient stock:", error);
-      toast.error("Error deducting recipe ingredient stock");
-    }
-  };
-
-  // Function to deduct stock for ingredient-type products (from ingredient's stock)
-  const deductIngredientTypeStock = async (
-    ingredientId: string,
-    requiredQuantity: number
-  ) => {
-    try {
-      // Find the ingredient product
-      const ingredient = productsData.find(
-        (product) =>
-          product.type === "ingredient" &&
-          product.id.toString() === ingredientId
-      );
-
-      if (!ingredient) {
-        console.error("Ingredient not found for stock deduction");
-        return;
-      }
-
-      // Calculate new stock
-      const newStock = Math.max(0, (ingredient.stock || 0) - requiredQuantity);
-
-      // Update the ingredient's stock
-      const response = await fetch(`/api/products`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: ingredient.id,
-          stock: newStock,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to deduct stock for ingredient: ${ingredient.name}`
-        );
-      }
-
-      console.log(
-        `Deducted ${requiredQuantity} units from ingredient ${ingredient.name}`
-      );
-
-      // Refresh products data to reflect changes
-      fetchProducts();
-    } catch (error) {
-      console.error("Error deducting ingredient stock:", error);
-      toast.error("Error deducting ingredient stock");
     }
   };
 
@@ -1535,9 +864,6 @@ const Stock = () => {
     } finally {
       setDeletingProductId(null);
     }
-  };
-  const handleNewTransfer = () => {
-    setTransferDialogOpen(true);
   };
   const handleMultipleTransfer = () => {
     setMultipleTransferOpen(true);
@@ -1807,9 +1133,6 @@ const Stock = () => {
     setCurrentProduct(productData);
     setProductDetailOpen(true);
   };
-  const selectedStockData = selectedStock
-    ? stocksData.find((stock) => stock.id == selectedStock)
-    : null;
   const areAllStockItemsSelected =
     displayItems.length > 0 &&
     displayItems.every((item) =>
@@ -3425,11 +2748,4 @@ const Stock = () => {
     </>
   );
 };
-function goToBarDetail(barName: string) {
-  const bar = bars.findIndex((b) => b === barName);
-  if (bar > 0) {
-    // Skipping "Todos"
-    window.location.href = `/bars/${bar}`;
-  }
-}
 export default Stock;

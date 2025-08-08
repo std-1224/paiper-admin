@@ -319,6 +319,7 @@ export type Recipe = {
 	sale_price?: number;
 	category?: string;
 	type?: string;
+	total_amount?: number | string;
 };
 
 export type PersonType = 'Staff' | 'Invitados VIP' | 'Clientes frecuentes' | 'Promotores' | 'PR' | 'Embajadores de marca' | 'Staff interno autorizado';

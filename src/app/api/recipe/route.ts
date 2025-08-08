@@ -24,7 +24,7 @@ export const POST = async (req: Request) => {
     try {
         const body = await req.json();
         const { name, ingredients, amount, category } = body;
-        
+
         if (!name || !ingredients) {
             return NextResponse.json({ error: 'Name and ingredients are required' }, { status: 400 });
         }
@@ -70,14 +70,15 @@ export const PUT = async (req: Request) => {
     try {
         // Parse the request body
         const body = await req.json();
-        const { id, name, ingredients, amount, category } = body;
+        console.log("body: ", body)
+        const { id, name, ingredients, amount, category, stock } = body;
 
         if (!id) {
             return NextResponse.json({ error: 'Recipe ID is required' }, { status: 400 });
         }
-        if (!ingredients) {
-            return NextResponse.json({ error: 'Ingredients are required' }, { status: 400 });
-        }
+        // if (!ingredients) {
+        //     return NextResponse.json({ error: 'Ingredients are required' }, { status: 400 });
+        // }
 
         // Get the current recipe to get existing data
         const { data: currentRecipe, error: fetchError } = await supabaseServerClient
@@ -91,32 +92,26 @@ export const PUT = async (req: Request) => {
         }
 
         // Validate ingredients
-        const ingredientValidation = await validateIngredients(ingredients);
-        if (!ingredientValidation.isValid) {
-            return NextResponse.json({
-                error: 'Invalid ingredients',
-                details: ingredientValidation.errors
-            }, { status: 400 });
+        if (ingredients) {
+            const ingredientValidation = await validateIngredients(ingredients);
+            if (!ingredientValidation.isValid) {
+                return NextResponse.json({
+                    error: 'Invalid ingredients',
+                    details: ingredientValidation.errors
+                }, { status: 400 });
+            }
         }
-
         // Use provided values or fall back to current recipe values
         const recipeName = name || currentRecipe.name;
-        const recipeAmount = amount !== undefined ? amount : currentRecipe.stock;
+        const recipeAmount = ingredients ? (amount !== undefined ? amount : currentRecipe.stock) : stock
         const recipeCategory = category || currentRecipe.category;
-
-        // Preserve availableStock from the request, don't override it
-        const ingredientsWithStock = ingredientValidation.validatedIngredients.map(ingredient => ({
-            ...ingredient,
-            // If availableStock is explicitly provided (including 0), use it. Otherwise use recipe amount
-            availableStock: ingredient.availableStock !== undefined ? ingredient.availableStock : (recipeAmount || 1)
-        }));
 
         // Update the recipe
         const { data, error } = await supabaseServerClient
             .from('products')
             .update({
                 name: recipeName,
-                ingredients: JSON.stringify(ingredientsWithStock),
+                ingredients: ingredients ? JSON.stringify(ingredients): currentRecipe.ingredients,
                 stock: recipeAmount,
                 category: recipeCategory
             })
