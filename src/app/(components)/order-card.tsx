@@ -295,7 +295,7 @@ export function OrderCard({
             toast.error("No tienes permiso para editar pedidos");
             return;
           }
-          handleUpdateStatus
+          handleUpdateStatus()
         }}
         className={`${config.className} w-[50%]`}
         disabled={
