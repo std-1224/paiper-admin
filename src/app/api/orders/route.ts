@@ -264,14 +264,14 @@ export const PUT = async (req: Request) => {
 
       for (const item of order.data.order_items) {
         // Try recipe-based stock deduction first
-        const recipeProcessed = await deductRecipeIngredients(
-          item.product_id,
-          item.quantity,
-          user?.qr?.bar_id
-        );
+        // const recipeProcessed = await deductRecipeIngredients(
+        //   item.product_id,
+        //   item.quantity,
+        //   user?.qr?.bar_id
+        // );
 
         // If no recipe was processed, use regular stock deduction
-        if (!recipeProcessed) {
+        // if (!recipeProcessed) {
           const { data: inventory } = await supabaseServerClient
             .from("inventory")
             .select("*")
@@ -305,7 +305,7 @@ export const PUT = async (req: Request) => {
                 .single();
             if (productError) throw productError;
           }
-        }
+        // }
       }
     }
 
