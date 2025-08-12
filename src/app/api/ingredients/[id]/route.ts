@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase as supabaseServerClient } from '@/lib/supabaseClient';
 
 // GET - Fetch single ingredient by ID
 export async function GET(
@@ -14,7 +11,7 @@ export async function GET(
   try {
     const { id } = params;
 
-    const { data: ingredient, error } = await supabase
+    const { data: ingredient, error } = await supabaseServerClient
       .from('ingredients')
       .select('*')
       .eq('id', id)
@@ -64,7 +61,7 @@ export async function PUT(
     if (stock !== undefined) updateData.stock = parseFloat(stock);
     if (is_liquid !== undefined) updateData.is_liquid = Boolean(is_liquid);
 
-    const { data: ingredient, error } = await supabase
+    const { data: ingredient, error } = await supabaseServerClient
       .from('ingredients')
       .update(updateData)
       .eq('id', id)
@@ -105,7 +102,7 @@ export async function DELETE(
     const { id } = params;
 
     // Check if ingredient is used in any recipes
-    const { data: recipes, error: recipesError } = await supabase
+    const { data: recipes, error: recipesError } = await supabaseServerClient
       .from('recipes')
       .select('id, name, ingredients')
       .contains('ingredients', [{ ingredient_id: id }]);
@@ -126,7 +123,7 @@ export async function DELETE(
       );
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseServerClient
       .from('ingredients')
       .delete()
       .eq('id', id);

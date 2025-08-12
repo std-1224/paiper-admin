@@ -1806,9 +1806,9 @@ export default function StockManagement() {
     // Handle recipe selection - load its ingredients
     if (selectedRecipe.recipe_ingredients && selectedRecipe.recipe_ingredients.length > 0) {
       const recipeIngredients = selectedRecipe.recipe_ingredients.map(ri => ({
-        name: ri.ingredient_name,
+        name: ri.ingredient_name || "", // Provide default empty string
         quantity: ri.deduct_amount.toString(), // Use deduct_amount as the quantity
-        unit: ri.ingredient_unit,
+        unit: ri.ingredient_unit || "ml", // Provide default unit
         requiredQuantity: 1,
         availableStock: ri.deduct_stock, // Show deduct_stock as available stock
         stock: ri.deduct_stock,
