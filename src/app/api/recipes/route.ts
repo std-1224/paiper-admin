@@ -157,7 +157,34 @@ export async function POST(request: NextRequest) {
 
     // Insert recipe ingredients if provided
     if (ingredients && ingredients.length > 0) {
-      const recipeIngredients = ingredients.map((ingredient: RecipeIngredientRequest) => ({
+      // FIXED: Check for duplicate ingredients in the request and remove duplicates
+      const uniqueIngredients = ingredients.filter((ingredient: RecipeIngredientRequest, index: number, self: RecipeIngredientRequest[]) =>
+        index === self.findIndex(i => i.ingredient_id === ingredient.ingredient_id)
+      );
+
+      if (uniqueIngredients.length !== ingredients.length) {
+        console.warn(`Removed ${ingredients.length - uniqueIngredients.length} duplicate ingredients from recipe`);
+      }
+
+      // Check if any of these recipe ingredients already exist
+      const { data: existingRecipeIngredients } = await supabaseServerClient
+        .from('recipe_ingredients')
+        .select('ingredient_id')
+        .eq('recipe_id', recipe.id)
+        .in('ingredient_id', uniqueIngredients.map((i: RecipeIngredientRequest) => i.ingredient_id));
+
+      if (existingRecipeIngredients && existingRecipeIngredients.length > 0) {
+        const existingIds = existingRecipeIngredients.map(ri => ri.ingredient_id);
+        console.error('Duplicate recipe ingredients found:', existingIds);
+        // Rollback: delete the created recipe
+        await supabaseServerClient.from('recipes').delete().eq('id', recipe.id);
+        return NextResponse.json(
+          { error: `Recipe ingredients already exist for ingredient IDs: ${existingIds.join(', ')}` },
+          { status: 409 }
+        );
+      }
+
+      const recipeIngredients = uniqueIngredients.map((ingredient: RecipeIngredientRequest) => ({
         recipe_id: recipe.id,
         ingredient_id: ingredient.ingredient_id,
         deduct_amount: ingredient.deduct_amount,

@@ -66,6 +66,7 @@ interface Product {
   type?: string;
   is_liquid?: boolean;
   total_amount?: number;
+  has_recipe?: boolean; // Added to track if product has ingredients from recipes
 }
 
 interface AddProductModalProps {
@@ -210,11 +211,17 @@ export default function AddProductModal({
       setIsLoading(true);
 
       const uploadedUrl = await handleImageUpload();
+
+      // FIXED: Set has_recipe to true ONLY when product has ingredients FROM RECIPES (not individual ingredients)
+      const isFromRecipe = Boolean(selectedRecipeId && recipes.find(r => r.id === selectedRecipeId));
+      const hasRecipeIngredients = isFromRecipe && recipeIngredients.length > 0;
+
       const productData = {
         ...newProduct,
         name: newProduct.name.trim(),
         description: newProduct.description.trim(),
         image_url: uploadedUrl,
+        has_recipe: hasRecipeIngredients, // Set to true when product has ingredients
         updated_at: new Date().toISOString(),
       };
 
@@ -261,6 +268,7 @@ export default function AddProductModal({
       }
 
       // 3) Create recipe_ingredients rows with product_id
+      // has_recipe: true is set ONLY when ingredients come from recipes, not individual ingredients
       if (recipeIngredients.length > 0) {
         const isFromRecipe = Boolean(selectedRecipeId && recipes.find(r => r.id === selectedRecipeId));
 
@@ -268,7 +276,7 @@ export default function AddProductModal({
           const amountToCreate = Number(ingredient.requiredQuantity || 1);
           const quantityPerUnit = parseFloat(ingredient.quantity) || 0;
 
-          const recipeIngredientData: any = {
+          const recipeIngredientData = {
             product_id: createdProduct.id,
             recipe_id: isFromRecipe ? selectedRecipeId : null,
             ingredient_id: ingredient.id,
@@ -295,7 +303,9 @@ export default function AddProductModal({
 
       toast.success("Producto agregado exitosamente");
       handleClose();
-      onProductAdded && onProductAdded();
+      if (onProductAdded) {
+        onProductAdded();
+      }
     } catch (err) {
       console.error("Error adding product:", err);
       toast.error(err instanceof Error ? err.message : "Error adding product");
@@ -318,7 +328,7 @@ export default function AddProductModal({
     const selectedIngredient = ingredients.find(ingredient => ingredient.id === value);
 
     if (selectedRecipe) {
-      // Handle recipe selection - load its ingredients
+      // Handle RECIPE selection - this will set has_recipe: true
       if (selectedRecipe.recipe_ingredients && selectedRecipe.recipe_ingredients.length > 0) {
         const recipeIngredients = selectedRecipe.recipe_ingredients.filter(ri => !ri.ingredients.is_liquid).map(ri => ({
           id: ri.ingredient_id,
@@ -339,7 +349,7 @@ export default function AddProductModal({
         setRecipeIngredients([]);
       }
     } else if (selectedIngredient) {
-      // Handle individual ingredient selection
+      // Handle INDIVIDUAL ingredient selection - this will NOT set has_recipe: true
       const ingredientData = [{
         id: selectedIngredient.id,
         name: selectedIngredient.name,
@@ -722,9 +732,9 @@ export default function AddProductModal({
                       <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
-                            <span className="text-blue-700">Cantidad total necesaria:</span>
+                            <span className="text-blue-700">Cantidad por unidad:</span>
                             <p className="font-semibold text-blue-900">
-                              {(parseFloat(ingredient.quantity) * (ingredient.requiredQuantity || 1)).toFixed(2)} {ingredient.unit}
+                              {parseFloat(ingredient.quantity).toFixed(2) || 0} {ingredient.unit}
                             </p>
                           </div>
                           <div>
@@ -739,7 +749,7 @@ export default function AddProductModal({
 
                           <div>
                             <span className="text-blue-700">Cantidad disponible:</span>
-                            <p className={`font-semibold ${(ingredient.total_amount || ingredient.available_stock || 0) >= (parseFloat(ingredient.quantity) * (ingredient.requiredQuantity || 1))
+                            <p className={`font-semibold ${(ingredient.total_amount || ingredient.available_stock || 0) >= parseFloat(ingredient.quantity)
                               ? 'text-green-600'
                               : 'text-red-600'
                               }`}>
@@ -759,7 +769,7 @@ export default function AddProductModal({
 
                         {/* Stock validation */}
                         {((ingredient.deduct_stock || ingredient.available_stock || 0) < (ingredient.requiredQuantity || 1) ||
-                          (ingredient.total_amount || ingredient.available_stock || 0) < (parseFloat(ingredient.quantity) * (ingredient.requiredQuantity || 1))) && (
+                          (ingredient.total_amount || ingredient.available_stock || 0) < (ingredient?.requiredQuantity || 1)) && (
                             <p className="text-xs text-red-600 font-medium mt-2">
                               ⚠️ Stock insuficiente
                             </p>
@@ -821,12 +831,13 @@ export default function AddProductModal({
                     </h4>
                     <div className="space-y-2">
                       {recipeIngredients.map((ingredient, index) => {
-                        const totalNeeded = parseFloat(ingredient.quantity) * (ingredient.requiredQuantity || 1);
+                        // FIXED: Don't calculate total needed, just use simple quantity and amount
+                        const quantityNeeded = parseFloat(ingredient.quantity);
                         const unitsNeeded = ingredient.requiredQuantity || 1;
                         const stockAvailable = ingredient.deduct_stock || ingredient.available_stock || 0;
                         const amountAvailable = ingredient.total_amount || ingredient.available_stock || 0;
 
-                        const hasEnoughStock = stockAvailable >= unitsNeeded && amountAvailable >= totalNeeded;
+                        const hasEnoughStock = stockAvailable >= unitsNeeded && amountAvailable >= quantityNeeded;
 
                         return (
                           <div key={index} className="space-y-1">
@@ -844,7 +855,7 @@ export default function AddProductModal({
                                 Stock: {unitsNeeded} / {stockAvailable} unidades
                               </div>
                               <div>
-                                Cantidad: {totalNeeded.toFixed(2)} / {amountAvailable} {ingredient.unit}
+                                Cantidad: {quantityNeeded.toFixed(2)} / {amountAvailable} {ingredient.unit}
                               </div>
                             </div>
                           </div>
