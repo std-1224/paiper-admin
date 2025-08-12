@@ -48,13 +48,9 @@ async function deductProductIngredients(productId: string, orderQuantity: number
 
       // Check if ingredient does NOT have product_id (as per your requirement)
       if (!ingredient.product_id) {
-        // Deduct from recipe_ingredients table: deduct_stock = deduct_stock - quantity, deduct_amount = deduct_amount - amount
-        const newDeductStock = recipeIngredient.deduct_stock - orderQuantity;
-        // const newDeductAmount = orderAmount > 0
-        //   ? recipeIngredient.deduct_amount - orderAmount
-        //   : recipeIngredient.deduct_amount - (recipeIngredient.deduct_amount * orderQuantity);
-
-        const newDeductAmount = recipeIngredient.deduct_amount - orderAmount;
+        // DEDUCTION SYSTEM - only subtraction (-): deduct_stock - quantity, deduct_amount - amount
+        const newDeductStock = recipeIngredient.deduct_stock - orderQuantity;   // deduct_stock - quantity
+        const newDeductAmount = recipeIngredient.deduct_amount - orderAmount;   // deduct_amount - amount
 
         await supabaseServerClient
           .from("recipe_ingredients")
@@ -78,15 +74,9 @@ async function deductProductIngredients(productId: string, orderQuantity: number
         .single();
 
       if (recipe) {
-        // Calculate amount to deduct from recipe
-        const amountToDeduct = orderAmount > 0
-          ? orderAmount
-          : recipeIngredients
-              .filter(ri => {
-                const ingredient = ri.ingredients as any;
-                return ri.recipe_id === recipeId && !ingredient.product_id;
-              })
-              .reduce((sum, ri) => sum + (ri.deduct_amount * orderQuantity), 0);
+        // DEDUCTION SYSTEM: Only subtraction (-), no addition (+) or multiplication (*)
+        // Simply use orderAmount for deduction, no complex calculations
+        const amountToDeduct = orderAmount;
 
         // Validate sufficient amounts in recipe
         if (recipe.stock < orderQuantity) {
@@ -96,12 +86,12 @@ async function deductProductIngredients(productId: string, orderQuantity: number
           throw new Error(`Insufficient recipe quantity. Available: ${recipe.quantity}, Required: ${amountToDeduct}`);
         }
 
-        // Update recipes table: stock = stock - quantity, quantity = quantity - amount
+        // Update recipes table: DEDUCTION SYSTEM - only subtraction (-)
         await supabaseServerClient
           .from("recipes")
           .update({
-            stock: recipe.stock - orderQuantity,
-            quantity: recipe.quantity - amountToDeduct,
+            stock: recipe.stock - orderQuantity,        // stock - quantity
+            quantity: recipe.quantity - amountToDeduct, // quantity - amount
           })
           .eq("id", recipeId);
       }
@@ -204,10 +194,8 @@ export const PUT = async (req: Request) => {
         { status: 400 }
       );
     }
+    console.log("body: ", body);
     const { id, ...orderData } = body;
-
-
-
     if (orderData.order_items) {
       const orderItems = orderData.order_items;
 
@@ -303,13 +291,13 @@ export const PUT = async (req: Request) => {
                 throw new Error(`Insufficient product quantity for: ${item.products.name}. Available: ${productData.quantity}, Required: ${item.amount}`);
               }
 
-              // Update products table: stock = stock - quantity, quantity = quantity - amount
+              // DEDUCTION SYSTEM: Only subtraction (-) - stock - quantity, quantity - amount
               const productUpdateData: any = {
-                stock: productData.stock - item.quantity,
+                stock: productData.stock - item.quantity, // stock - quantity
               };
 
               if (productData.quantity !== undefined && productData.quantity !== null) {
-                productUpdateData.quantity = productData.quantity - item.amount;
+                productUpdateData.quantity = productData.quantity - item.amount; // quantity - amount
               }
 
               const { error: productUpdateError } = await supabaseServerClient
@@ -336,12 +324,12 @@ export const PUT = async (req: Request) => {
                   throw new Error(`Insufficient ingredient quantity for: ${item.products.name}. Available: ${ingredientData.quantity}, Required: ${item.amount}`);
                 }
 
-                // Update ingredients table: stock = stock - quantity, quantity = quantity - amount
+                // DEDUCTION SYSTEM: Only subtraction (-) - stock - quantity, quantity - amount
                 const { error: ingredientUpdateError } = await supabaseServerClient
                   .from("ingredients")
                   .update({
-                    stock: ingredientData.stock - item.quantity,
-                    quantity: ingredientData.quantity - item.amount,
+                    stock: ingredientData.stock - item.quantity,  // stock - quantity
+                    quantity: ingredientData.quantity - item.amount, // quantity - amount
                   })
                   .eq("id", ingredientData.id);
 
