@@ -5,6 +5,7 @@ import { User, Staff } from "@/types/types";
 import { Recipe } from "@/types/types";
 import { Order } from "@/types/types";
 import { supabase, supabaseServerClient } from "@/lib/supabaseClient";
+import { Ingredient, Recipe as NormalizedRecipe } from "@/types/database";
 
 interface AppContextProps {
   barsData: BarData[];
@@ -16,6 +17,8 @@ interface AppContextProps {
   recipesData: Recipe[];
   ordersData: Order[];
   notificationsData: Notification[];
+  ingredientsData: Ingredient[];
+  normalizedRecipesData: NormalizedRecipe[];
   recipesLoading: boolean;
   fetchOrders: () => Promise<void>;
   fetchBars: () => Promise<void>;
@@ -25,6 +28,8 @@ interface AppContextProps {
   fetchUsers: () => Promise<void>;
   fetchStaff: (barId?: number | null) => Promise<void>;
   fetchRecipes: () => Promise<void>;
+  fetchIngredients: () => Promise<void>;
+  fetchNormalizedRecipes: () => Promise<void>;
   uploadImageToSupabase: (
     file: File | Blob,
     fileName: string
@@ -49,6 +54,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [notificationsData, setNotificationsData] = useState<Notification[]>(
     []
   );
+  const [ingredientsData, setIngredientsData] = useState<Ingredient[]>([]);
+  const [normalizedRecipesData, setNormalizedRecipesData] = useState<NormalizedRecipe[]>([]);
 
   useEffect(() => {
     const channel = supabase
@@ -372,6 +379,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
+  const fetchIngredients = useCallback(async () => {
+    try {
+      const response = await fetch('/api/ingredients');
+      if (response.ok) {
+        const data = await response.json();
+        setIngredientsData(data);
+      } else {
+        console.error('Failed to fetch ingredients:', response.status);
+        setIngredientsData([]);
+      }
+    } catch (error) {
+      console.error('Error fetching ingredients:', error);
+      setIngredientsData([]);
+    }
+  }, []);
+
+  const fetchNormalizedRecipes = useCallback(async () => {
+    try {
+      const response = await fetch('/api/recipes');
+      if (response.ok) {
+        const data = await response.json();
+        setNormalizedRecipesData(data);
+      } else {
+        console.error('Failed to fetch normalized recipes:', response.status);
+        setNormalizedRecipesData([]);
+      }
+    } catch (error) {
+      console.error('Error fetching normalized recipes:', error);
+      setNormalizedRecipesData([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchOrders();
     // fetchBars();
@@ -391,6 +430,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         recipesLoading,
         ordersData,
         notificationsData,
+        ingredientsData,
+        normalizedRecipesData,
         fetchOrders,
         fetchStaff,
         fetchBars,
@@ -398,6 +439,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         fetchProducts,
         fetchStocksOfBar,
         fetchRecipes,
+        fetchIngredients,
+        fetchNormalizedRecipes,
         fetchUsers,
         uploadImageToSupabase,
         fetchNotifications,

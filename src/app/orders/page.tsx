@@ -172,22 +172,20 @@ export default function OrdersManagement() {
   };
 
   const renderFilterButton = useCallback(
-    (filter: Order["status"] | "all", label: string) => (
+    (filter: Order["status"] | "all", label: string, index: number) => (
       <Button
+        key={index}
         variant={activeFilter === filter ? "default" : "outline"}
         size="sm"
         onClick={() => setActiveFilter(filter)}
-        className={`rounded-full ${
-          activeFilter === filter
-            ? `bg-${
-                STATUS_CONFIG[filter as keyof typeof STATUS_CONFIG]?.color ||
-                "blue"
-              }-600 hover:bg-${
-                STATUS_CONFIG[filter as keyof typeof STATUS_CONFIG]?.color ||
-                "blue"
-              }-700`
+        className={`rounded-full ${activeFilter === filter
+            ? `bg-${STATUS_CONFIG[filter as keyof typeof STATUS_CONFIG]?.color ||
+            "blue"
+            }-600 hover:bg-${STATUS_CONFIG[filter as keyof typeof STATUS_CONFIG]?.color ||
+            "blue"
+            }-700`
             : ""
-        }`}
+          }`}
       >
         {label}
       </Button>
@@ -244,8 +242,6 @@ export default function OrdersManagement() {
     setSelectedOrderId(id);
     setIsConfirmDialogOpen(true);
   };
-
-  console.log("Orders ------>", ordersData);
 
   const OrderDetailsContent = ({ order }: { order: Order }) => {
     const handleUpdateStatus = async () => {
@@ -401,10 +397,9 @@ export default function OrdersManagement() {
           </DialogClose>
           <Button
             onClick={handleUpdateStatus}
-            className={`${
-              ACTION_BUTTONS[order.status as keyof typeof ACTION_BUTTONS]
+            className={`${ACTION_BUTTONS[order.status as keyof typeof ACTION_BUTTONS]
                 ?.className || ""
-            }`}
+              }`}
             disabled={
               order.status === "cancelled" ||
               order.status === "delivered" ||
@@ -494,8 +489,8 @@ export default function OrdersManagement() {
 
       {/* Filters */}
       <div className="flex space-x-2 overflow-x-auto pb-2">
-        {FILTER_OPTIONS.map(({ value, label }) =>
-          renderFilterButton(value as Order["status"] | "all", label)
+        {FILTER_OPTIONS.map(({ value, label }, index) =>
+          renderFilterButton(value as Order["status"] | "all", label, index)
         )}
       </div>
 
@@ -520,23 +515,19 @@ export default function OrdersManagement() {
               <DialogTitle className="flex items-center justify-between">
                 <span>Detalles del Pedido {selectedOrder.id}</span>
                 <Badge
-                  className={`bg-${
-                    STATUS_CONFIG[
+                  className={`bg-${STATUS_CONFIG[
                       selectedOrder.status as keyof typeof STATUS_CONFIG
                     ].color
-                  }-100 text-${
-                    STATUS_CONFIG[
+                    }-100 text-${STATUS_CONFIG[
                       selectedOrder.status as keyof typeof STATUS_CONFIG
                     ].color
-                  }-800 dark:bg-${
-                    STATUS_CONFIG[
+                    }-800 dark:bg-${STATUS_CONFIG[
                       selectedOrder.status as keyof typeof STATUS_CONFIG
                     ].color
-                  }-900/20 dark:text-${
-                    STATUS_CONFIG[
+                    }-900/20 dark:text-${STATUS_CONFIG[
                       selectedOrder.status as keyof typeof STATUS_CONFIG
                     ].color
-                  }-400`}
+                    }-400`}
                 >
                   {
                     STATUS_CONFIG[

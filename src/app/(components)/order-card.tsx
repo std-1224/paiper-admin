@@ -241,7 +241,11 @@ export function OrderCard({
   );
 
   const handleUpdateStatus = async () => {
+    console.log("🚀 Updating order status for order:", order.id);
+    console.log("order: ", order.order_items)
+    console.log("barID: ", order)
     setIsButtonDisabled(true);
+
     try {
       const newStatus =
         order.status === "paying" && order.payment_method === "cash"
@@ -251,6 +255,9 @@ export function OrderCard({
             : order.status === "preparing" || order.status === "delayed"
               ? "ready"
               : "delivered";
+
+      console.log(`📝 Changing status from ${order.status} to ${newStatus}`);
+
       const response = await fetch(`/api/orders`, {
         method: "PUT",
         headers: {
@@ -262,7 +269,13 @@ export function OrderCard({
         }),
       });
 
+      if (!response.ok) {
+        throw new Error("Failed to update order status");
+      }
+
+      // Send email notification if order is delivered
       if (newStatus === "delivered") {
+        console.log("📧 Sending delivery notification email");
         fetch("/api/mails", {
           method: "POST",
           body: JSON.stringify({
@@ -271,16 +284,18 @@ export function OrderCard({
             orderNumber: order.id,
           }),
         });
+
+        toast.success("¡Pedido entregado! Se han deducido los ingredientes del stock.");
+      } else {
+        toast.success(`Estado actualizado a: ${newStatus}`);
       }
 
       fetchOrders();
       setIsButtonDisabled(false);
-      if (!response.ok) {
-        throw new Error("Failed to update order status");
-      }
       setIsEditOpen(false);
     } catch (error) {
-      console.error("Error updating order status:", error);
+      console.error("❌ Error updating order status:", error);
+      toast.error("Error al actualizar el estado del pedido");
       setIsButtonDisabled(false);
     }
   };
