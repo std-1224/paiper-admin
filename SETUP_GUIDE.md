@@ -82,12 +82,12 @@ const response = await fetch('/api/recipes', {
     ingredients: [
       {
         ingredient_id: 'uuid-of-mint',
-        deduct_amount: 5,
+        deduct_quantity: 5,
         deduct_stock: 5
       },
       {
         ingredient_id: 'uuid-of-lime',
-        deduct_amount: 1,
+        deduct_quantity: 1,
         deduct_stock: 1
       }
     ]
@@ -105,7 +105,7 @@ const response = await fetch('/api/recipe-ingredients', {
   body: JSON.stringify({
     recipe_id: 'recipe-uuid',
     ingredient_id: 'ingredient-uuid',
-    deduct_amount: 50,
+    deduct_quantity: 50,
     deduct_stock: 50
   })
 });
@@ -153,7 +153,7 @@ const response = await fetch('/api/ingredients', {
 - `recipe_id` (UUID, Foreign Key to recipes.id)
 - `ingredient_id` (UUID, Foreign Key to ingredients.id)
 - `deduct_stock` (DECIMAL)
-- `deduct_amount` (DECIMAL)
+- `deduct_quantity` (DECIMAL)
 - `created_at` (TIMESTAMP)
 - `updated_at` (TIMESTAMP)
 - `UNIQUE(recipe_id, ingredient_id)` - Prevents duplicate ingredients per recipe

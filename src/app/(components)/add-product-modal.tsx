@@ -31,7 +31,7 @@ import { Ingredient, Recipe } from "@/types/database";
 interface RecipeIngredientWithDetails {
   id: string;
   ingredient_id: string;
-  deduct_amount: number;
+  deduct_quantity: number;
   deduct_stock: number;
   ingredients: {
     name: string;
@@ -118,7 +118,7 @@ export default function AddProductModal({
     name: string;
     quantity: string;
     unit: string;
-    deduct_amount?: number;
+    deduct_quantity?: number;
     deduct_stock?: number;
     available_stock: number;
     total_amount?: number;
@@ -281,7 +281,7 @@ export default function AddProductModal({
             recipe_id: isFromRecipe ? selectedRecipeId : null,
             ingredient_id: ingredient.id,
             deduct_stock: amountToCreate,           // amount to create
-            deduct_amount: quantityPerUnit,         // quantity per unit
+            deduct_quantity: quantityPerUnit,         // quantity per unit
           };
 
           try {
@@ -333,12 +333,12 @@ export default function AddProductModal({
         const recipeIngredients = selectedRecipe.recipe_ingredients.filter(ri => !ri.ingredients.is_liquid).map(ri => ({
           id: ri.ingredient_id,
           name: ri.ingredients.name,
-          quantity: ri.deduct_amount.toString(), // Use deduct_amount as the quantity
+          quantity: ri.deduct_quantity.toString(), // Use deduct_quantity as the quantity
           unit: ri.ingredients.unit,
-          deduct_amount: ri.deduct_amount,
+          deduct_quantity: ri.deduct_quantity,
           deduct_stock: ri.deduct_stock,
           available_stock: ri.deduct_stock, // Show deduct_stock as available stock
-          total_amount: ri.deduct_amount, // Show deduct_amount as total amount
+          total_amount: ri.deduct_quantity, // Show deduct_quantity as total amount
           requiredQuantity: 1,
           is_liquid: ri.ingredients.is_liquid || false,
           isCustom: false,
@@ -358,7 +358,7 @@ export default function AddProductModal({
         available_stock: selectedIngredient.stock,
         total_amount: selectedIngredient.quantity, // Use stock directly without calculation
         deduct_stock: selectedIngredient.stock, // Available units
-        deduct_amount: selectedIngredient.quantity, // Use stock directly without calculation
+        deduct_quantity: selectedIngredient.quantity, // Use stock directly without calculation
         requiredQuantity: 1,
         is_liquid: selectedIngredient.is_liquid,
         isCustom: false,

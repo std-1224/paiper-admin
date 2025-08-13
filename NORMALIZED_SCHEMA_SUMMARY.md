@@ -41,7 +41,7 @@ CREATE TABLE recipe_ingredients (
     recipe_id UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
     ingredient_id UUID NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
     deduct_stock DECIMAL(10,2) NOT NULL DEFAULT 0,
-    deduct_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+    deduct_quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(recipe_id, ingredient_id)
@@ -114,12 +114,12 @@ const response = await fetch('/api/recipes', {
     ingredients: [
       {
         ingredient_id: 'mint-uuid',
-        deduct_amount: 5,
+        deduct_quantity: 5,
         deduct_stock: 5
       },
       {
         ingredient_id: 'lime-uuid', 
-        deduct_amount: 1,
+        deduct_quantity: 1,
         deduct_stock: 1
       }
     ]
@@ -142,7 +142,7 @@ const response = await fetch('/api/recipes/recipe-uuid');
     {
       "id": "ri-uuid-1",
       "ingredient_id": "mint-uuid",
-      "deduct_amount": 5,
+      "deduct_quantity": 5,
       "deduct_stock": 5,
       "ingredients": {
         "name": "Mint Leaves",

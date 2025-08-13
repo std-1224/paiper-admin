@@ -153,7 +153,7 @@ export default function RecipeDetailsModal({
                         </div>
                         <div className="text-right space-y-1">
                           <div className="text-sm">
-                            <span className="font-medium">Amount needed:</span> {recipeIngredient.deduct_amount} {recipeIngredient.ingredients?.unit || ''}
+                            <span className="font-medium">Amount needed:</span> {recipeIngredient.deduct_quantity} {recipeIngredient.ingredients?.unit || ''}
                           </div>
                           <div className="text-sm">
                             <span className="font-medium">Stock to deduct:</span> {recipeIngredient.deduct_stock}

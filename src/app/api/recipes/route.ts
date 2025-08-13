@@ -6,7 +6,7 @@ import { supabase as supabaseServerClient } from '@/lib/supabaseClient';
 // Interface for recipe ingredients
 interface RecipeIngredientRequest {
   ingredient_id: string;
-  deduct_amount: number;
+  deduct_quantity: number;
   deduct_stock: number;
 }
 
@@ -20,7 +20,7 @@ export async function GET() {
         recipe_ingredients!inner (
           id,
           ingredient_id,
-          deduct_amount,
+          deduct_quantity,
           deduct_stock,
           ingredients (
             name,
@@ -86,10 +86,10 @@ export async function POST(request: NextRequest) {
     if (ingredients && ingredients.length > 0) {
       for (const ingredient of ingredients) {
         if (!ingredient.ingredient_id ||
-            ingredient.deduct_amount === undefined ||
+            ingredient.deduct_quantity === undefined ||
             ingredient.deduct_stock === undefined) {
           return NextResponse.json(
-            { error: 'Each ingredient must have ingredient_id, deduct_amount, and deduct_stock' },
+            { error: 'Each ingredient must have ingredient_id, deduct_quantity, and deduct_stock' },
             { status: 400 }
           );
         }
@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
       const recipeIngredients = uniqueIngredients.map((ingredient: RecipeIngredientRequest) => ({
         recipe_id: recipe.id,
         ingredient_id: ingredient.ingredient_id,
-        deduct_amount: ingredient.deduct_amount,
+        deduct_quantity: ingredient.deduct_quantity,
         deduct_stock: ingredient.deduct_stock,
       }));
 
@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
         recipe_ingredients (
           id,
           ingredient_id,
-          deduct_amount,
+          deduct_quantity,
           deduct_stock,
           ingredients (
             name,
@@ -277,10 +277,10 @@ export async function PUT(request: NextRequest) {
     if (ingredients && ingredients.length > 0) {
       for (const ingredient of ingredients) {
         if (!ingredient.ingredient_id ||
-            ingredient.deduct_amount === undefined ||
+            ingredient.deduct_quantity === undefined ||
             ingredient.deduct_stock === undefined) {
           return NextResponse.json(
-            { error: 'Each ingredient must have ingredient_id, deduct_amount, and deduct_stock' },
+            { error: 'Each ingredient must have ingredient_id, deduct_quantity, and deduct_stock' },
             { status: 400 }
           );
         }
@@ -353,7 +353,7 @@ export async function PUT(request: NextRequest) {
         const recipeIngredients = ingredients.map((ingredient: RecipeIngredientRequest) => ({
           recipe_id: id,
           ingredient_id: ingredient.ingredient_id,
-          deduct_amount: ingredient.deduct_amount,
+          deduct_quantity: ingredient.deduct_quantity,
           deduct_stock: ingredient.deduct_stock,
         }));
 
@@ -379,7 +379,7 @@ export async function PUT(request: NextRequest) {
         recipe_ingredients (
           id,
           ingredient_id,
-          deduct_amount,
+          deduct_quantity,
           deduct_stock,
           ingredients (
             name,

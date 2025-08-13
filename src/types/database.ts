@@ -18,7 +18,7 @@ export interface RecipeIngredient {
   product_id: string | null;     // new link to product when not tied to a recipe
   ingredient_id: string;
   deduct_stock: number;
-  deduct_amount: number;
+  deduct_quantity: number;
   created_at: string;
   updated_at: string;
   // Enhanced fields (populated when fetching recipe details)
@@ -63,7 +63,7 @@ export interface UpdateIngredientRequest {
 
 export interface CreateRecipeIngredientRequest {
   ingredient_id: string;
-  deduct_amount: number;
+  deduct_quantity: number;
   deduct_stock: number;
 }
 

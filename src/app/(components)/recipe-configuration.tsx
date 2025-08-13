@@ -291,7 +291,7 @@ export default function RecipeConfiguration() {
                       <div key={index} className="flex justify-between text-sm">
                         <span>{recipeIngredient.ingredients?.name || 'Unknown ingredient'}</span>
                         <span className="text-muted-foreground">
-                          {recipeIngredient.deduct_amount} {recipeIngredient.ingredients?.unit || ''}
+                          {recipeIngredient.deduct_quantity} {recipeIngredient.ingredients?.unit || ''}
                           <Badge
                             className={cn(
                               recipe.stock > 0

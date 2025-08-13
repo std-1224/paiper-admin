@@ -29,7 +29,7 @@ import { useAppContext } from "@/context/AppContext";
 // Define the recipe ingredient type interface
 interface RecipeIngredientType {
   ingredient_id: string;
-  deduct_amount: number;
+  deduct_quantity: number;
   deduct_stock: number;
 }
 
@@ -171,7 +171,7 @@ export default function AddRecipeModal({
 
     const newRecipeIngredient: RecipeIngredientType = {
       ingredient_id: selectedIngredientId,
-      deduct_amount: deductAmount,
+      deduct_quantity: deductAmount,
       deduct_stock: deductStock
     };
 
@@ -400,7 +400,7 @@ export default function AddRecipeModal({
                           <span className="text-xs text-gray-500">{ingredientData?.unit || ""}</span>
                         </div>
                         <div className="text-sm text-gray-600">
-                          Amount: {ingredient.deduct_amount}
+                          Amount: {ingredient.deduct_quantity}
                         </div>
                         <div className="text-sm text-gray-600">
                           Stock: {ingredient.deduct_stock}

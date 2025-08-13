@@ -166,7 +166,7 @@ const Stock = () => {
       stock?: number;
       // Product Ingredient fields
       from_total_amount?: number;
-      deduct_amount?: number;
+      deduct_quantity?: number;
       // Custom Ingredient fields
       amount?: string;
       // Type flags

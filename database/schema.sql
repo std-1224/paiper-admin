@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS recipe_ingredients (
     product_id UUID REFERENCES products(id) ON DELETE CASCADE, -- nullable for base recipe definitions
     ingredient_id UUID NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
     deduct_stock DECIMAL(10,2) NOT NULL DEFAULT 0,
-    deduct_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+    deduct_quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -113,7 +113,7 @@ INSERT INTO recipes (name, unit, quantity, type, stock) VALUES
 
 -- Note: To insert recipe_ingredients, you'll need the actual UUIDs from the ingredients table
 -- Example (replace with actual UUIDs after running the above):
--- INSERT INTO recipe_ingredients (recipe_id, ingredient_id, deduct_amount, deduct_stock) VALUES
+-- INSERT INTO recipe_ingredients (recipe_id, ingredient_id, deduct_quantity, deduct_stock) VALUES
 -- ('mojito-recipe-uuid', 'mint-ingredient-uuid', 5, 5),
 -- ('mojito-recipe-uuid', 'lime-ingredient-uuid', 1, 1),
 -- ('screwdriver-recipe-uuid', 'vodka-ingredient-uuid', 50, 50),

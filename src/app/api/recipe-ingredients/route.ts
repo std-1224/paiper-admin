@@ -58,12 +58,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { recipe_id, product_id, ingredient_id, deduct_amount, deduct_stock } = body;
+    const { recipe_id, product_id, ingredient_id, deduct_quantity, deduct_stock } = body;
 
     // Validation: need an ingredient and at least one of recipe_id or product_id
-    if (!ingredient_id || deduct_amount === undefined || deduct_stock === undefined || (!recipe_id && !product_id)) {
+    if (!ingredient_id || deduct_quantity === undefined || deduct_stock === undefined || (!recipe_id && !product_id)) {
       return NextResponse.json(
-        { error: 'ingredient_id, deduct_amount, deduct_stock and one of recipe_id or product_id are required' },
+        { error: 'ingredient_id, deduct_quantity, deduct_stock and one of recipe_id or product_id are required' },
         { status: 400 }
       );
     }
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
           recipe_id: recipe_id || null,
           product_id: product_id || null,
           ingredient_id,
-          deduct_amount: parseFloat(deduct_amount),
+          deduct_quantity: parseFloat(deduct_quantity),
           deduct_stock: parseFloat(deduct_stock),
         },
       ])
@@ -179,7 +179,7 @@ export async function PATCH(request: NextRequest) {
 
     let select = supabaseServerClient
       .from('recipe_ingredients')
-      .select('id, deduct_stock, deduct_amount')
+      .select('id, deduct_stock, deduct_quantity')
       .eq('ingredient_id', ingredient_id);
 
     if (recipe_id) select = select.eq('recipe_id', recipe_id).is('product_id', null);
@@ -195,11 +195,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     const newDeductStock = Math.max(0, (Number(data.deduct_stock) || 0) - (Number(amount_to_create) || 0));
-    const newDeductAmount = Math.max(0, (Number(data.deduct_amount) || 0) - (Number(quantity_per_unit) || 0));
+    const newDeductAmount = Math.max(0, (Number(data.deduct_quantity) || 0) - (Number(quantity_per_unit) || 0));
 
     const { error: updateErr } = await supabaseServerClient
       .from('recipe_ingredients')
-      .update({ deduct_stock: newDeductStock, deduct_amount: newDeductAmount })
+      .update({ deduct_stock: newDeductStock, deduct_quantity: newDeductAmount })
       .eq('id', data.id);
 
     if (updateErr) {
@@ -209,7 +209,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ id: data.id, deduct_stock: newDeductStock, deduct_amount: newDeductAmount }, { status: 200 });
+    return NextResponse.json({ id: data.id, deduct_stock: newDeductStock, deduct_quantity: newDeductAmount }, { status: 200 });
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json(

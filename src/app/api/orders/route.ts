@@ -27,7 +27,7 @@ async function deductProductIngredients(
           `
         id,
         recipe_id,
-        deduct_amount,
+        deduct_quantity,
         deduct_stock,
         ingredient_id,
         ingredients (
@@ -56,16 +56,16 @@ async function deductProductIngredients(
 
       // Check if ingredient does NOT have product_id (as per your requirement)
       if (!ingredient.product_id) {
-        // DEDUCTION SYSTEM - only subtraction (-): deduct_stock - quantity, deduct_amount - amount
+        // DEDUCTION SYSTEM - only subtraction (-): deduct_stock - quantity, deduct_quantity - amount
         const newDeductStock = recipeIngredient.deduct_stock - orderQuantity; // deduct_stock - quantity
-        const newDeductAmount = recipeIngredient.deduct_amount - orderAmount; // deduct_amount - amount
+        const newDeductAmount = recipeIngredient.deduct_quantity - orderAmount; // deduct_quantity - amount
 
         // 1. Update recipe_ingredients table
         await supabaseServerClient
           .from("recipe_ingredients")
           .update({
             deduct_stock: newDeductStock,
-            deduct_amount: newDeductAmount,
+            deduct_quantity: newDeductAmount,
           })
           .eq("id", recipeIngredient.id);
 
