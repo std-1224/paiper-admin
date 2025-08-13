@@ -26,7 +26,7 @@ export async function GET(
             quantity
           )
         )
-      `)
+      `).eq('id', id)
       .is('recipe_ingredients.product_id', null)
       .single();
 
