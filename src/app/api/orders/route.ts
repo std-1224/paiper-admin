@@ -449,13 +449,70 @@ export const PUT = async (req: Request) => {
                   .eq("bar_id", user?.qr?.bar_id);
                 if (inventoryError) throw inventoryError;
               } else {
-                const { error: productError } = await supabaseServerClient
-                  .from("products")
-                  .update({
-                    stock: item.products.stock - item.quantity,
-                  })
-                  .eq("id", item.product_id);
-                if (productError) throw productError;
+                // Deduct directly from ingredients table for individual ingredient products
+                const { data: ingredientForProduct, error: ingredientForProductError } = await supabaseServerClient
+                  .from("ingredients")
+                  .select("id, stock, quantity")
+                  .eq("product_id", item.product_id)
+                  .single();
+
+                if (ingredientForProduct && !ingredientForProductError) {
+                  // Validate sufficient stock in ingredient
+                  if (ingredientForProduct.stock < item.quantity) {
+                    throw new Error(
+                      `Insufficient ingredient stock for: ${item.products.name}. Available: ${ingredientForProduct.stock}, Required: ${item.quantity}`
+                    );
+                  }
+
+                  // Deduct from ingredients table
+                  const { error: ingredientError } = await supabaseServerClient
+                    .from("ingredients")
+                    .update({
+                      stock: ingredientForProduct.stock - item.quantity,
+                      quantity: ingredientForProduct.quantity - (item.amount || item.quantity),
+                    })
+                    .eq("id", ingredientForProduct.id);
+
+                  if (ingredientError) throw ingredientError;
+
+                  // Also deduct from recipe_ingredients table if this product was created with ingredient-product
+                  const { data: productRecipeIngredients, error: productRecipeError } = await supabaseServerClient
+                    .from("recipe_ingredients")
+                    .select("id, deduct_stock, deduct_quantity")
+                    .eq("product_id", item.product_id)
+                    .eq("ingredient_id", ingredientForProduct.id);
+
+                  if (productRecipeIngredients && productRecipeIngredients.length > 0 && !productRecipeError) {
+                    for (const productRecipeIngredient of productRecipeIngredients) {
+                      // Validate sufficient deduct amounts
+                      if (productRecipeIngredient.deduct_stock < item.quantity) {
+                        throw new Error(
+                          `Insufficient recipe ingredient stock for: ${item.products.name}. Available: ${productRecipeIngredient.deduct_stock}, Required: ${item.quantity}`
+                        );
+                      }
+
+                      // Deduct from recipe_ingredients table
+                      const { error: recipeIngredientError } = await supabaseServerClient
+                        .from("recipe_ingredients")
+                        .update({
+                          deduct_stock: productRecipeIngredient.deduct_stock - item.quantity,
+                          deduct_quantity: productRecipeIngredient.deduct_quantity - (item.amount || item.quantity),
+                        })
+                        .eq("id", productRecipeIngredient.id);
+
+                      if (recipeIngredientError) throw recipeIngredientError;
+                    }
+                  }
+                } else {
+                  // Fallback to product stock if no ingredient found
+                  const { error: productError } = await supabaseServerClient
+                    .from("products")
+                    .update({
+                      stock: item.products.stock - item.quantity,
+                    })
+                    .eq("id", item.product_id);
+                  if (productError) throw productError;
+                }
               }
             }
           }
