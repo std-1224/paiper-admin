@@ -52,6 +52,7 @@ async function deductProductIngredients(productId: string, orderQuantity: number
         const newDeductStock = recipeIngredient.deduct_stock - orderQuantity;   // deduct_stock - quantity
         const newDeductAmount = recipeIngredient.deduct_amount - orderAmount;   // deduct_amount - amount
 
+        // 1. Update recipe_ingredients table
         await supabaseServerClient
           .from("recipe_ingredients")
           .update({
@@ -59,6 +60,23 @@ async function deductProductIngredients(productId: string, orderQuantity: number
             deduct_amount: newDeductAmount,
           })
           .eq("id", recipeIngredient.id);
+
+        // 2. ALSO deduct from ingredients table by ingredient_id
+        const { data: ingredientData } = await supabaseServerClient
+          .from("ingredients")
+          .select("stock, quantity")
+          .eq("id", recipeIngredient.ingredient_id)
+          .single();
+
+        if (ingredientData) {
+          await supabaseServerClient
+            .from("ingredients")
+            .update({
+              stock: ingredientData.stock - orderQuantity,     // stock - quantity
+              quantity: ingredientData.quantity - orderAmount, // quantity - amount
+            })
+            .eq("id", recipeIngredient.ingredient_id);
+        }
       }
     }
 
@@ -95,6 +113,39 @@ async function deductProductIngredients(productId: string, orderQuantity: number
           })
           .eq("id", recipeId);
       }
+    }
+
+    // STEP 3: ALSO deduct from the main product that has recipe ingredients
+    // This ensures both the ingredients AND the final product stock are reduced
+    const { data: productData } = await supabaseServerClient
+      .from("products")
+      .select("stock, quantity, name")
+      .eq("id", productId)
+      .single();
+
+    if (productData) {
+      // Validate sufficient stock in the main product
+      if (productData.stock < orderQuantity) {
+        throw new Error(`Insufficient product stock for: ${productData.name}. Available: ${productData.stock}, Required: ${orderQuantity}`);
+      }
+
+      if (productData.quantity && productData.quantity < orderAmount) {
+        throw new Error(`Insufficient product quantity for: ${productData.name}. Available: ${productData.quantity}, Required: ${orderAmount}`);
+      }
+
+      // DEDUCTION SYSTEM: Only subtraction (-) - stock - quantity, quantity - amount
+      const productUpdateData: any = {
+        stock: productData.stock - orderQuantity, // stock - quantity
+      };
+
+      if (productData.quantity !== undefined && productData.quantity !== null) {
+        productUpdateData.quantity = productData.quantity - orderAmount; // quantity - amount
+      }
+
+      await supabaseServerClient
+        .from("products")
+        .update(productUpdateData)
+        .eq("id", productId);
     }
 
     return true; // Recipe ingredients were processed successfully
@@ -370,6 +421,12 @@ export const PUT = async (req: Request) => {
           throw error; // Re-throw to prevent order completion
         }
       }
+    } else {
+      const { error } = await supabaseServerClient
+        .from("orders")
+        .update(orderData)
+        .eq("id", id);
+      if (error) throw error;
     }
 
     return NextResponse.json(orderData, { status: 200 });
