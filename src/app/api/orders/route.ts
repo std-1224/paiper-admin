@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import { supabase as supabaseServerClient } from "@/lib/supabaseClient";
-// Helper function to deduct ingredients based on the new schema
+
 async function deductProductIngredients(
   productId: string,
   orderQuantity: number,
-  orderAmount: number,
   barId: number
 ) {
   try {
-    // Get the product to check its type
     const { data: product, error: productError } = await supabaseServerClient
       .from("products")
       .select("id, name, type, stock, has_recipe")
@@ -19,7 +17,10 @@ async function deductProductIngredients(
       return false;
     }
 
-    // Check if this product has recipe ingredients in the recipe_ingredients table
+    if (!product.has_recipe) {
+      return false;
+    }
+
     const { data: recipeIngredients, error: recipeError } =
       await supabaseServerClient
         .from("recipe_ingredients")
@@ -47,128 +48,150 @@ async function deductProductIngredients(
     }
 
     if (!recipeIngredients || recipeIngredients.length === 0) {
-      return false; // No recipe ingredients, use regular stock deduction
+      return false;
     }
 
-    // Process each recipe ingredient
     for (const recipeIngredient of recipeIngredients) {
-      const ingredient = recipeIngredient.ingredients as any;
-
-      // Check if ingredient does NOT have product_id (as per your requirement)
-      if (!ingredient.product_id) {
-        // DEDUCTION SYSTEM - only subtraction (-): deduct_stock - quantity, deduct_quantity - amount
-        const newDeductStock = recipeIngredient.deduct_stock - orderQuantity; // deduct_stock - quantity
-        const newDeductAmount = recipeIngredient.deduct_quantity - orderAmount; // deduct_quantity - amount
-
-        // 1. Update recipe_ingredients table
-        await supabaseServerClient
-          .from("recipe_ingredients")
-          .update({
-            deduct_stock: newDeductStock,
-            deduct_quantity: newDeductAmount,
-          })
-          .eq("id", recipeIngredient.id);
-
-        // 2. ALSO deduct from ingredients table by ingredient_id
-        const { data: ingredientData } = await supabaseServerClient
-          .from("ingredients")
-          .select("stock, quantity")
-          .eq("id", recipeIngredient.ingredient_id)
-          .single();
-
-        if (ingredientData) {
-          await supabaseServerClient
-            .from("ingredients")
-            .update({
-              stock: ingredientData.stock - orderQuantity, // stock - quantity
-              quantity: ingredientData.quantity - orderAmount, // quantity - amount
-            })
-            .eq("id", recipeIngredient.ingredient_id);
-        }
-      }
-    }
-
-    // Find unique recipe_ids from the recipe ingredients
-    const recipeIds = Array.from(
-      new Set(recipeIngredients.map((ri) => ri.recipe_id).filter(Boolean))
-    );
-
-    // Deduct from recipes table for each recipe
-    for (const recipeId of recipeIds) {
-      const { data: recipe } = await supabaseServerClient
-        .from("recipes")
-        .select("stock, quantity")
-        .eq("id", recipeId)
+      const { data: ingredientData, error: ingredientError } = await supabaseServerClient
+        .from("ingredients")
+        .select("id, name, stock, quantity, product_id")
+        .eq("id", recipeIngredient.ingredient_id)
         .single();
 
-      if (recipe) {
-        // DEDUCTION SYSTEM: Only subtraction (-), no addition (+) or multiplication (*)
-        // Simply use orderAmount for deduction, no complex calculations
-        const amountToDeduct = orderAmount;
+      if (ingredientError || !ingredientData) {
+        continue;
+      }
 
-        // Validate sufficient amounts in recipe
-        if (recipe.stock < orderQuantity) {
-          throw new Error(
-            `Insufficient recipe stock. Available: ${recipe.stock}, Required: ${orderQuantity}`
-          );
-        }
-        if (recipe.quantity < amountToDeduct) {
-          throw new Error(
-            `Insufficient recipe quantity. Available: ${recipe.quantity}, Required: ${amountToDeduct}`
-          );
-        }
+      // Validate sufficient stock and quantity in ingredients
+      if (ingredientData.stock < recipeIngredient.deduct_stock) {
+        throw new Error(
+          `Insufficient ingredient stock for: ${ingredientData.name}. Available: ${ingredientData.stock}, Required: ${recipeIngredient.deduct_stock}`
+        );
+      }
 
-        // Update recipes table: DEDUCTION SYSTEM - only subtraction (-)
-        await supabaseServerClient
-          .from("recipes")
-          .update({
-            stock: recipe.stock - orderQuantity, // stock - quantity
-            quantity: recipe.quantity - amountToDeduct, // quantity - amount
-          })
-          .eq("id", recipeId);
+      if (ingredientData.quantity < recipeIngredient.deduct_quantity) {
+        throw new Error(
+          `Insufficient ingredient quantity for: ${ingredientData.name}. Available: ${ingredientData.quantity}, Required: ${recipeIngredient.deduct_quantity}`
+        );
+      }
+
+      // Validate sufficient deduct amounts in recipe_ingredients
+      if (recipeIngredient.deduct_stock < 0) {
+        throw new Error(
+          `Invalid recipe ingredient stock for: ${ingredientData.name}. Current deduct_stock: ${recipeIngredient.deduct_stock}`
+        );
+      }
+
+      if (recipeIngredient.deduct_quantity < 0) {
+        throw new Error(
+          `Invalid recipe ingredient quantity for: ${ingredientData.name}. Current deduct_quantity: ${recipeIngredient.deduct_quantity}`
+        );
+      }
+
+      // 1. Deduct from real ingredients
+      const { error: ingredientUpdateError } = await supabaseServerClient
+        .from("ingredients")
+        .update({
+          stock: ingredientData.stock - recipeIngredient.deduct_stock,
+          quantity: ingredientData.quantity - recipeIngredient.deduct_quantity,
+        })
+        .eq("id", recipeIngredient.ingredient_id);
+
+      if (ingredientUpdateError) {
+        throw ingredientUpdateError;
+      }
+
+      // 2. Deduct from recipe_ingredients table (the current recipeIngredient is from the product)
+      // We need to deduct from the base recipe's recipe_ingredients
+      if (recipeIngredient.recipe_id) {
+        // Find the base recipe ingredient (where product_id is null)
+        const { data: baseRecipeIngredient, error: baseRecipeError } = await supabaseServerClient
+          .from("recipe_ingredients")
+          .select("id, deduct_stock, deduct_quantity")
+          .eq("recipe_id", recipeIngredient.recipe_id)
+          .eq("ingredient_id", recipeIngredient.ingredient_id)
+          .is("product_id", null)
+          .single();
+
+        if (baseRecipeIngredient && !baseRecipeError) {
+          // Deduct from base recipe ingredients using the product's deduct values
+          const { error: baseRecipeUpdateError } = await supabaseServerClient
+            .from("recipe_ingredients")
+            .update({
+              deduct_stock: baseRecipeIngredient.deduct_stock - recipeIngredient.deduct_stock,
+              deduct_quantity: baseRecipeIngredient.deduct_quantity - recipeIngredient.deduct_quantity,
+            })
+            .eq("id", baseRecipeIngredient.id);
+
+          if (baseRecipeUpdateError) {
+            throw baseRecipeUpdateError;
+          }
+        }
+      }
+
+      // 3. If ingredient has product_id (ingredient-product), also deduct from products table
+      if (ingredientData.product_id) {
+        const { data: ingredientProductData, error: ingredientProductError } = await supabaseServerClient
+          .from("products")
+          .select("id, name, stock, quantity")
+          .eq("id", ingredientData.product_id)
+          .single();
+
+        if (ingredientProductData && !ingredientProductError) {
+          // Validate sufficient stock in ingredient-product
+          if (ingredientProductData.stock < recipeIngredient.deduct_stock) {
+            throw new Error(
+              `Insufficient ingredient-product stock for: ${ingredientProductData.name}. Available: ${ingredientProductData.stock}, Required: ${recipeIngredient.deduct_stock}`
+            );
+          }
+
+          // Deduct from ingredient-product
+          const { error: ingredientProductUpdateError } = await supabaseServerClient
+            .from("products")
+            .update({
+              stock: ingredientProductData.stock - recipeIngredient.deduct_stock,
+              quantity: ingredientProductData.quantity ? ingredientProductData.quantity - recipeIngredient.deduct_quantity : null,
+            })
+            .eq("id", ingredientData.product_id);
+
+          if (ingredientProductUpdateError) {
+            throw ingredientProductUpdateError;
+          }
+        }
       }
     }
 
-    // STEP 3: ALSO deduct from the main product that has recipe ingredients
-    // This ensures both the ingredients AND the final product stock are reduced
-    const { data: productData } = await supabaseServerClient
+    const { data: productData, error: productFetchError } = await supabaseServerClient
       .from("products")
-      .select("stock, quantity, name")
+      .select("stock, name")
       .eq("id", productId)
       .single();
 
-    if (productData) {
-      // Validate sufficient stock in the main product
-      if (productData.stock < orderQuantity) {
-        throw new Error(
-          `Insufficient product stock for: ${productData.name}. Available: ${productData.stock}, Required: ${orderQuantity}`
-        );
-      }
-
-      if (productData.quantity && productData.quantity < orderAmount) {
-        throw new Error(
-          `Insufficient product quantity for: ${productData.name}. Available: ${productData.quantity}, Required: ${orderAmount}`
-        );
-      }
-
-      // DEDUCTION SYSTEM: Only subtraction (-) - stock - quantity, quantity - amount
-      const productUpdateData: any = {
-        stock: productData.stock - orderQuantity, // stock - quantity
-      };
-
-      if (productData.quantity !== undefined && productData.quantity !== null) {
-        productUpdateData.quantity = productData.quantity - orderAmount; // quantity - amount
-      }
-
-      await supabaseServerClient
-        .from("products")
-        .update(productUpdateData)
-        .eq("id", productId);
+    if (productFetchError || !productData) {
+      throw new Error(`Product not found: ${productId}`);
     }
 
-    return true; // Recipe ingredients were processed successfully
+    // Validate sufficient stock in the main product
+    if (productData.stock < orderQuantity) {
+      throw new Error(
+        `Insufficient product stock for: ${productData.name}. Available: ${productData.stock}, Required: ${orderQuantity}`
+      );
+    }
+
+    const { error: productUpdateError } = await supabaseServerClient
+      .from("products")
+      .update({
+        stock: productData.stock - orderQuantity,
+      })
+      .eq("id", productId);
+
+    if (productUpdateError) {
+      throw productUpdateError;
+    }
+
+    return true;
   } catch (error) {
-    throw error; // Re-throw to prevent order completion
+    throw error;
   }
 }
 
@@ -263,12 +286,10 @@ export const PUT = async (req: Request) => {
         { status: 400 }
       );
     }
-    console.log("body: ", body);
     const { id, ...orderData } = body;
     if (orderData.order_items) {
       const orderItems = orderData.order_items;
 
-      // Fix: Use for...of loop instead of map() for proper async/await
       for (const item of orderItems) {
         if (item.id) {
           const { error } = await supabaseServerClient
@@ -320,7 +341,6 @@ export const PUT = async (req: Request) => {
           })
           .eq("id", order.data.user_id);
 
-        // Fix: Add error handling for balance update
         if (userError) {
           throw new Error(
             `Failed to update user balance: ${userError.message}`
@@ -330,19 +350,14 @@ export const PUT = async (req: Request) => {
 
       for (const item of order.data.order_items) {
         try {
-          // Try the new recipe ingredients deduction system first
           const recipeProcessed = await deductProductIngredients(
             item.product_id,
             item.quantity,
-            item.amount || 0, // Use order amount if provided, otherwise 0
             user?.qr?.bar_id
           );
 
-          // If no recipe ingredients were processed, use regular stock deduction
           if (!recipeProcessed) {
-            // Check if this is an ingredient product (has amount field)
             if (item.amount !== undefined) {
-              // STEP 1: Find and update product using product_id
               const { data: productData, error: productFetchError } =
                 await supabaseServerClient
                   .from("products")
@@ -367,16 +382,15 @@ export const PUT = async (req: Request) => {
                 );
               }
 
-              // DEDUCTION SYSTEM: Only subtraction (-) - stock - quantity, quantity - amount
               const productUpdateData: any = {
-                stock: productData.stock - item.quantity, // stock - quantity
+                stock: productData.stock - item.quantity,
               };
 
               if (
                 productData.quantity !== undefined &&
                 productData.quantity !== null
               ) {
-                productUpdateData.quantity = productData.quantity - item.amount; // quantity - amount
+                productUpdateData.quantity = productData.quantity - item.amount;
               }
 
               const { error: productUpdateError } = await supabaseServerClient
@@ -386,7 +400,6 @@ export const PUT = async (req: Request) => {
 
               if (productUpdateError) throw productUpdateError;
 
-              // STEP 2: Find and update ingredient using product_id
               const { data: ingredientData } = await supabaseServerClient
                 .from("ingredients")
                 .select("id, stock, quantity")
@@ -407,21 +420,18 @@ export const PUT = async (req: Request) => {
                   );
                 }
 
-                // DEDUCTION SYSTEM: Only subtraction (-) - stock - quantity, quantity - amount
                 const { error: ingredientUpdateError } =
                   await supabaseServerClient
                     .from("ingredients")
                     .update({
-                      stock: ingredientData.stock - item.quantity, // stock - quantity
-                      quantity: ingredientData.quantity - item.amount, // quantity - amount
+                      stock: ingredientData.stock - item.quantity,
+                      quantity: ingredientData.quantity - item.amount,
                     })
                     .eq("id", ingredientData.id);
 
                 if (ingredientUpdateError) throw ingredientUpdateError;
               }
             } else {
-              // Regular product deduction (stock only)
-              // Try to deduct from inventory first (bar-specific)
               const { data: inventory } = await supabaseServerClient
                 .from("inventory")
                 .select("*")
@@ -439,7 +449,6 @@ export const PUT = async (req: Request) => {
                   .eq("bar_id", user?.qr?.bar_id);
                 if (inventoryError) throw inventoryError;
               } else {
-                // Deduct from product stock only
                 const { error: productError } = await supabaseServerClient
                   .from("products")
                   .update({
@@ -451,7 +460,7 @@ export const PUT = async (req: Request) => {
             }
           }
         } catch (error) {
-          throw error; // Re-throw to prevent order completion
+          throw error;
         }
       }
     }

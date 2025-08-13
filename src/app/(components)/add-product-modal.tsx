@@ -214,7 +214,7 @@ export default function AddProductModal({
 
       // FIXED: Set has_recipe to true ONLY when product has ingredients FROM RECIPES (not individual ingredients)
       const isFromRecipe = Boolean(selectedRecipeId && recipes.find(r => r.id === selectedRecipeId));
-      const hasRecipeIngredients = isFromRecipe && recipeIngredients.length > 0;
+      const hasRecipeIngredients = recipeIngredients.length > 0;
 
       const productData = {
         ...newProduct,

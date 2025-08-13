@@ -241,61 +241,55 @@ export function OrderCard({
   );
 
   const handleUpdateStatus = async () => {
-    console.log("🚀 Updating order status for order:", order.id);
-    console.log("order: ", order.order_items)
-    console.log("barID: ", order)
-    // setIsButtonDisabled(true);
+    setIsButtonDisabled(true);
 
     try {
-      // const newStatus =
-      //   order.status === "paying" && order.payment_method === "cash"
-      //     ? "pending"
-      //     : order.status === "pending" || order.status === "delayed"
-      //       ? "preparing"
-      //       : order.status === "preparing" || order.status === "delayed"
-      //         ? "ready"
-      //         : "delivered";
+      const newStatus =
+        order.status === "paying" && order.payment_method === "cash"
+          ? "pending"
+          : order.status === "pending" || order.status === "delayed"
+            ? "preparing"
+            : order.status === "preparing" || order.status === "delayed"
+              ? "ready"
+              : "delivered";
 
-      // console.log(`📝 Changing status from ${order.status} to ${newStatus}`);
+      const response = await fetch(`/api/orders`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: order.id,
+          status: newStatus,
+        }),
+      });
 
-      // const response = await fetch(`/api/orders`, {
-      //   method: "PUT",
-      //   headers: {
-      //     "Content-Type": "application/json",
-      //   },
-      //   body: JSON.stringify({
-      //     id: order.id,
-      //     status: newStatus,
-      //   }),
-      // });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update order status");
+      }
 
-      // if (!response.ok) {
-      //   throw new Error("Failed to update order status");
-      // }
+      // Send email notification if order is delivered
+      if (newStatus === "delivered") {
+        fetch("/api/mails", {
+          method: "POST",
+          body: JSON.stringify({
+            email: user?.email,
+            type: "order_delivered",
+            orderNumber: order.id,
+          }),
+        });
 
-      // // Send email notification if order is delivered
-      // if (newStatus === "delivered") {
-      //   console.log("📧 Sending delivery notification email");
-      //   fetch("/api/mails", {
-      //     method: "POST",
-      //     body: JSON.stringify({
-      //       email: user?.email,
-      //       type: "order_delivered",
-      //       orderNumber: order.id,
-      //     }),
-      //   });
+        toast.success("¡Pedido entregado! Se han deducido los ingredientes del stock.");
+      } else {
+        toast.success(`Estado actualizado a: ${newStatus}`);
+      }
 
-      //   toast.success("¡Pedido entregado! Se han deducido los ingredientes del stock.");
-      // } else {
-      //   toast.success(`Estado actualizado a: ${newStatus}`);
-      // }
-
-      // fetchOrders();
-      // setIsButtonDisabled(false);
-      // setIsEditOpen(false);
+      fetchOrders();
+      setIsButtonDisabled(false);
+      setIsEditOpen(false);
     } catch (error) {
-      console.error("❌ Error updating order status:", error);
-      toast.error("Error al actualizar el estado del pedido");
+      toast.error(`Error al actualizar el estado del pedido: ${error instanceof Error ? error.message : 'Error desconocido'}`);
       setIsButtonDisabled(false);
     }
   };
