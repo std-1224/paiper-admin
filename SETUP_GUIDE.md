@@ -141,10 +141,7 @@ const response = await fetch('/api/ingredients', {
 ### Recipes Table
 - `id` (UUID, Primary Key)
 - `name` (VARCHAR, NOT NULL)
-- `unit` (VARCHAR, NOT NULL)
-- `quantity` (DECIMAL)
 - `type` (VARCHAR, CHECK: 'drink', 'meal', 'input')
-- `stock` (DECIMAL)
 - `created_at` (TIMESTAMP)
 - `updated_at` (TIMESTAMP)
 

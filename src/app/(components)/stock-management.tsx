@@ -2068,12 +2068,19 @@ export default function StockManagement() {
   // Calculate derived data
   const {
     totalProducts,
+    totalRecipes,
+    totalIngredients,
     lowStockProducts,
     outOfStockProducts,
     stockValue,
     averageMargin,
   } = useMemo(() => {
-    const totalProducts = productsData.length;
+    // Count recipes and ingredients separately
+    const recipeCount = recipesData.filter(r => r.type === "recipe").length;
+    const ingredientCount = ingredientsData.length;
+    const productCount = productsData.length;
+    const totalItems = productCount + recipeCount + ingredientCount;
+
     const lowStockProducts = productsData.filter(
       (p) => calculateStatus(p.stock) === "low"
     ).length;
@@ -2096,17 +2103,19 @@ export default function StockManagement() {
         : 0;
 
     return {
-      totalProducts,
+      totalProducts: totalItems, // Total products + recipes + ingredients
+      totalRecipes: recipeCount,
+      totalIngredients: ingredientCount,
       lowStockProducts,
       outOfStockProducts,
       stockValue,
       averageMargin,
     };
-  }, [productsData]);
+  }, [productsData, recipesData, ingredientsData]);
 
   // Filter products based on search, category filter, and sales filter
   const filteredProducts = useMemo(() => {
-    // Combine productsData and recipesData, but avoid duplicates by ID
+    // Combine productsData, recipesData, and ingredientsData, but avoid duplicates by ID
     const seenIds = new Set();
     const allItems: any[] = [];
 
@@ -2121,6 +2130,14 @@ export default function StockManagement() {
     // Add only recipes (not ingredients) from recipesData that aren't already added
     recipesData.forEach((item) => {
       if (item.type === "recipe" && !seenIds.has(item.id)) {
+        seenIds.add(item.id);
+        allItems.push(item);
+      }
+    });
+
+    // Add all ingredients from ingredientsData that aren't already added
+    ingredientsData.forEach((item) => {
+      if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
         allItems.push(item);
       }
@@ -2167,7 +2184,7 @@ export default function StockManagement() {
     }
 
     return filtered;
-  }, [productsData, searchTerm, filter, salesFilter]);
+  }, [productsData, recipesData, ingredientsData, searchTerm, filter, salesFilter]);
 
   const toggleSelectAll = useCallback(() => {
     setSelectedProducts((prev) =>
@@ -2709,18 +2726,21 @@ export default function StockManagement() {
   // Export to Excel functionality
   const handleExportToExcel = () => {
     const exportData = filteredProducts.map((item) => {
-      // Check if it's a product or recipe
+      // Check if it's a product, recipe, or ingredient
       const isProduct = "purchase_price" in item;
+      const isRecipe = item.type === "recipe";
+      const isIngredient = "quantity" in item && !isProduct && !isRecipe;
       const product = item as any; // Cast to any to access all properties
 
       return {
         Nombre: product.name,
-        Tipo: product.type || "producto",
-        Categoría: product.category,
+        Tipo: isProduct ? "Producto" : isRecipe ? "Receta" : isIngredient ? "Ingrediente" : "Otro",
+        Categoría: isProduct ? product.category : isRecipe ? "Receta" : isIngredient ? (product.type === "ingredient-product" ? "Ingrediente-Producto" : "Ingrediente Individual") : "N/A",
         "Precio Compra": isProduct ? product.purchase_price : "N/A",
         "Precio Venta": isProduct ? product.sale_price : "N/A",
-        Stock: product.stock || 0,
-        Estado: calculateStatus(product.stock || 0),
+        Stock: isProduct ? (product.stock || 0) : "N/A",
+        "Cantidad/Estado": isProduct ? calculateStatus(product.stock || 0) : isRecipe ? "Receta" : isIngredient ? `${product.quantity || 0} ${product.unit || "unidad"}` : "N/A",
+        "Es Líquido": isIngredient && product.is_liquid ? "Sí" : "No",
         "Visible Courtesy": isProduct && product.is_courtsey ? "Sí" : "No",
         "Visible PR Token": isProduct && product.is_pr ? "Sí" : "No",
         Activo: isProduct && product.is_active ? "Sí" : "No",
@@ -2740,14 +2760,81 @@ export default function StockManagement() {
 
     XLSX.writeFile(
       wb,
-      `productos_${new Date().toISOString().split("T")[0]}.xlsx`
+      `inventario_completo_${new Date().toISOString().split("T")[0]}.xlsx`
     );
-    toast.success("Productos exportados exitosamente");
+    toast.success("Inventario completo exportado exitosamente");
   };
 
   return (
     <div className="space-y-4">
-      {/* Header and Summary Cards (same as before) */}
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Gestión de Stock</h1>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowAddProductModal(true)}
+            className="gap-2"
+          >
+            <Plus size={16} />
+            Agregar Producto
+          </Button>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <p className="text-sm font-medium">Total Items</p>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalProducts}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalRecipes} recetas, {totalIngredients} ingredientes
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <p className="text-sm font-medium">Stock Bajo</p>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{lowStockProducts}</div>
+            <p className="text-xs text-muted-foreground">
+              Productos con stock &lt; 5
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <p className="text-sm font-medium">Sin Stock</p>
+            <PackageX className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{outOfStockProducts}</div>
+            <p className="text-xs text-muted-foreground">
+              Productos agotados
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <p className="text-sm font-medium">Valor Stock</p>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${stockValue.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">
+              Margen promedio: {averageMargin.toFixed(1)}%
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Search and Filters */}
       <div className="flex flex-col gap-4">
@@ -2755,7 +2842,7 @@ export default function StockManagement() {
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar producto..."
+              placeholder="Buscar productos, recetas e ingredientes..."
               className="pl-8"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -2973,6 +3060,8 @@ export default function StockManagement() {
                 : filteredProducts.map((item) => {
                   const product = item as any; // Cast to access all properties
                   const isProduct = "purchase_price" in item;
+                  const isRecipe = item.type === "recipe";
+                  const isIngredient = "quantity" in item && !isProduct && !isRecipe;
 
                   return (
                     <tr
@@ -3014,7 +3103,8 @@ export default function StockManagement() {
                               </div>
                               <div className="text-xs text-muted-foreground line-clamp-1">
                                 {product.description}{" "}
-                                {!isProduct && "(Receta)"}
+                                {isRecipe && "(Receta)"}
+                                {isIngredient && "(Ingrediente)"}
                               </div>
                             </div>
                           </div>
@@ -3032,54 +3122,87 @@ export default function StockManagement() {
                       </td>
 
                       <td className="p-3">
-                        <Switch
-                          checked={product.is_courtsey}
-                          onCheckedChange={(checked) =>
-                            handleToggleActive(
-                              product.id,
-                              checked,
-                              "is_courtsey"
-                            )
-                          }
-                        />
+                        {isProduct ? (
+                          <Switch
+                            checked={product.is_courtsey}
+                            onCheckedChange={(checked) =>
+                              handleToggleActive(
+                                product.id,
+                                checked,
+                                "is_courtsey"
+                              )
+                            }
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </td>
                       <td className="p-3">
-                        <Switch
-                          checked={product.is_pr}
-                          onCheckedChange={(checked) =>
-                            handleToggleActive(product.id, checked, "is_pr")
-                          }
-                        />
+                        {isProduct ? (
+                          <Switch
+                            checked={product.is_pr}
+                            onCheckedChange={(checked) =>
+                              handleToggleActive(product.id, checked, "is_pr")
+                            }
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </td>
                       <td className="p-3">
                         <Badge variant="outline">
-                          {categoryList.find(
-                            (c) => c.value === product.category
-                          )?.label || product.category}
-                        </Badge>
-                      </td>
-                      <td className="p-3">
-                        ${product.sale_price.toFixed(2)}
-                      </td>
-                      <td className="p-3">
-                        <Badge
-                          className={cn(
-                            "font-normal",
-                            calculateStatus(product.stock) === "sufficient" &&
-                            "bg-green-50 text-green-700",
-                            calculateStatus(product.stock) === "low" &&
-                            "bg-amber-50 text-amber-700",
-                            calculateStatus(product.stock) === "out" &&
-                            "bg-red-50 text-red-700"
+                          {isProduct ? (
+                            categoryList.find(
+                              (c) => c.value === product.category
+                            )?.label || product.category
+                          ) : isRecipe ? (
+                            "Receta"
+                          ) : isIngredient ? (
+                            product.type === "ingredient-product" ? "Ingrediente-Producto" : "Ingrediente"
+                          ) : (
+                            product.type || "Otro"
                           )}
-                        >
-                          {product.stock}{" "}
-                          {calculateStatus(product.stock) === "sufficient"
-                            ? "✓"
-                            : calculateStatus(product.stock) === "low"
-                              ? "⚠"
-                              : "✕"}
                         </Badge>
+                      </td>
+                      <td className="p-3">
+                        {isProduct ? (
+                          `$${product.sale_price.toFixed(2)}`
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {isProduct ? (
+                          <Badge
+                            className={cn(
+                              "font-normal",
+                              calculateStatus(product.stock || 0) === "sufficient" &&
+                              "bg-green-50 text-green-700",
+                              calculateStatus(product.stock || 0) === "low" &&
+                              "bg-amber-50 text-amber-700",
+                              calculateStatus(product.stock || 0) === "out" &&
+                              "bg-red-50 text-red-700"
+                            )}
+                          >
+                            {product.stock || 0}{" "}
+                            {calculateStatus(product.stock || 0) === "sufficient"
+                              ? "✓"
+                              : calculateStatus(product.stock || 0) === "low"
+                                ? "⚠"
+                                : "✕"}
+                          </Badge>
+                        ) : isRecipe ? (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                            Receta
+                          </Badge>
+                        ) : isIngredient ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700">
+                            {product.quantity || 0} {product.unit || "unidad"}
+                            {product.is_liquid && <span className="ml-1 text-blue-600">💧</span>}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </td>
                       <td className="p-3">
                         <div className="flex gap-2">
@@ -3087,10 +3210,16 @@ export default function StockManagement() {
                             variant="ghost"
                             size="icon"
                             onClick={() => viewProductDetails(product)}
+                            title={
+                              isProduct ? "Ver detalles del producto" :
+                              isRecipe ? "Ver detalles de la receta" :
+                              isIngredient ? "Ver detalles del ingrediente" :
+                              "Ver detalles"
+                            }
                           >
                             <Info className="h-4 w-4" />
                           </Button>
-                          {(product.type === "product" || (product.type === "ingredient" && product.is_liquid === true)) && (
+                          {isProduct && (product.type === "product" || (product.type === "ingredient" && product.is_liquid === true)) && (
                             <Button
                               variant="ghost"
                               size="icon"

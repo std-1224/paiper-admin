@@ -7,8 +7,6 @@ export const GET = async (req: Request) => {
         const { searchParams } = new URL(req.url);
         const type = searchParams.get('type');
 
-        console.log("type: ", type)
-
         let query = supabaseServerClient
             .from("products")
             .select("*")

@@ -30,10 +30,7 @@ export interface RecipeIngredient {
 export interface Recipe {
   id: string;
   name: string;
-  unit: string;
-  quantity: number;
   type: 'drink' | 'meal' | 'input';
-  stock: number;
   created_at: string;
   updated_at: string;
   // Populated when fetching with ingredients

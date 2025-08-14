@@ -55,12 +55,12 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, unit, quantity, type, stock, ingredients } = body;
+    const { name, type, ingredients } = body;
 
     // Validation
-    if (!name || !unit || quantity === undefined || !type) {
+    if (!name || !type) {
       return NextResponse.json(
-        { error: 'Name, unit, quantity, and type are required' },
+        { error: 'Name and type are required' },
         { status: 400 }
       );
     }
@@ -86,8 +86,8 @@ export async function POST(request: NextRequest) {
     if (ingredients && ingredients.length > 0) {
       for (const ingredient of ingredients) {
         if (!ingredient.ingredient_id ||
-            ingredient.deduct_quantity === undefined ||
-            ingredient.deduct_stock === undefined) {
+          ingredient.deduct_quantity === undefined ||
+          ingredient.deduct_stock === undefined) {
           return NextResponse.json(
             { error: 'Each ingredient must have ingredient_id, deduct_quantity, and deduct_stock' },
             { status: 400 }
@@ -138,10 +138,7 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           name: name.trim(),
-          unit,
-          quantity: parseFloat(quantity) || 0,
           type,
-          stock: parseFloat(stock) || 0,
         },
       ])
       .select()
@@ -245,7 +242,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, name, unit, quantity, type, stock, ingredients } = body;
+    const { id, name, type, ingredients } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -277,8 +274,8 @@ export async function PUT(request: NextRequest) {
     if (ingredients && ingredients.length > 0) {
       for (const ingredient of ingredients) {
         if (!ingredient.ingredient_id ||
-            ingredient.deduct_quantity === undefined ||
-            ingredient.deduct_stock === undefined) {
+          ingredient.deduct_quantity === undefined ||
+          ingredient.deduct_stock === undefined) {
           return NextResponse.json(
             { error: 'Each ingredient must have ingredient_id, deduct_quantity, and deduct_stock' },
             { status: 400 }
@@ -304,10 +301,7 @@ export async function PUT(request: NextRequest) {
     // Build update object with only provided fields (excluding ingredients)
     const updateData: any = {};
     if (name !== undefined) updateData.name = name.trim();
-    if (unit !== undefined) updateData.unit = unit;
-    if (quantity !== undefined) updateData.quantity = parseFloat(quantity);
     if (type !== undefined) updateData.type = type;
-    if (stock !== undefined) updateData.stock = parseFloat(stock);
 
     // Update the recipe
     const { data: recipe, error: recipeError } = await supabaseServerClient

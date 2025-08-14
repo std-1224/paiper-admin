@@ -51,10 +51,7 @@ export default function AddRecipeModal({
   onIngredientAdded,
 }: AddRecipeModalProps) {
   const [recipeName, setRecipeName] = useState("");
-  const [unit, setUnit] = useState("");
-  const [quantity, setQuantity] = useState("");
   const [type, setType] = useState("drink");
-  const [stock, setStock] = useState("");
   const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredientType[]>([]);
   const [selectedIngredientId, setSelectedIngredientId] = useState("");
   const [ingredientQuantity, setIngredientQuantity] = useState("");
@@ -108,10 +105,7 @@ export default function AddRecipeModal({
 
       if (selectedItem) {
         setRecipeName(selectedItem.name || "");
-        setUnit((selectedItem as any).unit || "");
-        setQuantity(String((selectedItem as any).quantity || ""));
         setType((selectedItem as any).type || "drink");
-        setStock(String(selectedItem.stock || ""));
 
         // Handle existing ingredients
         if (selectedItem.ingredients && Array.isArray(selectedItem.ingredients)) {
@@ -126,10 +120,7 @@ export default function AddRecipeModal({
 
   const resetForm = () => {
     setRecipeName("");
-    setUnit("");
-    setQuantity("");
     setType("drink");
-    setStock("");
     setRecipeIngredients([]);
     setSelectedIngredientId("");
     setIngredientQuantity("");
@@ -192,16 +183,6 @@ export default function AddRecipeModal({
       return;
     }
 
-    if (!unit.trim()) {
-      toast.error("La unidad es requerida");
-      return;
-    }
-
-    if (!quantity.trim()) {
-      toast.error("La cantidad es requerida");
-      return;
-    }
-
     setLoading(true);
     try {
       const response = await fetch("/api/recipes", {
@@ -211,10 +192,7 @@ export default function AddRecipeModal({
         },
         body: JSON.stringify({
           name: recipeName.trim(),
-          unit: unit,
-          quantity: parseFloat(quantity) || 0,
           type: type,
-          stock: parseFloat(stock) || 0,
           ingredients: recipeIngredients,
         }),
       });
@@ -325,36 +303,6 @@ export default function AddRecipeModal({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="unit">Unit <span className="text-red-500">*</span></Label>
-            <Select value={unit} onValueChange={(value) => setUnit(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select unit" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ml">Milliliters (ml)</SelectItem>
-                <SelectItem value="L">Liters (L)</SelectItem>
-                <SelectItem value="g">Grams (g)</SelectItem>
-                <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                <SelectItem value="pieces">Pieces</SelectItem>
-                <SelectItem value="servings">Servings</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="quantity">Quantity <span className="text-red-500">*</span></Label>
-            <Input
-              id="quantity"
-              type="number"
-              placeholder="Enter quantity"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              min="0"
-              step="0.01"
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="type">Type <span className="text-red-500">*</span></Label>
             <Select value={type} onValueChange={(value) => setType(value)}>
               <SelectTrigger>
@@ -366,19 +314,6 @@ export default function AddRecipeModal({
                 <SelectItem value="input">Input</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="stock">Stock</Label>
-            <Input
-              id="stock"
-              type="number"
-              placeholder="Enter stock amount"
-              value={stock}
-              onChange={(e) => setStock(e.target.value)}
-              min="0"
-              step="0.01"
-            />
           </div>
 
           {/* Recipe Ingredients Section */}

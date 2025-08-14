@@ -103,26 +103,6 @@ export default function RecipeDetailsModal({
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Quantity</label>
-                  <div className="mt-1 text-sm">
-                    {recipe.quantity} {recipe.unit}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Stock Available</label>
-                  <div className="mt-1">
-                    <Badge
-                      className={cn(
-                        recipe.stock > 0
-                          ? "bg-green-50 text-green-700 border-green-200"
-                          : "bg-red-50 text-red-700 border-red-200"
-                      )}
-                    >
-                      {recipe.stock} available
-                    </Badge>
-                  </div>
-                </div>
-                <div>
                   <label className="text-sm font-medium text-gray-600">Created</label>
                   <div className="mt-1 text-sm text-gray-500">
                     {new Date(recipe.created_at).toLocaleDateString()}
@@ -153,10 +133,10 @@ export default function RecipeDetailsModal({
                         </div>
                         <div className="text-right space-y-1">
                           <div className="text-sm">
-                            <span className="font-medium">Amount needed:</span> {recipeIngredient.deduct_quantity} {recipeIngredient.ingredients?.unit || ''}
+                            <span className="font-medium">Quantity:</span> {recipeIngredient.deduct_quantity} {recipeIngredient.ingredients?.unit || ''}
                           </div>
                           <div className="text-sm">
-                            <span className="font-medium">Stock to deduct:</span> {recipeIngredient.deduct_stock}
+                            <span className="font-medium">Stock:</span> {recipeIngredient.deduct_stock}
                           </div>
                           <Badge
                             className={cn(
@@ -174,7 +154,7 @@ export default function RecipeDetailsModal({
                                 : "bg-red-50 text-red-700 border-red-200"
                             )}
                           >
-                            Available Quantity: {recipeIngredient.ingredients?.quantity || 0}
+                            Available Quantity: {recipeIngredient.ingredients?.quantity || 0} {recipeIngredient.ingredients?.unit || ''}
                           </Badge>
                         </div>
                       </div>
@@ -187,33 +167,6 @@ export default function RecipeDetailsModal({
                   <p className="text-gray-500">No ingredients added to this recipe</p>
                 </div>
               )}
-            </div>
-
-            {/* Recipe Summary */}
-            <div className="bg-blue-50 rounded-lg p-4">
-              <h4 className="text-md font-semibold mb-2 text-blue-900">Recipe Summary</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-blue-800">Total Ingredients:</span>
-                  <span className="ml-2">{recipe.recipe_ingredients?.length || 0}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-blue-800">Recipe Yield:</span>
-                  <span className="ml-2">{recipe.quantity} {recipe.unit}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-blue-800">Stock Status:</span>
-                  <span className="ml-2">
-                    {recipe.stock > 0 ? `${recipe.stock} available` : 'Out of stock'}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium text-blue-800">Last Updated:</span>
-                  <span className="ml-2">
-                    {new Date(recipe.updated_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
             </div>
           </div>
         ) : (

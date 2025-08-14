@@ -28,6 +28,8 @@ export default function RecipeConfiguration() {
   const [selectedRecipe, setSelectedRecipe] = useState<number | null>(null);
   const [recipesData, setRecipesData] = useState<any[]>([]);
   const [recipesLoading, setRecipesLoading] = useState(false);
+  const [ingredientsData, setIngredientsData] = useState<any[]>([]);
+  const [ingredientsLoading, setIngredientsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   // Modal states
@@ -56,12 +58,38 @@ export default function RecipeConfiguration() {
     }
   };
 
+  // Fetch ingredients from the API endpoint
+  const fetchIngredients = async () => {
+    setIngredientsLoading(true);
+    try {
+      const response = await fetch('/api/ingredients');
+      if (response.ok) {
+        const ingredients = await response.json();
+        setIngredientsData(ingredients);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to fetch ingredients:', response.status, errorData);
+        toast.error(`Failed to load ingredients: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error fetching ingredients:', error);
+      toast.error('Error loading ingredients. Please check your connection.');
+    } finally {
+      setIngredientsLoading(false);
+    }
+  };
+
   const filteredRecipes = recipesData.filter((recipe) =>
     recipe.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const filteredIngredients = ingredientsData.filter((ingredient) =>
+    ingredient.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   useEffect(() => {
     fetchRecipes();
+    fetchIngredients();
   }, []);
 
 
@@ -141,7 +169,7 @@ export default function RecipeConfiguration() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="border rounded-lg p-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="bg-blue-100 p-2 rounded-lg">
@@ -153,6 +181,22 @@ export default function RecipeConfiguration() {
               </div>
               <div className="text-2xl font-bold text-blue-500">
                 {recipesLoading ? "..." : recipesData.length}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border rounded-lg p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="bg-orange-100 p-2 rounded-lg">
+              <Leaf className="text-orange-500" />
+            </div>
+            <div>
+              <div className="text-sm text-muted-foreground">
+                Total de Ingredientes
+              </div>
+              <div className="text-2xl font-bold text-orange-500">
+                {ingredientsLoading ? "..." : ingredientsData.length}
               </div>
             </div>
           </div>
@@ -217,100 +261,161 @@ export default function RecipeConfiguration() {
       <div className="relative w-full sm:w-64">
         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search recipes..."
+          placeholder="Search recipes and ingredients..."
           className="pl-8"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
-      {/* Recipe Cards */}
-      {recipesLoading ? (
+      {/* Recipe and Ingredient Cards */}
+      {recipesLoading || ingredientsLoading ? (
         <Loading />
-      ) : recipesData.length === 0 ? (
+      ) : recipesData.length === 0 && ingredientsData.length === 0 ? (
         <div className="text-center py-12">
           <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <Book className="h-12 w-12 text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay recetas</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay recetas ni ingredientes</h3>
           <p className="text-gray-500 mb-6">
-            No se han creado recetas aún. Crea tu primera receta para comenzar.
+            No se han creado recetas ni ingredientes aún. Crea tu primera receta o ingrediente para comenzar.
           </p>
-          <Button onClick={() => setShowAddRecipeModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Crear Primera Receta
-          </Button>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={() => setShowAddIngredientModal(true)} variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Crear Primer Ingrediente
+            </Button>
+            <Button onClick={() => setShowAddRecipeModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Crear Primera Receta
+            </Button>
+          </div>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredRecipes.map((recipe) => (
-              <div key={recipe.id} className="border rounded-lg p-4">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-lg font-medium">{recipe.name}</h3>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {recipe.type || 'Recipe'}
-                    </Badge>
-                    <Button
-                      onClick={() => handleViewRecipeDetails(recipe.id)}
-                      variant="ghost"
-                      size="icon"
-                      title="View recipe details"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Recipe Info */}
-                <div className="mb-3 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Quantity:</span>
-                    <span>{recipe.quantity} {recipe.unit}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Stock:</span>
-                    <Badge
-                      className={cn(
-                        recipe.stock > 0
-                          ? "bg-green-50 text-green-700 border-green-200"
-                          : "bg-red-50 text-red-700 border-red-200"
+          {/* Recipes Section */}
+          {filteredRecipes.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Book className="h-5 w-5" />
+                Recetas ({filteredRecipes.length})
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredRecipes.map((recipe) => (
+                  <div key={`recipe-${recipe.id}`} className="border rounded-lg p-4 bg-blue-50/30">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="text-lg font-medium">{recipe.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                          {recipe.type || 'Recipe'}
+                        </Badge>
+                        <Button
+                          onClick={() => handleViewRecipeDetails(recipe.id)}
+                          variant="ghost"
+                          size="icon"
+                          title="View recipe details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    {/* Show recipe ingredients */}
+                    <div className="text-sm font-medium mb-2">Ingredients:</div>
+                    <div className="space-y-1">
+                      {recipe.recipe_ingredients && recipe.recipe_ingredients.length > 0 ? (
+                        recipe.recipe_ingredients.map((recipeIngredient: any, index: number) => (
+                          <div key={index} className="flex justify-between text-sm">
+                            <span>{recipeIngredient.ingredients?.name || 'Unknown ingredient'}</span>
+                            <span className="text-muted-foreground">
+                              {recipeIngredient.deduct_quantity} {recipeIngredient.ingredients?.unit || ''}
+                              <Badge
+                                variant="outline"
+                                className="ml-2 bg-green-50 text-green-700 border-green-200"
+                              >
+                                {recipeIngredient.deduct_stock} available
+                              </Badge>
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-gray-500 italic">No ingredients added</div>
                       )}
-                    >
-                      {recipe.stock} available
-                    </Badge>
+                    </div>
                   </div>
-                </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                {/* Show recipe ingredients */}
-                <div className="text-sm font-medium mb-2">Ingredients:</div>
-                <div className="space-y-1">
-                  {recipe.recipe_ingredients && recipe.recipe_ingredients.length > 0 ? (
-                    recipe.recipe_ingredients.map((recipeIngredient: any, index: number) => (
-                      <div key={index} className="flex justify-between text-sm">
-                        <span>{recipeIngredient.ingredients?.name || 'Unknown ingredient'}</span>
-                        <span className="text-muted-foreground">
-                          {recipeIngredient.deduct_quantity} {recipeIngredient.ingredients?.unit || ''}
-                          <Badge
-                            className={cn(
-                              recipe.stock > 0
-                                ? "bg-green-50 text-green-700 border-green-200"
-                                : "bg-red-50 text-red-700 border-red-200"
-                            )}
-                          >
-                            {recipeIngredient.deduct_stock} available
+          {/* Ingredients Section */}
+          {filteredIngredients.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Leaf className="h-5 w-5" />
+                Ingredientes ({filteredIngredients.length})
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredIngredients.map((ingredient) => (
+                  <div key={`ingredient-${ingredient.id}`} className="border rounded-lg p-4 bg-green-50/30">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="text-lg font-medium">{ingredient.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-200">
+                          {ingredient.product_id ? 'Ingredient-Product' : 'Individual'}
+                        </Badge>
+                        {ingredient.is_liquid && (
+                          <Badge variant="outline" className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                            Liquid
                           </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Show ingredient details */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">Stock:</span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            ingredient.stock > 0
+                              ? "bg-green-50 text-green-700 border-green-200"
+                              : "bg-red-50 text-red-700 border-red-200"
+                          )}
+                        >
+                          {ingredient.stock} units
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">Quantity:</span>
+                        <span className="text-muted-foreground">
+                          {ingredient.quantity} {ingredient.unit || ''}
                         </span>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-gray-500 italic">No ingredients added</div>
-                  )}
-                </div>
+                      {ingredient.product_id && (
+                        <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                          Linked to Product ID: {ingredient.product_id}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
+          {/* No results message */}
+          {filteredRecipes.length === 0 && filteredIngredients.length === 0 && searchTerm && (
+            <div className="text-center py-12">
+              <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <Search className="h-12 w-12 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron resultados</h3>
+              <p className="text-gray-500">
+                No se encontraron recetas ni ingredientes que coincidan con "{searchTerm}".
+              </p>
+            </div>
+          )}
         </>
       )}
 
@@ -336,8 +441,9 @@ export default function RecipeConfiguration() {
         isOpen={showAddIngredientModal}
         onClose={() => setShowAddIngredientModal(false)}
         onIngredientAdded={() => {
-          // Refresh recipes data after ingredient is added
+          // Refresh both recipes and ingredients data after ingredient is added
           fetchRecipes();
+          fetchIngredients();
         }}
       />
 
