@@ -462,7 +462,7 @@ export default function AddRecipeModal({
           </Button>
           <Button
             onClick={selectedRecipe ? updateRecipe : addNewRecipe}
-            disabled={loading || !recipeName.trim() || !unit.trim() || !quantity.trim()}
+            disabled={loading || !recipeName.trim()}
           >
             {loading ? (
               <div className="flex items-center">
