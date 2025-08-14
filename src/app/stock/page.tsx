@@ -1095,7 +1095,7 @@ const Stock = () => {
                 </TableHeader>
                 <TableBody>
                   {(() => {
-                    // Combine productsData and recipesData, but avoid duplicates by ID
+                    // Combine productsData, recipesData, and ingredientsData, but avoid duplicates by ID
                     const seenIds = new Set();
                     const allItems: any[] = [];
 
@@ -1115,9 +1115,19 @@ const Stock = () => {
                       }
                     });
 
+                    // Add all ingredients from ingredientsData that aren't already added
+                    ingredientsData.forEach((item) => {
+                      if (!seenIds.has(item.id)) {
+                        seenIds.add(item.id);
+                        allItems.push(item);
+                      }
+                    });
+
                     return allItems;
                   })().map((item) => {
                     const isProduct = "purchase_price" in item;
+                    const isRecipe = item.type === "recipe";
+                    const isIngredient = "quantity" in item && !isProduct && !isRecipe;
                     const product = item as any; // Cast to access all properties
 
                     return (
@@ -1142,31 +1152,57 @@ const Stock = () => {
                             }
                             className="p-0 h-auto font-medium text-orange-900"
                           >
-                            {item.name} {!isProduct && "(Receta)"}
+                            {item.name} {isRecipe && "(Receta)"} {isIngredient && "(Ingrediente)"}
                           </Button>
                         </TableCell>
                         <TableCell>
-                          <Switch
-                            checked={isProduct ? product.is_active : false}
-                            onCheckedChange={(checked) =>
-                              isProduct &&
-                              handleToggleActive(
-                                item.id?.toString(),
-                                checked,
-                                "is_active"
-                              )
-                            }
-                          />
+                          {isProduct ? (
+                            <Switch
+                              checked={product.is_active}
+                              onCheckedChange={(checked) =>
+                                handleToggleActive(
+                                  item.id?.toString(),
+                                  checked,
+                                  "is_active"
+                                )
+                              }
+                            />
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
-                          {"category" in item ? item.category : "N/A"}
+                          {isProduct ? (
+                            item.category || "N/A"
+                          ) : isRecipe ? (
+                            "Receta"
+                          ) : isIngredient ? (
+                            item.type === "ingredient-product" ? "Ingrediente-Producto" : "Ingrediente"
+                          ) : (
+                            "N/A"
+                          )}
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium text-green-600">
-                            ${item.purchase_price?.toFixed(2) || "0.00"}
-                          </span>
+                          {isProduct ? (
+                            <span className="font-medium text-green-600">
+                              ${item.purchase_price?.toFixed(2) || "0.00"}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </TableCell>
-                        <TableCell>{item.stock}</TableCell>
+                        <TableCell>
+                          {isProduct || isRecipe ? (
+                            item.stock || 0
+                          ) : isIngredient ? (
+                            <span>
+                              {item.quantity || 0} {item.unit || "unidad"}
+                              {item.is_liquid && <span className="ml-1 text-blue-600">💧</span>}
+                            </span>
+                          ) : (
+                            "N/A"
+                          )}
+                        </TableCell>
                         <TableCell>
                           {stocksData
                             .filter((s) => item.id == s.productId)
@@ -1188,16 +1224,30 @@ const Stock = () => {
                             .length > 2 && "..."}
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              "quantity" in item && item.stock > 5
-                                ? "bg-green-50 text-green-700 border-green-200"
-                                : "bg-amber-50 text-amber-700 border-amber-200"
-                            }
-                          >
-                            {item.stock > 5 ? "En Stock" : "Falta Stock"}
-                          </Badge>
+                          {isProduct ? (
+                            <Badge
+                              variant="outline"
+                              className={
+                                item.stock > 5
+                                  ? "bg-green-50 text-green-700 border-green-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                              }
+                            >
+                              {item.stock > 5 ? "En Stock" : "Falta Stock"}
+                            </Badge>
+                          ) : isRecipe ? (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                              Receta
+                            </Badge>
+                          ) : isIngredient ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              Ingrediente
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">
+                              N/A
+                            </Badge>
+                          )}
                         </TableCell>
                         {showUnredeemed && "date" in item && (
                           <TableCell>{product.created_at || "N/A"}</TableCell>
