@@ -228,16 +228,6 @@ export default function AddRecipeModal({
       return;
     }
 
-    if (!unit.trim()) {
-      toast.error("La unidad es requerida");
-      return;
-    }
-
-    if (!quantity.trim()) {
-      toast.error("La cantidad es requerida");
-      return;
-    }
-
     setLoading(true);
     try {
       const response = await fetch("/api/recipes", {
@@ -248,10 +238,7 @@ export default function AddRecipeModal({
         body: JSON.stringify({
           id: selectedRecipe,
           name: recipeName.trim(),
-          unit: unit,
-          quantity: parseFloat(quantity) || 0,
           type: type,
-          stock: parseFloat(stock) || 0,
           ingredients: recipeIngredients,
         }),
       });
