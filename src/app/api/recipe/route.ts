@@ -71,7 +71,7 @@ export const PUT = async (req: Request) => {
         // Parse the request body
         const body = await req.json();
         console.log("body: ", body)
-        const { id, name, ingredients, amount, category, stock } = body;
+        const { id, name, ingredients, amount, category } = body;
 
         if (!id) {
             return NextResponse.json({ error: 'Recipe ID is required' }, { status: 400 });
@@ -83,7 +83,7 @@ export const PUT = async (req: Request) => {
         // Get the current recipe to get existing data
         const { data: currentRecipe, error: fetchError } = await supabaseServerClient
             .from('products')
-            .select('name, stock, ingredients, category')
+            .select('name, ingredients, category')
             .eq('id', id)
             .single();
 
@@ -103,7 +103,6 @@ export const PUT = async (req: Request) => {
         }
         // Use provided values or fall back to current recipe values
         const recipeName = name || currentRecipe.name;
-        const recipeAmount = ingredients ? (amount !== undefined ? amount : currentRecipe.stock) : stock
         const recipeCategory = category || currentRecipe.category;
 
         // Update the recipe
@@ -112,7 +111,6 @@ export const PUT = async (req: Request) => {
             .update({
                 name: recipeName,
                 ingredients: ingredients ? JSON.stringify(ingredients): currentRecipe.ingredients,
-                stock: recipeAmount,
                 category: recipeCategory
             })
             .eq('id', id)

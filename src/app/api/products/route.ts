@@ -10,7 +10,9 @@ export const GET = async (req: Request) => {
         let query = supabaseServerClient
             .from("products")
             .select("*")
-            .order("id", { ascending: true });
+            .order("id", { ascending: true })
+            .is('recipe_id', null)
+            .is('ingredient_id', null);
 
         // Filter by type if specified
         if (type) {
@@ -45,6 +47,11 @@ export const POST = async (req: Request) => {
                 sale_price: body.sale_price,
                 type: body.type || 'product', // Default type is "product"
                 has_recipe: body.has_recipe || false,
+                is_active: body.is_active !== undefined ? body.is_active : true,
+                is_pr: body.is_pr || false,
+                is_courtsey: body.is_courtsey || false,
+                recipe_id: body.recipe_id || null,
+                ingredient_id: body.ingredient_id || null,
                 // ingredients: body.ingredients || null,
                 // is_liquid: body.is_liquid || false,
                 // total_amount: body.total_amount || null

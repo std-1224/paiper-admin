@@ -261,7 +261,9 @@ export interface Product {
 	is_pr?: boolean;
 	is_courtsey?: boolean;
 	is_liquid?: boolean; // Toggle for liquid products
-	total_amount?: number; // Total amount calculated as (total amount * stock) for ingredient-type products
+	quantity?: number; // Total amount calculated as (total amount * stock) for ingredient-type products
+	ingredient_id?: string; // Reference to ingredient when product is created from an active ingredient
+	recipe_id?: string; // Reference to recipe when product is created from an active recipe
 }
 
 export interface CartItem extends Product {
@@ -308,6 +310,8 @@ export type Ingredient = {
 	name: string;
 	quantity: string;
 	unit: string;
+	is_active?: boolean;
+	sale_price?: number;
 };
 
 export type Recipe = {
@@ -320,6 +324,7 @@ export type Recipe = {
 	category?: string;
 	type?: string;
 	total_amount?: number | string;
+	is_active?: boolean;
 };
 
 export type PersonType = 'Staff' | 'Invitados VIP' | 'Clientes frecuentes' | 'Promotores' | 'PR' | 'Embajadores de marca' | 'Staff interno autorizado';

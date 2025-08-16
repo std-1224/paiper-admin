@@ -7,7 +7,7 @@ import { supabase as supabaseServerClient } from '@/lib/supabaseClient';
 interface RecipeIngredientRequest {
   ingredient_id: string;
   deduct_quantity: number;
-  deduct_stock: number;
+  deduct_stock?: number; // Optional - defaults to 0 for recipe creation
 }
 
 // GET - Fetch all recipes with their ingredients
@@ -25,7 +25,6 @@ export async function GET() {
           ingredients (
             name,
             unit,
-            stock,
             quantity
           )
         )
@@ -86,10 +85,9 @@ export async function POST(request: NextRequest) {
     if (ingredients && ingredients.length > 0) {
       for (const ingredient of ingredients) {
         if (!ingredient.ingredient_id ||
-          ingredient.deduct_quantity === undefined ||
-          ingredient.deduct_stock === undefined) {
+          ingredient.deduct_quantity === undefined) {
           return NextResponse.json(
-            { error: 'Each ingredient must have ingredient_id, deduct_quantity, and deduct_stock' },
+            { error: 'Each ingredient must have ingredient_id, deduct_quantity' },
             { status: 400 }
           );
         }
@@ -97,7 +95,7 @@ export async function POST(request: NextRequest) {
         // Verify ingredient exists
         const { data: existingIngredient } = await supabaseServerClient
           .from('ingredients')
-          .select('id, stock')
+          .select('id')
           .eq('id', ingredient.ingredient_id)
           .single();
 
@@ -108,13 +106,8 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Check if there's enough stock
-        if (existingIngredient.stock < ingredient.deduct_stock) {
-          return NextResponse.json(
-            { error: `Insufficient stock for ingredient ${ingredient.ingredient_id}` },
-            { status: 400 }
-          );
-        }
+        // Note: We don't check stock availability when creating recipes
+        // Recipes are formulas/instructions, not actual production that consumes ingredients
       }
     }
 
@@ -185,7 +178,7 @@ export async function POST(request: NextRequest) {
         recipe_id: recipe.id,
         ingredient_id: ingredient.ingredient_id,
         deduct_quantity: ingredient.deduct_quantity,
-        deduct_stock: ingredient.deduct_stock,
+        deduct_stock: ingredient.deduct_stock || 0, // Default to 0 for recipe creation
       }));
 
       const { error: ingredientsError } = await supabaseServerClient
@@ -242,7 +235,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, name, type, ingredients } = body;
+    const { id, name, type, ingredients, is_active } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -274,10 +267,9 @@ export async function PUT(request: NextRequest) {
     if (ingredients && ingredients.length > 0) {
       for (const ingredient of ingredients) {
         if (!ingredient.ingredient_id ||
-          ingredient.deduct_quantity === undefined ||
-          ingredient.deduct_stock === undefined) {
+          ingredient.deduct_quantity === undefined) {
           return NextResponse.json(
-            { error: 'Each ingredient must have ingredient_id, deduct_quantity, and deduct_stock' },
+            { error: 'Each ingredient must have ingredient_id, deduct_quantity' },
             { status: 400 }
           );
         }
@@ -302,6 +294,7 @@ export async function PUT(request: NextRequest) {
     const updateData: any = {};
     if (name !== undefined) updateData.name = name.trim();
     if (type !== undefined) updateData.type = type;
+    if (is_active !== undefined) updateData.is_active = is_active;
 
     // Update the recipe
     const { data: recipe, error: recipeError } = await supabaseServerClient
@@ -348,7 +341,7 @@ export async function PUT(request: NextRequest) {
           recipe_id: id,
           ingredient_id: ingredient.ingredient_id,
           deduct_quantity: ingredient.deduct_quantity,
-          deduct_stock: ingredient.deduct_stock,
+          deduct_stock: ingredient.deduct_stock || 0, // Default to 0 for recipe updates
         }));
 
         const { error: insertError } = await supabaseServerClient
@@ -378,7 +371,7 @@ export async function PUT(request: NextRequest) {
           ingredients (
             name,
             unit,
-            stock
+            quantity
           )
         )
       `)

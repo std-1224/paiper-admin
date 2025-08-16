@@ -82,6 +82,7 @@ export default function AddIngredientModal({
           quantity: parseFloat(quantity) || 0,
           stock: parseFloat(stock) || 0,
           is_liquid: false, // Default to false, can be updated later for product creation
+
         }),
       });
 
@@ -188,6 +189,8 @@ export default function AddIngredientModal({
               className="w-full"
             />
           </div>
+
+
         </div>
 
         <DialogFooter className="flex gap-3">

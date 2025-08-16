@@ -22,7 +22,6 @@ export async function GET(
           ingredients (
             name,
             unit,
-            stock,
             quantity
           )
         )
@@ -63,7 +62,7 @@ export async function PUT(
   try {
     const { id } = params;
     const body = await request.json();
-    const { name, unit, quantity, type, stock, ingredients } = body;
+    const { name, unit, quantity, type, ingredients } = body;
 
     // Validate type if provided
     if (type) {
@@ -118,7 +117,6 @@ export async function PUT(
     if (unit !== undefined) updateData.unit = unit;
     if (quantity !== undefined) updateData.quantity = parseFloat(quantity);
     if (type !== undefined) updateData.type = type;
-    if (stock !== undefined) updateData.stock = parseFloat(stock);
 
     // Update the recipe
     const { data: recipe, error: recipeError } = await supabaseServerClient
@@ -195,7 +193,6 @@ export async function PUT(
           ingredients (
             name,
             unit,
-            stock,
             quantity
           )
         )

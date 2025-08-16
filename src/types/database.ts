@@ -8,6 +8,7 @@ export interface Ingredient {
   quantity: number;
   stock: number;
   is_liquid: boolean;
+  is_active?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -31,6 +32,7 @@ export interface Recipe {
   id: string;
   name: string;
   type: 'drink' | 'meal' | 'input';
+  is_active?: boolean;
   created_at: string;
   updated_at: string;
   // Populated when fetching with ingredients

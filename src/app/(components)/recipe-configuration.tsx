@@ -328,12 +328,6 @@ export default function RecipeConfiguration() {
                             <span>{recipeIngredient.ingredients?.name || 'Unknown ingredient'}</span>
                             <span className="text-muted-foreground">
                               {recipeIngredient.deduct_quantity} {recipeIngredient.ingredients?.unit || ''}
-                              <Badge
-                                variant="outline"
-                                className="ml-2 bg-green-50 text-green-700 border-green-200"
-                              >
-                                {recipeIngredient.deduct_stock} available
-                              </Badge>
                             </span>
                           </div>
                         ))
@@ -454,8 +448,8 @@ export default function RecipeConfiguration() {
           setShowRecipeDetailsModal(false);
           setSelectedRecipeForDetails(null);
         }}
-        recipeId={selectedRecipeForDetails}
-        onEditRecipe={handleEditRecipe}
+        recipeId={selectedRecipeForDetails?.toString() || null}
+        onEditRecipe={() => handleEditRecipe}
       />
     </div>
   );

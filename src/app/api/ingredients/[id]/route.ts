@@ -50,7 +50,7 @@ export async function PUT(
   try {
     const { id } = params;
     const body = await request.json();
-    const { product_id, name, unit, quantity, stock, is_liquid } = body;
+    const { product_id, name, unit, quantity, stock, is_liquid, is_active, sale_price } = body;
 
     // Build update object with only provided fields
     const updateData: any = {};
@@ -60,6 +60,7 @@ export async function PUT(
     if (quantity !== undefined) updateData.quantity = parseFloat(quantity);
     if (stock !== undefined) updateData.stock = parseFloat(stock);
     if (is_liquid !== undefined) updateData.is_liquid = Boolean(is_liquid);
+    if (is_active !== undefined) updateData.is_active = Boolean(is_active);
 
     const { data: ingredient, error } = await supabaseServerClient
       .from('ingredients')

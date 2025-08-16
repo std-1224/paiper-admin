@@ -152,6 +152,9 @@ const Stock = () => {
     fetchNormalizedRecipes();
   }, [fetchRecipes, fetchIngredients, fetchNormalizedRecipes]);
 
+  // Log normalized recipes data for debugging
+  console.log("normalizedRecipesData in stock page: ", normalizedRecipesData);
+
   // Recipe ingredient states for product modal
   const [selectedRecipeId, setSelectedRecipeId] = useState<string>("");
   const [recipeIngredients, setRecipeIngredients] = useState<
@@ -739,6 +742,123 @@ const Stock = () => {
     }
   };
 
+  const handleToggleRecipeActive = async (
+    id: string,
+    checked: boolean
+  ) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/recipes`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          is_active: checked,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update recipe");
+
+      // Update associated product if it exists
+      try {
+        const productResponse = await fetch(`/api/products/by-recipe/${id}`);
+
+        if (productResponse.ok) {
+          const productData = await productResponse.json();
+
+          if (productData && productData.id) {
+            // Update the product's is_active status
+            const updateResponse = await fetch(`/api/products`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                id: productData.id,
+                is_active: checked,
+                updated_at: new Date().toISOString(),
+              }),
+            });
+
+            if (!updateResponse.ok) {
+              console.error(`Failed to update product ${productData.id}: ${updateResponse.status}`);
+            }
+          }
+        }
+      } catch (productError) {
+        console.error("Error updating associated product:", productError);
+        // Don't throw here, recipe update was successful
+      }
+
+      // Refresh recipes and normalized recipes data
+      fetchRecipes();
+      fetchNormalizedRecipes();
+    } catch (err) {
+      console.log(
+        err instanceof Error ? err.message : "Error updating recipe"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggleIngredientActive = async (
+    id: string,
+    checked: boolean
+  ) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/ingredients`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          is_active: checked,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update ingredient");
+
+      // Update associated product if it exists
+      try {
+        const productResponse = await fetch(`/api/products/by-ingredient/${id}`);
+
+        if (productResponse.ok) {
+          const productData = await productResponse.json();
+
+          if (productData && productData.id) {
+            // Update the product's is_active status
+            const updateResponse = await fetch(`/api/products`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                id: productData.id,
+                is_active: checked,
+                updated_at: new Date().toISOString(),
+              }),
+            });
+
+            if (!updateResponse.ok) {
+              console.error(`Failed to update product ${productData.id}: ${updateResponse.status}`);
+            }
+          }
+        }
+      } catch (productError) {
+        console.error("Error updating associated product:", productError);
+        // Don't throw here, ingredient update was successful
+      }
+
+      // Refresh ingredients data
+      fetchIngredients();
+    } catch (err) {
+      console.log(
+        err instanceof Error ? err.message : "Error updating ingredient"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   interface ProductDetail {
     id: number;
     name: string;
@@ -1084,6 +1204,7 @@ const Stock = () => {
                     <TableHead>Producto</TableHead>
                     <TableHead>Vis. Menu</TableHead>
                     <TableHead>Categoría</TableHead>
+                    <TableHead>Precio Venta</TableHead>
                     <TableHead>Precio Compra</TableHead>
                     <TableHead>Cantidad</TableHead>
                     <TableHead>Bar</TableHead>
@@ -1095,7 +1216,7 @@ const Stock = () => {
                 </TableHeader>
                 <TableBody>
                   {(() => {
-                    // Combine productsData, recipesData, and ingredientsData, but avoid duplicates by ID
+                    // Combine productsData, normalizedRecipesData, and ingredientsData, but avoid duplicates by ID
                     const seenIds = new Set();
                     const allItems: any[] = [];
 
@@ -1107,15 +1228,20 @@ const Stock = () => {
                       }
                     });
 
-                    // Add only recipes from recipesData that aren't already added
-                    recipesData.forEach((item) => {
-                      if (item.type === "recipe" && !seenIds.has(item.id)) {
+                    // Add ALL normalized recipes data that aren't already added
+                    // Stock page shows all recipes regardless of is_active status
+                    normalizedRecipesData.forEach((item) => {
+                      if (!seenIds.has(item.id)) {
                         seenIds.add(item.id);
-                        allItems.push(item);
+                        allItems.push({
+                          ...item,
+                          type: "recipe" // Ensure type is set for consistency
+                        });
                       }
                     });
 
-                    // Add all ingredients from ingredientsData that aren't already added
+                    // Add ALL ingredients from ingredientsData that aren't already added
+                    // Stock page shows all ingredients regardless of is_active status
                     ingredientsData.forEach((item) => {
                       if (!seenIds.has(item.id)) {
                         seenIds.add(item.id);
@@ -1156,14 +1282,34 @@ const Stock = () => {
                           </Button>
                         </TableCell>
                         <TableCell>
-                          {isProduct ? (
+                          {isRecipe ? (
                             <Switch
-                              checked={product.is_active}
+                              checked={item.is_active || false}
+                              onCheckedChange={(checked) =>
+                                handleToggleRecipeActive(
+                                  item.id?.toString(),
+                                  checked
+                                )
+                              }
+                            />
+                          ) : isProduct ? (
+                            <Switch
+                              checked={product.is_active || false}
                               onCheckedChange={(checked) =>
                                 handleToggleActive(
                                   item.id?.toString(),
                                   checked,
                                   "is_active"
+                                )
+                              }
+                            />
+                          ) : isIngredient ? (
+                            <Switch
+                              checked={item.is_active || false}
+                              onCheckedChange={(checked) =>
+                                handleToggleIngredientActive(
+                                  item.id?.toString(),
+                                  checked
                                 )
                               }
                             />
@@ -1183,6 +1329,27 @@ const Stock = () => {
                           )}
                         </TableCell>
                         <TableCell>
+                          {isRecipe ? (
+                            item.sale_price ? (
+                              <span className="font-medium text-blue-600">
+                                ${item.sale_price.toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )
+                          ) : isIngredient ? (
+                            item.sale_price ? (
+                              <span className="font-medium text-green-600">
+                                ${item.sale_price.toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           {isProduct ? (
                             <span className="font-medium text-green-600">
                               ${item.purchase_price?.toFixed(2) || "0.00"}
@@ -1192,7 +1359,7 @@ const Stock = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          {isProduct || isRecipe ? (
+                          {isProduct ? (
                             item.stock || 0
                           ) : isIngredient ? (
                             <span>
@@ -1200,7 +1367,7 @@ const Stock = () => {
                               {item.is_liquid && <span className="ml-1 text-blue-600">💧</span>}
                             </span>
                           ) : (
-                            "N/A"
+                            ""
                           )}
                         </TableCell>
                         <TableCell>

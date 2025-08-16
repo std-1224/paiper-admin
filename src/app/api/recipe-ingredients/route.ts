@@ -21,9 +21,28 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         ingredients (
+          id,
           name,
           unit,
-          stock
+          quantity,
+          stock,
+          is_liquid,
+          product_id
+        ),
+        recipes (
+          id,
+          name,
+          type,
+          recipe_ingredients (
+            *,
+            ingredients (
+              id,
+              name,
+              unit,
+              quantity,
+              stock
+            )
+          )
         )
       `);
 
@@ -60,10 +79,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { recipe_id, product_id, ingredient_id, deduct_quantity, deduct_stock } = body;
 
-    // Validation: need an ingredient and at least one of recipe_id or product_id
-    if (!ingredient_id || deduct_quantity === undefined || deduct_stock === undefined || (!recipe_id && !product_id)) {
+    // Validation: need deduct values and at least one of recipe_id or product_id
+    // For individual ingredients: ingredient_id is required, recipe_id can be null
+    // For recipes: recipe_id is required, ingredient_id should be null
+    if (deduct_quantity === undefined || deduct_stock === undefined || (!recipe_id && !product_id)) {
       return NextResponse.json(
-        { error: 'ingredient_id, deduct_quantity, deduct_stock and one of recipe_id or product_id are required' },
+        { error: 'deduct_quantity, deduct_stock and one of recipe_id or product_id are required' },
+        { status: 400 }
+      );
+    }
+
+    // Additional validation: must have either ingredient_id OR recipe_id (not both, not neither)
+    if (!ingredient_id && !recipe_id) {
+      return NextResponse.json(
+        { error: 'Either ingredient_id or recipe_id must be provided' },
+        { status: 400 }
+      );
+    }
+
+    if (ingredient_id && recipe_id) {
+      return NextResponse.json(
+        { error: 'Cannot have both ingredient_id and recipe_id - must be one or the other' },
         { status: 400 }
       );
     }
@@ -84,39 +120,52 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate ingredient exists
-    const { data: ingredient } = await supabaseServerClient
-      .from('ingredients')
-      .select('id')
-      .eq('id', ingredient_id)
-      .single();
+    // Validate ingredient exists (only if ingredient_id is provided)
+    if (ingredient_id) {
+      const { data: ingredient } = await supabaseServerClient
+        .from('ingredients')
+        .select('id')
+        .eq('id', ingredient_id)
+        .single();
 
-    if (!ingredient) {
-      return NextResponse.json(
-        { error: 'Ingredient not found' },
-        { status: 404 }
-      );
+      if (!ingredient) {
+        return NextResponse.json(
+          { error: 'Ingredient not found' },
+          { status: 404 }
+        );
+      }
     }
 
     // Check for existing entry to avoid constraint violations
     let existingQuery = supabaseServerClient
       .from('recipe_ingredients')
-      .select('id')
-      .eq('ingredient_id', ingredient_id);
+      .select('id');
 
-    if (recipe_id && !product_id) {
-      // Base recipe case: check recipe_id + ingredient_id where product_id is null
-      existingQuery = existingQuery.eq('recipe_id', recipe_id).is('product_id', null);
-    } else if (product_id) {
-      // Product case: check product_id + ingredient_id
-      existingQuery = existingQuery.eq('product_id', product_id);
+    if (ingredient_id && product_id) {
+      // Individual ingredient linked to product case
+      existingQuery = existingQuery
+        .eq('ingredient_id', ingredient_id)
+        .eq('product_id', product_id)
+        .is('recipe_id', null);
+    } else if (recipe_id && product_id) {
+      // Recipe linked to product case
+      existingQuery = existingQuery
+        .eq('recipe_id', recipe_id)
+        .eq('product_id', product_id)
+        .is('ingredient_id', null);
+    } else if (recipe_id && ingredient_id && !product_id) {
+      // Base recipe case: recipe + ingredient where product_id is null
+      existingQuery = existingQuery
+        .eq('recipe_id', recipe_id)
+        .eq('ingredient_id', ingredient_id)
+        .is('product_id', null);
     }
 
     const { data: existing } = await existingQuery.single();
 
     if (existing) {
       return NextResponse.json(
-        { error: 'This ingredient relation already exists' },
+        { error: 'This relation already exists' },
         { status: 409 }
       );
     }
@@ -128,7 +177,7 @@ export async function POST(request: NextRequest) {
         {
           recipe_id: recipe_id || null,
           product_id: product_id || null,
-          ingredient_id,
+          ingredient_id: ingredient_id || null,
           deduct_quantity: parseFloat(deduct_quantity),
           deduct_stock: parseFloat(deduct_stock),
         },
@@ -219,33 +268,45 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// DELETE - Remove ingredient from recipe
+// DELETE - Remove ingredient from recipe or all ingredients for a product
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const productId = searchParams.get('product_id');
 
-    if (!id) {
+    if (!id && !productId) {
       return NextResponse.json(
-        { error: 'Recipe ingredient ID is required' },
+        { error: 'Either recipe ingredient ID or product_id is required' },
         { status: 400 }
       );
     }
 
-    const { error } = await supabaseServerClient
-      .from('recipe_ingredients')
-      .delete()
-      .eq('id', id);
+    let query = supabaseServerClient.from('recipe_ingredients').delete();
+
+    if (productId) {
+      // Delete all recipe ingredients for a specific product
+      query = query.eq('product_id', productId);
+    } else if (id) {
+      // Delete a specific recipe ingredient by id
+      query = query.eq('id', id);
+    }
+
+    const { error } = await query;
 
     if (error) {
       console.error('Error deleting recipe ingredient:', error);
       return NextResponse.json(
-        { error: 'Failed to remove ingredient from recipe' },
+        { error: 'Failed to remove ingredient(s)' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ message: 'Ingredient removed from recipe successfully' });
+    const message = productId
+      ? 'All ingredients removed from product successfully'
+      : 'Ingredient removed from recipe successfully';
+
+    return NextResponse.json({ message });
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json(

@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS ingredients (
     quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
     stock DECIMAL(10,2) NOT NULL DEFAULT 0,
     is_liquid BOOLEAN NOT NULL DEFAULT false,
+    is_active BOOLEAN NOT NULL DEFAULT false,
+    price DECIMAL(10,2),
     product_id UUID REFERENCES products(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -18,6 +20,8 @@ CREATE TABLE IF NOT EXISTS recipes (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     type VARCHAR(50) NOT NULL CHECK (type IN ('drink', 'meal', 'input')),
+    is_active BOOLEAN NOT NULL DEFAULT false,
+    price DECIMAL(10,2),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -27,7 +31,7 @@ CREATE TABLE IF NOT EXISTS recipe_ingredients (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     recipe_id UUID REFERENCES recipes(id) ON DELETE CASCADE, -- nullable for individual ingredients
     product_id UUID REFERENCES products(id) ON DELETE CASCADE, -- nullable for base recipe definitions
-    ingredient_id UUID NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+    ingredient_id UUID REFERENCES ingredients(id) ON DELETE CASCADE, -- nullable for recipe links
     deduct_stock DECIMAL(10,2) NOT NULL DEFAULT 0,
     deduct_quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

@@ -33,7 +33,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { product_id, name, unit, quantity, stock, is_liquid } = body;
+    const { product_id, name, unit, quantity, stock, is_liquid, is_active, sale_price } = body;
 
     // Validation
     if (!name || !unit || quantity === undefined) {
@@ -66,7 +66,9 @@ export async function POST(request: NextRequest) {
           unit,
           quantity: parseFloat(quantity) || 0,
           stock: parseFloat(stock) || 0,
-          is_liquid: Boolean(is_liquid),
+          // is_liquid: Boolean(is_liquid),
+          // is_active: Boolean(is_active),
+          // sale_price: sale_price ? parseFloat(sale_price) : null,
         },
       ])
       .select()
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, product_id, name, unit, quantity, stock, is_liquid } = body;
+    const { id, product_id, name, unit, quantity, stock, is_liquid, is_active } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -111,6 +113,8 @@ export async function PUT(request: NextRequest) {
     if (quantity !== undefined) updateData.quantity = parseFloat(quantity);
     if (stock !== undefined) updateData.stock = parseFloat(stock);
     if (is_liquid !== undefined) updateData.is_liquid = Boolean(is_liquid);
+    if (is_active !== undefined) updateData.is_active = Boolean(is_active);
+
 
     const { data: ingredient, error } = await supabaseServerClient
       .from('ingredients')

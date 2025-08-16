@@ -30,7 +30,7 @@ import { useAppContext } from "@/context/AppContext";
 interface RecipeIngredientType {
   ingredient_id: string;
   deduct_quantity: number;
-  deduct_stock: number;
+  deduct_stock?: number; // Optional - defaults to 0 for recipe creation
 }
 
 interface AddRecipeModalProps {
@@ -56,7 +56,6 @@ export default function AddRecipeModal({
   const [selectedIngredientId, setSelectedIngredientId] = useState("");
   const [ingredientQuantity, setIngredientQuantity] = useState("");
   const [ingredientUnit, setIngredientUnit] = useState("");
-  const [ingredientStock, setIngredientStock] = useState("");
   const [loading, setLoading] = useState(false);
   const [ingredientsData, setIngredientsData] = useState<any[]>([]);
   const [loadingIngredients, setLoadingIngredients] = useState(false);
@@ -125,7 +124,6 @@ export default function AddRecipeModal({
     setSelectedIngredientId("");
     setIngredientQuantity("");
     setIngredientUnit("");
-    setIngredientStock("");
   };
 
   const handleClose = () => {
@@ -152,18 +150,15 @@ export default function AddRecipeModal({
     }
 
     const deductAmount = parseFloat(ingredientQuantity) || 0;
-    const deductStock = parseFloat(ingredientStock) || 0;
 
-    // Validate stock availability
-    if (deductStock > selectedIngredient.stock) {
-      toast.error(`Stock insuficiente. Disponible: ${selectedIngredient.stock}, Requerido: ${deductStock}`);
-      return;
-    }
+    // Note: We don't validate stock availability when creating recipes
+    // Recipes are formulas/instructions, not actual production that consumes ingredients
+    // Stock validation happens when the recipe is actually used/produced
 
     const newRecipeIngredient: RecipeIngredientType = {
       ingredient_id: selectedIngredientId,
       deduct_quantity: deductAmount,
-      deduct_stock: deductStock
+      // deduct_stock is optional and will default to 0 on the backend
     };
 
     setRecipeIngredients([...recipeIngredients, newRecipeIngredient]);
@@ -172,7 +167,6 @@ export default function AddRecipeModal({
     setSelectedIngredientId("");
     setIngredientQuantity("");
     setIngredientUnit("");
-    setIngredientStock("");
   };
 
 
@@ -303,6 +297,8 @@ export default function AddRecipeModal({
             </Select>
           </div>
 
+
+
           {/* Recipe Ingredients Section */}
           <div className="space-y-4">
             <div className="space-y-2">
@@ -322,10 +318,7 @@ export default function AddRecipeModal({
                           <span className="text-xs text-gray-500">{ingredientData?.unit || ""}</span>
                         </div>
                         <div className="text-sm text-gray-600">
-                          Amount: {ingredient.deduct_quantity}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          Stock: {ingredient.deduct_stock}
+                          Amount: {ingredient.deduct_quantity} {ingredientData?.unit || ""}
                         </div>
                         <div className="flex justify-end">
                           <Button
@@ -363,7 +356,6 @@ export default function AddRecipeModal({
                     const selectedIngredient = ingredientsData.find(ing => ing.id === value);
                     if (selectedIngredient) {
                       setIngredientUnit(selectedIngredient.unit || "");
-                      setIngredientStock(selectedIngredient.stock?.toString() || "0");
                     }
                   }}
                 >
@@ -389,11 +381,10 @@ export default function AddRecipeModal({
                             <span className="flex-1">{ingredient.name}</span>
                             <div className="flex items-center gap-1">
                               <span className="text-xs text-gray-500">{ingredient.quantity} {ingredient.unit || ""}</span>
-                              <span className={`text-xs px-1 py-0.5 rounded ${
-                                ingredient.stock > 10 ? 'bg-green-100 text-green-800' :
-                                ingredient.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
+                              <span className={`text-xs px-1 py-0.5 rounded ${ingredient.stock > 10 ? 'bg-green-100 text-green-800' :
+                                  ingredient.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
+                                }`}>
                                 Stock: {ingredient.stock}
                               </span>
                             </div>
@@ -406,7 +397,7 @@ export default function AddRecipeModal({
               </div>
 
               {selectedIngredientId && (
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <Label className="text-xs text-gray-600 mb-1 block">Quantity</Label>
                     <Input
@@ -422,21 +413,10 @@ export default function AddRecipeModal({
                   <div>
                     <Label className="text-xs text-gray-600 mb-1 block">Unit</Label>
                     <Input
+                      disabled
                       value={ingredientUnit}
-                      onChange={(e) => setIngredientUnit(e.target.value)}
                       className="h-10"
                       readOnly
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-600 mb-1 block">Stock</Label>
-                    <Input
-                      type="number"
-                      value={ingredientStock}
-                      onChange={(e) => setIngredientStock(e.target.value)}
-                      min="0"
-                      step="0.01"
-                      className="h-10"
                     />
                   </div>
                   <div className="flex items-end">
@@ -444,7 +424,7 @@ export default function AddRecipeModal({
                       variant="secondary"
                       size="icon"
                       onClick={addIngredientToRecipe}
-                      disabled={!selectedIngredientId || !ingredientQuantity.trim() || !ingredientStock.trim()}
+                      disabled={!selectedIngredientId || !ingredientQuantity.trim()}
                       className="h-10 w-10"
                     >
                       <Plus className="h-4 w-4" />

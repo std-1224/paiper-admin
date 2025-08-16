@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { supabase as supabaseServerClient } from "@/lib/supabaseClient";
 
-async function deductProductIngredients(
+async function deductInventory(
   productId: string,
   orderQuantity: number,
   barId: number
-) {
+): Promise<boolean> {
   try {
     const { data: product, error: productError } = await supabaseServerClient
       .from("products")
-      .select("id, name, type, stock, has_recipe")
+      .select(`
+        id, name, type, stock, has_recipe, ingredient_id, recipe_id
+      `)
       .eq("id", productId)
       .single();
 
@@ -17,31 +19,58 @@ async function deductProductIngredients(
       return false;
     }
 
-    if (!product.has_recipe) {
-      return false;
+    // Case 1: Direct ingredient sale (product has ingredient_id)
+    if (product.ingredient_id) {
+      return await deductDirectIngredientSale(product.ingredient_id, orderQuantity, productId);
     }
 
-    const { data: recipeIngredients, error: recipeError } =
-      await supabaseServerClient
-        .from("recipe_ingredients")
-        .select(
-          `
+    // Case 2: Direct recipe sale (product has recipe_id)
+    if (product.recipe_id) {
+      return await deductDirectRecipeSale(product.recipe_id, orderQuantity, productId);
+    }
+
+    // Case 3: Product with recipe_ingredients (complex products)
+    if (product.has_recipe) {
+      return await deductFromRecipeIngredients(productId, orderQuantity);
+    }
+
+    // Case 4: Simple product without ingredients/recipes
+    return await deductDirectProductStock(productId, orderQuantity);
+
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function deductFromRecipeIngredients(
+  productId: string,
+  orderQuantity: number
+): Promise<boolean> {
+  try {
+    const { data: recipeIngredients, error: recipeError } = await supabaseServerClient
+      .from("recipe_ingredients")
+      .select(`
         id,
         recipe_id,
-        deduct_quantity,
-        deduct_stock,
         ingredient_id,
+        deduct_stock,
+        deduct_quantity,
         ingredients (
           id,
           name,
           stock,
           quantity,
+          unit,
           is_liquid,
           product_id
+        ),
+        recipes (
+          id,
+          name,
+          type
         )
-      `
-        )
-        .eq("product_id", productId);
+      `)
+      .eq("product_id", productId);
 
     if (recipeError) {
       return false;
@@ -51,148 +80,461 @@ async function deductProductIngredients(
       return false;
     }
 
+    // Group ingredients by ingredient_id to combine multiple entries for the same ingredient
+    const ingredientGroups: { [key: string]: any } = {};
+
     for (const recipeIngredient of recipeIngredients) {
-      const { data: ingredientData, error: ingredientError } = await supabaseServerClient
-        .from("ingredients")
-        .select("id, name, stock, quantity, product_id")
-        .eq("id", recipeIngredient.ingredient_id)
-        .single();
-
-      if (ingredientError || !ingredientData) {
-        continue;
-      }
-
-      // Validate sufficient stock and quantity in ingredients
-      if (ingredientData.stock < recipeIngredient.deduct_stock) {
-        throw new Error(
-          `Insufficient ingredient stock for: ${ingredientData.name}. Available: ${ingredientData.stock}, Required: ${recipeIngredient.deduct_stock}`
-        );
-      }
-
-      if (ingredientData.quantity < recipeIngredient.deduct_quantity) {
-        throw new Error(
-          `Insufficient ingredient quantity for: ${ingredientData.name}. Available: ${ingredientData.quantity}, Required: ${recipeIngredient.deduct_quantity}`
-        );
-      }
-
-      // Validate sufficient deduct amounts in recipe_ingredients
-      if (recipeIngredient.deduct_stock < 0) {
-        throw new Error(
-          `Invalid recipe ingredient stock for: ${ingredientData.name}. Current deduct_stock: ${recipeIngredient.deduct_stock}`
-        );
-      }
-
-      if (recipeIngredient.deduct_quantity < 0) {
-        throw new Error(
-          `Invalid recipe ingredient quantity for: ${ingredientData.name}. Current deduct_quantity: ${recipeIngredient.deduct_quantity}`
-        );
-      }
-
-      // 1. Deduct from real ingredients
-      const { error: ingredientUpdateError } = await supabaseServerClient
-        .from("ingredients")
-        .update({
-          stock: ingredientData.stock - recipeIngredient.deduct_stock,
-          quantity: ingredientData.quantity - recipeIngredient.deduct_quantity,
-        })
-        .eq("id", recipeIngredient.ingredient_id);
-
-      if (ingredientUpdateError) {
-        throw ingredientUpdateError;
-      }
-
-      // 2. Deduct from recipe_ingredients table (the current recipeIngredient is from the product)
-      // We need to deduct from the base recipe's recipe_ingredients
-      if (recipeIngredient.recipe_id) {
-        // Find the base recipe ingredient (where product_id is null)
-        const { data: baseRecipeIngredient, error: baseRecipeError } = await supabaseServerClient
-          .from("recipe_ingredients")
-          .select("id, deduct_stock, deduct_quantity")
-          .eq("recipe_id", recipeIngredient.recipe_id)
-          .eq("ingredient_id", recipeIngredient.ingredient_id)
-          .is("product_id", null)
-          .single();
-
-        if (baseRecipeIngredient && !baseRecipeError) {
-          // Deduct from base recipe ingredients using the product's deduct values
-          const { error: baseRecipeUpdateError } = await supabaseServerClient
-            .from("recipe_ingredients")
-            .update({
-              deduct_stock: baseRecipeIngredient.deduct_stock - recipeIngredient.deduct_stock,
-              deduct_quantity: baseRecipeIngredient.deduct_quantity - recipeIngredient.deduct_quantity,
-            })
-            .eq("id", baseRecipeIngredient.id);
-
-          if (baseRecipeUpdateError) {
-            throw baseRecipeUpdateError;
-          }
+      if (recipeIngredient.ingredient_id && recipeIngredient.ingredients) {
+        const ingredientId = recipeIngredient.ingredient_id;
+        if (!ingredientGroups[ingredientId]) {
+          ingredientGroups[ingredientId] = {
+            ingredient: recipeIngredient.ingredients,
+            totalDeductQuantity: 0,
+            entries: []
+          };
         }
-      }
 
-      // 3. If ingredient has product_id (ingredient-product), also deduct from products table
-      if (ingredientData.product_id) {
-        const { data: ingredientProductData, error: ingredientProductError } = await supabaseServerClient
-          .from("products")
-          .select("id, name, stock, quantity")
-          .eq("id", ingredientData.product_id)
-          .single();
-
-        if (ingredientProductData && !ingredientProductError) {
-          // Validate sufficient stock in ingredient-product
-          if (ingredientProductData.stock < recipeIngredient.deduct_stock) {
-            throw new Error(
-              `Insufficient ingredient-product stock for: ${ingredientProductData.name}. Available: ${ingredientProductData.stock}, Required: ${recipeIngredient.deduct_stock}`
-            );
-          }
-
-          // Deduct from ingredient-product
-          const { error: ingredientProductUpdateError } = await supabaseServerClient
-            .from("products")
-            .update({
-              stock: ingredientProductData.stock - recipeIngredient.deduct_stock,
-              quantity: ingredientProductData.quantity ? ingredientProductData.quantity - recipeIngredient.deduct_quantity : null,
-            })
-            .eq("id", ingredientData.product_id);
-
-          if (ingredientProductUpdateError) {
-            throw ingredientProductUpdateError;
-          }
-        }
+        ingredientGroups[ingredientId].totalDeductQuantity += recipeIngredient.deduct_quantity;
+        ingredientGroups[ingredientId].entries.push(recipeIngredient);
+      } else if (recipeIngredient.recipe_id && recipeIngredient.recipes) {
+        await deductRecipeFromRecipeIngredient(
+          recipeIngredient,
+          orderQuantity
+        );
       }
     }
 
-    const { data: productData, error: productFetchError } = await supabaseServerClient
-      .from("products")
-      .select("stock, name")
-      .eq("id", productId)
-      .single();
+    // Process grouped ingredients
+    for (const ingredientId in ingredientGroups) {
+      const group = ingredientGroups[ingredientId];
+      // Create a combined recipe ingredient entry
+      const combinedEntry = {
+        ingredients: group.ingredient,
+        deduct_quantity: group.totalDeductQuantity,
+        deduct_stock: 0
+      };
 
-    if (productFetchError || !productData) {
-      throw new Error(`Product not found: ${productId}`);
-    }
-
-    // Validate sufficient stock in the main product
-    if (productData.stock < orderQuantity) {
-      throw new Error(
-        `Insufficient product stock for: ${productData.name}. Available: ${productData.stock}, Required: ${orderQuantity}`
+      await deductIndividualIngredientFromRecipeIngredient(
+        combinedEntry,
+        orderQuantity
       );
     }
 
-    const { error: productUpdateError } = await supabaseServerClient
-      .from("products")
-      .update({
-        stock: productData.stock - orderQuantity,
-      })
-      .eq("id", productId);
-
-    if (productUpdateError) {
-      throw productUpdateError;
-    }
-
+    await updateProductStock(productId, orderQuantity);
     return true;
+
   } catch (error) {
     throw error;
   }
+}
+
+async function deductDirectProductStock(
+  productId: string,
+  orderQuantity: number
+): Promise<boolean> {
+  try {
+    const { data: product, error: productError } = await supabaseServerClient
+      .from("products")
+      .select("id, name, stock")
+      .eq("id", productId)
+      .single();
+
+    if (productError || !product) {
+      return false;
+    }
+
+    if (product.stock < orderQuantity) {
+      throw new Error(
+        `Insufficient stock for ${product.name}: Available: ${product.stock}, Required: ${orderQuantity}`
+      );
+    }
+
+    const { error: updateError } = await supabaseServerClient
+      .from("products")
+      .update({ stock: product.stock - orderQuantity })
+      .eq("id", productId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    return true;
+
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function deductIndividualIngredientFromRecipeIngredient(
+  recipeIngredient: any,
+  orderQuantity: number
+) {
+  const ingredient = recipeIngredient.ingredients;
+
+  // Calculate total consumption needed
+  const quantityPerRecipe = recipeIngredient.deduct_quantity; // e.g., 150ml per cocktail
+  const totalConsumption = quantityPerRecipe * orderQuantity; // e.g., 150ml × 3 = 450ml
+
+  // Get quantity per unit (e.g., 250ml per bottle)
+  const quantityPerUnit = ingredient.quantity;
+
+  // Calculate units needed (e.g., 450ml ÷ 250ml = 1.8 units)
+  const unitsNeeded = totalConsumption / quantityPerUnit;
+  const fullUnitsToDeduct = Math.floor(unitsNeeded); // e.g., 1 full unit
+  const remainingConsumption = totalConsumption % quantityPerUnit; // e.g., 450ml % 250ml = 200ml
+
+  // Validate sufficient stock
+  const totalUnitsRequired = Math.ceil(unitsNeeded);
+  if (ingredient.stock < totalUnitsRequired) {
+    throw new Error(
+      `Insufficient stock for ${ingredient.name}: Available: ${ingredient.stock}, Required: ${totalUnitsRequired} units for ${totalConsumption}${ingredient.unit || 'units'}`
+    );
+  }
+
+  let newStock = ingredient.stock;
+  let newQuantity = ingredient.quantity;
+
+  if (unitsNeeded <= 1) {
+    // Consumption is less than one full unit - just reduce quantity in current unit
+    newQuantity = ingredient.quantity - totalConsumption;
+
+    // If we're consuming from an already opened unit and it becomes less than full unit size,
+    // we need to check if we should reduce stock
+    // if (newQuantity < quantityPerUnit && ingredient.stock > 0) {
+      // If the remaining quantity is less than a full unit, we have an opened unit
+      // Stock should represent full unopened units only
+      // newStock = ingredient.stock - 1;
+    // }
+  } else {
+    // Consumption spans multiple units
+    newStock = ingredient.stock - fullUnitsToDeduct;
+
+    if (remainingConsumption > 0) {
+      // There's partial consumption in the last unit
+      // We need to consume one more unit and leave the remainder
+      newStock = newStock - 1; // Consume one more unit for the partial consumption
+      newQuantity = quantityPerUnit - remainingConsumption; // e.g., 250ml - 200ml = 50ml remaining
+    } else {
+      // Exact unit consumption, no partial unit
+      newQuantity = quantityPerUnit;
+    }
+  }
+
+  // Ensure values don't go negative
+  newStock = Math.max(0, newStock);
+  newQuantity = Math.max(0, newQuantity);
+
+  const { error: updateError } = await supabaseServerClient
+    .from("ingredients")
+    .update({
+      stock: newStock,
+      quantity: newQuantity,
+    })
+    .eq("id", ingredient.id);
+
+  if (updateError) {
+    throw updateError;
+  }
+
+  if (ingredient.product_id) {
+    await updateAssociatedProduct(ingredient.product_id, newStock, newQuantity);
+  }
+}
+
+async function deductRecipeFromRecipeIngredient(
+  recipeIngredient: any,
+  orderQuantity: number
+) {
+  const recipe = recipeIngredient.recipes;
+  // Based on the expected calculation: (5g × 2 units) + (15g × 2 units) = 40g
+  // The recipe part should be: recipe_requirement_per_recipe × recipes_in_product × orderQuantity
+  // But the expected result suggests: recipe_requirement_per_recipe × orderQuantity
+  // This means deduct_stock should represent the TOTAL requirement per unit, not number of recipes
+  const recipesToCreate = recipeIngredient.deduct_stock * orderQuantity;
+
+  const { data: recipeIngredients, error: recipeError } = await supabaseServerClient
+    .from("recipe_ingredients")
+    .select(`
+      id,
+      deduct_stock,
+      deduct_quantity,
+      ingredients (
+        id, name, stock, quantity, unit, product_id
+      )
+    `)
+    .eq("recipe_id", recipe.id)
+    .is("product_id", null);
+
+  if (recipeError || !recipeIngredients) {
+    return;
+  }
+
+  for (const ri of recipeIngredients) {
+    const ingredient = ri.ingredients as any;
+    if (!ingredient) continue;
+
+    // Calculate total consumption needed for this ingredient
+    const quantityPerRecipe = ri.deduct_quantity; // e.g., 150ml per cocktail
+    const totalConsumption = quantityPerRecipe * recipesToCreate; // e.g., 150ml × 3 = 450ml
+
+    // Calculate how many units we need to consume
+    const quantityPerUnit = ingredient.quantity; // e.g., 250ml per bottle
+    const unitsNeeded = totalConsumption / quantityPerUnit; // e.g., 450ml ÷ 250ml = 1.8 units
+    const fullUnitsToDeduct = Math.floor(unitsNeeded); // e.g., 1 full unit
+    const remainingConsumption = totalConsumption % quantityPerUnit; // e.g., 450ml % 250ml = 200ml
+
+    // Validate sufficient stock
+    const totalUnitsRequired = Math.ceil(unitsNeeded);
+    if (ingredient.stock < totalUnitsRequired) {
+      throw new Error(
+        `Insufficient stock for ${ingredient.name}: Available: ${ingredient.stock}, Required: ${totalUnitsRequired} units for ${totalConsumption}${ingredient.unit || 'units'}`
+      );
+    }
+
+    // Calculate new stock and quantity values
+    let newStock = ingredient.stock;
+    let newQuantity = ingredient.quantity;
+
+    if (unitsNeeded <= 1) {
+      // Consumption is less than one full unit - just reduce quantity in current unit
+      newQuantity = ingredient.quantity - totalConsumption;
+
+      // If we're consuming from an already opened unit and it becomes less than full unit size,
+      // we need to check if we should reduce stock
+      // if (newQuantity < quantityPerUnit && ingredient.stock > 0) {
+        // If the remaining quantity is less than a full unit, we have an opened unit
+        // Stock should represent full unopened units only
+        newStock = ingredient.stock - 1;
+      // }
+    } else {
+      // Consumption spans multiple units
+      newStock = ingredient.stock - fullUnitsToDeduct;
+
+      if (remainingConsumption > 0) {
+        // There's partial consumption in the last unit
+        // We need to consume one more unit and leave the remainder
+        newStock = newStock - 1; // Consume one more unit for the partial consumption
+        newQuantity = quantityPerUnit - remainingConsumption; // e.g., 250ml - 200ml = 50ml remaining
+      } else {
+        // Exact unit consumption, no partial unit
+        newQuantity = quantityPerUnit;
+      }
+    }
+
+    // Ensure values don't go negative
+    newStock = Math.max(0, newStock);
+    newQuantity = Math.max(0, newQuantity);
+
+    const { error: updateError } = await supabaseServerClient
+      .from("ingredients")
+      .update({ stock: newStock, quantity: newQuantity })
+      .eq("id", ingredient.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    if (ingredient.product_id) {
+      await updateAssociatedProduct(ingredient.product_id, newStock, newQuantity);
+    }
+  }
+}
+
+async function updateProductStock(productId: string, orderQuantity: number) {
+  const { data: product, error: productError } = await supabaseServerClient
+    .from("products")
+    .select("id, name, stock")
+    .eq("id", productId)
+    .single();
+
+  if (productError || !product) {
+    return;
+  }
+
+  if (product.stock < orderQuantity) {
+    throw new Error(
+      `Insufficient product stock for ${product.name}: Available: ${product.stock}, Required: ${orderQuantity}`
+    );
+  }
+
+  const { error: updateError } = await supabaseServerClient
+    .from("products")
+    .update({ stock: product.stock - orderQuantity })
+    .eq("id", productId);
+
+  if (updateError) {
+    throw updateError;
+  }
+}
+
+async function updateAssociatedProduct(productId: string, newStock: number, newQuantity: number) {
+  const { error: updateError } = await supabaseServerClient
+    .from("products")
+    .update({ stock: newStock, quantity: newQuantity })
+    .eq("id", productId);
+
+  if (updateError) {
+    throw updateError;
+  }
+}
+
+/**
+ * Handle direct ingredient sale (when product has ingredient_id)
+ * This is for selling individual ingredients as products
+ */
+async function deductDirectIngredientSale(
+  ingredientId: string,
+  orderQuantity: number,
+  productId: string
+): Promise<boolean> {
+  try {
+    const { data: ingredient, error: ingredientError } = await supabaseServerClient
+      .from("ingredients")
+      .select("id, name, stock, quantity, unit")
+      .eq("id", ingredientId)
+      .single();
+
+    if (ingredientError || !ingredient) {
+      return false;
+    }
+
+    // For direct ingredient sales, deduct from ingredient stock
+    if (ingredient.stock < orderQuantity) {
+      throw new Error(
+        `Insufficient stock for ${ingredient.name}: Available: ${ingredient.stock}, Required: ${orderQuantity}`
+      );
+    }
+
+    const newStock = ingredient.stock - orderQuantity;
+
+    // Update ingredient stock
+    const { error: updateError } = await supabaseServerClient
+      .from("ingredients")
+      .update({ stock: newStock })
+      .eq("id", ingredientId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Update the product stock to match ingredient stock
+    await updateProductStock(productId, orderQuantity);
+
+    return true;
+
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Handle direct recipe sale (when product has recipe_id)
+ * This is for selling individual recipes as products
+ */
+async function deductDirectRecipeSale(
+  recipeId: string,
+  orderQuantity: number,
+  productId: string
+): Promise<boolean> {
+  try {
+    // Get all ingredients for this recipe
+    const { data: recipeIngredients, error: recipeError } = await supabaseServerClient
+      .from("recipe_ingredients")
+      .select(`
+        id,
+        deduct_stock,
+        deduct_quantity,
+        ingredients (
+          id, name, stock, quantity, unit, product_id
+        )
+      `)
+      .eq("recipe_id", recipeId)
+      .is("product_id", null); // Only get recipe ingredients, not product ingredients
+
+    if (recipeError || !recipeIngredients) {
+      return false;
+    }
+
+    // Process each ingredient in the recipe
+    for (const ri of recipeIngredients) {
+      const ingredient = ri.ingredients as any;
+      if (!ingredient) continue;
+
+      // Calculate total consumption needed for this ingredient
+      const quantityPerRecipe = ri.deduct_quantity; // e.g., 150ml per cocktail
+      const totalConsumption = quantityPerRecipe * orderQuantity; // e.g., 150ml × 3 = 450ml
+
+      // Calculate how many units we need to consume
+      const quantityPerUnit = ingredient.quantity; // e.g., 250ml per bottle
+      const unitsNeeded = totalConsumption / quantityPerUnit; // e.g., 450ml ÷ 250ml = 1.8 units
+      const fullUnitsToDeduct = Math.floor(unitsNeeded); // e.g., 1 full unit
+      const remainingConsumption = totalConsumption % quantityPerUnit; // e.g., 450ml % 250ml = 200ml
+
+      // Validate sufficient stock
+      const totalUnitsRequired = Math.ceil(unitsNeeded);
+      if (ingredient.stock < totalUnitsRequired) {
+        throw new Error(
+          `Insufficient stock for ${ingredient.name}: Available: ${ingredient.stock}, Required: ${totalUnitsRequired} units for ${totalConsumption}${ingredient.unit || 'units'}`
+        );
+      }
+
+      // Calculate new stock and quantity values
+      let newStock = ingredient.stock;
+      let newQuantity = ingredient.quantity;
+
+      if (unitsNeeded <= 1) {
+        // Consumption is less than one full unit - just reduce quantity in current unit
+        newQuantity = ingredient.quantity - totalConsumption;
+      } else {
+        // Consumption spans multiple units
+        newStock = ingredient.stock - fullUnitsToDeduct;
+
+        if (remainingConsumption > 0) {
+          // There's partial consumption in the last unit
+          // We need to consume one more unit and leave the remainder
+          newStock = newStock - 1; // Consume one more unit for the partial consumption
+          newQuantity = quantityPerUnit - remainingConsumption; // e.g., 250ml - 200ml = 50ml remaining
+        } else {
+          // Exact unit consumption, no partial unit
+          newQuantity = quantityPerUnit;
+        }
+      }
+
+      // Ensure values don't go negative
+      newStock = Math.max(0, newStock);
+      newQuantity = Math.max(0, newQuantity);
+
+      const { error: updateError } = await supabaseServerClient
+        .from("ingredients")
+        .update({ stock: newStock, quantity: newQuantity })
+        .eq("id", ingredient.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Update associated product if exists
+      if (ingredient.product_id) {
+        await updateAssociatedProduct(ingredient.product_id, newStock, newQuantity);
+      }
+    }
+
+    // Update the recipe product stock
+    await updateProductStock(productId, orderQuantity);
+
+    return true;
+
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function deductRecipeIngredients(
+  productId: string,
+  orderQuantity: number,
+  barId: number
+): Promise<boolean> {
+  return deductInventory(productId, orderQuantity, barId);
 }
 
 export const GET = async () => {
@@ -350,172 +692,11 @@ export const PUT = async (req: Request) => {
 
       for (const item of order.data.order_items) {
         try {
-          const recipeProcessed = await deductProductIngredients(
+          await deductRecipeIngredients(
             item.product_id,
             item.quantity,
             user?.qr?.bar_id
           );
-
-          if (!recipeProcessed) {
-            if (item.amount !== undefined) {
-              const { data: productData, error: productFetchError } =
-                await supabaseServerClient
-                  .from("products")
-                  .select("stock, quantity")
-                  .eq("id", item.product_id)
-                  .single();
-
-              if (productFetchError || !productData) {
-                throw new Error(`Product not found: ${item.product_id}`);
-              }
-
-              // Validate sufficient stock and quantity in products table
-              if (productData.stock < item.quantity) {
-                throw new Error(
-                  `Insufficient product stock for: ${item.products.name}. Available: ${productData.stock}, Required: ${item.quantity}`
-                );
-              }
-
-              if (productData.quantity && productData.quantity < item.amount) {
-                throw new Error(
-                  `Insufficient product quantity for: ${item.products.name}. Available: ${productData.quantity}, Required: ${item.amount}`
-                );
-              }
-
-              const productUpdateData: any = {
-                stock: productData.stock - item.quantity,
-              };
-
-              if (
-                productData.quantity !== undefined &&
-                productData.quantity !== null
-              ) {
-                productUpdateData.quantity = productData.quantity - item.amount;
-              }
-
-              const { error: productUpdateError } = await supabaseServerClient
-                .from("products")
-                .update(productUpdateData)
-                .eq("id", item.product_id);
-
-              if (productUpdateError) throw productUpdateError;
-
-              const { data: ingredientData } = await supabaseServerClient
-                .from("ingredients")
-                .select("id, stock, quantity")
-                .eq("product_id", item.product_id)
-                .single();
-
-              if (ingredientData) {
-                // Validate sufficient stock and quantity in ingredients table
-                if (ingredientData.stock < item.quantity) {
-                  throw new Error(
-                    `Insufficient ingredient stock for: ${item.products.name}. Available: ${ingredientData.stock}, Required: ${item.quantity}`
-                  );
-                }
-
-                if (ingredientData.quantity < item.amount) {
-                  throw new Error(
-                    `Insufficient ingredient quantity for: ${item.products.name}. Available: ${ingredientData.quantity}, Required: ${item.amount}`
-                  );
-                }
-
-                const { error: ingredientUpdateError } =
-                  await supabaseServerClient
-                    .from("ingredients")
-                    .update({
-                      stock: ingredientData.stock - item.quantity,
-                      quantity: ingredientData.quantity - item.amount,
-                    })
-                    .eq("id", ingredientData.id);
-
-                if (ingredientUpdateError) throw ingredientUpdateError;
-              }
-            } else {
-              const { data: inventory } = await supabaseServerClient
-                .from("inventory")
-                .select("*")
-                .eq("product_id", item.product_id)
-                .eq("bar_id", user?.qr?.bar_id)
-                .single();
-
-              if (inventory && inventory.quantity >= item.quantity) {
-                const { error: inventoryError } = await supabaseServerClient
-                  .from("inventory")
-                  .update({
-                    quantity: inventory.quantity - item.quantity,
-                  })
-                  .eq("product_id", item.product_id)
-                  .eq("bar_id", user?.qr?.bar_id);
-                if (inventoryError) throw inventoryError;
-              } else {
-                // Deduct directly from ingredients table for individual ingredient products
-                const { data: ingredientForProduct, error: ingredientForProductError } = await supabaseServerClient
-                  .from("ingredients")
-                  .select("id, stock, quantity")
-                  .eq("product_id", item.product_id)
-                  .single();
-
-                if (ingredientForProduct && !ingredientForProductError) {
-                  // Validate sufficient stock in ingredient
-                  if (ingredientForProduct.stock < item.quantity) {
-                    throw new Error(
-                      `Insufficient ingredient stock for: ${item.products.name}. Available: ${ingredientForProduct.stock}, Required: ${item.quantity}`
-                    );
-                  }
-
-                  // Deduct from ingredients table
-                  const { error: ingredientError } = await supabaseServerClient
-                    .from("ingredients")
-                    .update({
-                      stock: ingredientForProduct.stock - item.quantity,
-                      quantity: ingredientForProduct.quantity - (item.amount || item.quantity),
-                    })
-                    .eq("id", ingredientForProduct.id);
-
-                  if (ingredientError) throw ingredientError;
-
-                  // Also deduct from recipe_ingredients table if this product was created with ingredient-product
-                  const { data: productRecipeIngredients, error: productRecipeError } = await supabaseServerClient
-                    .from("recipe_ingredients")
-                    .select("id, deduct_stock, deduct_quantity")
-                    .eq("product_id", item.product_id)
-                    .eq("ingredient_id", ingredientForProduct.id);
-
-                  if (productRecipeIngredients && productRecipeIngredients.length > 0 && !productRecipeError) {
-                    for (const productRecipeIngredient of productRecipeIngredients) {
-                      // Validate sufficient deduct amounts
-                      if (productRecipeIngredient.deduct_stock < item.quantity) {
-                        throw new Error(
-                          `Insufficient recipe ingredient stock for: ${item.products.name}. Available: ${productRecipeIngredient.deduct_stock}, Required: ${item.quantity}`
-                        );
-                      }
-
-                      // Deduct from recipe_ingredients table
-                      const { error: recipeIngredientError } = await supabaseServerClient
-                        .from("recipe_ingredients")
-                        .update({
-                          deduct_stock: productRecipeIngredient.deduct_stock - item.quantity,
-                          deduct_quantity: productRecipeIngredient.deduct_quantity - (item.amount || item.quantity),
-                        })
-                        .eq("id", productRecipeIngredient.id);
-
-                      if (recipeIngredientError) throw recipeIngredientError;
-                    }
-                  }
-                } else {
-                  // Fallback to product stock if no ingredient found
-                  const { error: productError } = await supabaseServerClient
-                    .from("products")
-                    .update({
-                      stock: item.products.stock - item.quantity,
-                    })
-                    .eq("id", item.product_id);
-                  if (productError) throw productError;
-                }
-              }
-            }
-          }
         } catch (error) {
           throw error;
         }
@@ -526,7 +707,6 @@ export const PUT = async (req: Request) => {
       .update(orderData)
       .eq("id", id);
     if (error) throw error;
-
     return NextResponse.json(orderData, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
