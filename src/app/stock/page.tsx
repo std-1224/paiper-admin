@@ -1350,11 +1350,11 @@ const Stock = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          {isProduct ? (
+                          {isProduct && item.is_liquid ? (
                             <span className="font-medium text-green-600">
                               ${item.purchase_price?.toFixed(2) || "0.00"}
                             </span>
-                          ): isIngredient ? (
+                          ) : isIngredient && !item.is_liquid ? (
                             <span className="font-medium text-green-600">
                               Stock: {item.stock || 0}
                             </span>
@@ -1367,8 +1367,7 @@ const Stock = () => {
                             item.stock || 0
                           ) : isIngredient ? (
                             <span>
-                              {item.quantity || 0} {item.unit || "unidad"}
-                              {item.is_liquid && <span className="ml-1 text-blue-600">💧</span>}
+                              {item.is_liquid ? <span className="ml-1 text-blue-600">{item.stock}💧</span> : item.quantity || 0} {item.unit || "unidad"}
                             </span>
                           ) : (
                             ""
