@@ -66,8 +66,9 @@ export async function POST(request: NextRequest) {
           unit,
           quantity: parseFloat(quantity) || 0,
           stock: parseFloat(stock) || 0,
-          // is_liquid: Boolean(is_liquid),
-          // is_active: Boolean(is_active),
+          original_quantity: quantity ? parseFloat(quantity) : parseFloat(quantity) || 0,
+          is_liquid: Boolean(is_liquid),
+          is_active: Boolean(is_active),
           // sale_price: sale_price ? parseFloat(sale_price) : null,
         },
       ])

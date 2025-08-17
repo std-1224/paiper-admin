@@ -21,6 +21,7 @@ import { useAuth } from "@/context/AuthContext";
 import AddIngredientModal from "./add-ingredient-modal";
 import AddRecipeModal from "./add-recipe-modal";
 import RecipeDetailsModal from "./recipe-details-modal";
+import IngredientDetailsModal from "./ingredient-details-modal";
 
 export default function RecipeConfiguration() {
   const [showAddRecipeModal, setShowAddRecipeModal] = useState(false);
@@ -354,6 +355,7 @@ export default function RecipeConfiguration() {
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="text-lg font-medium">{ingredient.name}</h3>
                       <div className="flex items-center gap-2">
+                        <span className="text-gray-700 text-sm">{ingredient.original_quantity} {ingredient.unit}</span>
                         <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-200">
                           {ingredient.product_id ? 'Ingredient-Product' : 'Individual'}
                         </Badge>
@@ -377,18 +379,17 @@ export default function RecipeConfiguration() {
                               : "bg-red-50 text-red-700 border-red-200"
                           )}
                         >
-                          {ingredient.stock} units
+                          {ingredient.stock > 0 && ingredient.original_quantity > ingredient.quantity ? `${ingredient.stock - 1} unit` : ''}
+                          {ingredient.stock === 0 ? 'Empty' : ''}
+                          {ingredient.original_quantity == ingredient.quantity ? `${ingredient.stock} unit` : ''}
                         </Badge>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium">Quantity:</span>
-                        <span className="text-muted-foreground">
-                          {ingredient.quantity} {ingredient.unit || ''}
-                        </span>
-                      </div>
-                      {ingredient.product_id && (
-                        <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
-                          Linked to Product ID: {ingredient.product_id}
+                      {ingredient.original_quantity > ingredient.quantity && (
+                        <div className="flex justify-between text-sm">
+                          <span className="font-medium">Opened Quantity:</span>
+                          <span className="text-muted-foreground">
+                            {ingredient.quantity}  {ingredient.unit}
+                          </span>
                         </div>
                       )}
                     </div>
