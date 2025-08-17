@@ -1354,6 +1354,10 @@ const Stock = () => {
                             <span className="font-medium text-green-600">
                               ${item.purchase_price?.toFixed(2) || "0.00"}
                             </span>
+                          ): isIngredient ? (
+                            <span className="font-medium text-green-600">
+                              Stock: {item.stock || 0}
+                            </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
