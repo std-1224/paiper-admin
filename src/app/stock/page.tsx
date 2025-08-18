@@ -137,7 +137,7 @@ const Stock = () => {
   const [stockAdjustmentOpen, setStockAdjustmentOpen] = useState(false);
   const [multipleTransferOpen, setMultipleTransferOpen] = useState(false);
   const [selectedStockItems, setSelectedStockItems] = useState<string[]>([]);
-  const { user } = useAuth()
+  const { user } = useAuth();
   const [showCreateRecipeDialog, setShowCreateRecipeDialog] = useState(false);
   const {
     recipesData,
@@ -145,7 +145,7 @@ const Stock = () => {
     ingredientsData,
     normalizedRecipesData,
     fetchIngredients,
-    fetchNormalizedRecipes
+    fetchNormalizedRecipes,
   } = useAppContext();
 
   // Fetch recipes, ingredients, and normalized recipes on component mount
@@ -202,12 +202,13 @@ const Stock = () => {
   });
 
   // Custom ingredient creation for recipe ingredients list
-  const [showCustomIngredientForm, setShowCustomIngredientForm] = useState(false);
+  const [showCustomIngredientForm, setShowCustomIngredientForm] =
+    useState(false);
   const [customIngredientForm, setCustomIngredientForm] = useState({
     name: "",
     amount: "",
     unit: "ml",
-    stock: ""
+    stock: "",
   });
   const [newIngredient, setNewIngredient] = useState({
     name: "",
@@ -234,7 +235,9 @@ const Stock = () => {
   const [recipeDetailOpen, setRecipeDetailOpen] = useState(false);
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [ingredientDetailOpen, setIngredientDetailOpen] = useState(false);
-  const [selectedIngredientId, setSelectedIngredientId] = useState<string | null>(null);
+  const [selectedIngredientId, setSelectedIngredientId] = useState<
+    string | null
+  >(null);
   const assignForm = useForm({
     defaultValues: {
       quantity: 0,
@@ -295,6 +298,87 @@ const Stock = () => {
     (product) => product.stock === 0
   ).length;
 
+  // Function to calculate recipe purchase price based on ingredients
+  const calculateRecipePurchasePrice = (recipe: any) => {
+    if (!recipe.recipe_ingredients || !Array.isArray(recipe.recipe_ingredients)) {
+      return 0;
+    }
+
+    let totalPrice = 0;
+    recipe.recipe_ingredients.forEach((recipeIngredient: any) => {
+      const ingredient = recipeIngredient.ingredients;
+      if (ingredient && ingredient.purchase_price && ingredient.quantity && recipeIngredient.deduct_quantity) {
+        // Calculate price per unit: ingredient.purchase_price / ingredient.quantity
+        const pricePerUnit = ingredient.purchase_price / ingredient.quantity;
+        // Calculate total cost for this ingredient: pricePerUnit * quantity used in recipe
+        const ingredientCost = pricePerUnit * recipeIngredient.deduct_quantity;
+        totalPrice += ingredientCost;
+      }
+    });
+
+    return totalPrice;
+  };
+
+  // Function to calculate ingredient purchase price based on recipe ingredients (for compound ingredients)
+  const calculateIngredientPurchasePrice = (ingredient: any) => {
+    if (!ingredient.recipe_ingredients || !Array.isArray(ingredient.recipe_ingredients)) {
+      return ingredient.purchase_price || 0;
+    }
+
+    // If ingredient has recipe ingredients, calculate based on components
+    let totalPrice = 0;
+    ingredient.recipe_ingredients.forEach((recipeIngredient: any) => {
+      const subIngredient = recipeIngredient.ingredients;
+      if (subIngredient && subIngredient.purchase_price && subIngredient.quantity && recipeIngredient.deduct_quantity) {
+        // Calculate price per unit: subIngredient.purchase_price / subIngredient.quantity
+        const pricePerUnit = subIngredient.purchase_price / subIngredient.quantity;
+        // Calculate total cost for this sub-ingredient: pricePerUnit * quantity used
+        const subIngredientCost = pricePerUnit * recipeIngredient.deduct_quantity;
+        totalPrice += subIngredientCost;
+      }
+    });
+
+    return totalPrice > 0 ? totalPrice : (ingredient.purchase_price || 0);
+  };
+
+  // State to store product data for recipes and ingredients
+  const [recipeProducts, setRecipeProducts] = useState<{[key: string]: any}>({});
+  const [ingredientProducts, setIngredientProducts] = useState<{[key: string]: any}>({});
+
+  // Function to fetch product data for a recipe
+  const fetchRecipeProduct = async (recipeId: string) => {
+    if (recipeProducts[recipeId]) return recipeProducts[recipeId];
+
+    try {
+      const response = await fetch(`/api/products/by-recipe/${recipeId}`);
+      if (response.ok) {
+        const productData = await response.json();
+        setRecipeProducts(prev => ({ ...prev, [recipeId]: productData }));
+        return productData;
+      }
+    } catch (error) {
+      console.error('Error fetching recipe product:', error);
+    }
+    return null;
+  };
+
+  // Function to fetch product data for an ingredient
+  const fetchIngredientProduct = async (ingredientId: string) => {
+    if (ingredientProducts[ingredientId]) return ingredientProducts[ingredientId];
+
+    try {
+      const response = await fetch(`/api/products/by-ingredient/${ingredientId}`);
+      if (response.ok) {
+        const productData = await response.json();
+        setIngredientProducts(prev => ({ ...prev, [ingredientId]: productData }));
+        return productData;
+      }
+    } catch (error) {
+      console.error('Error fetching ingredient product:', error);
+    }
+    return null;
+  };
+
   // Calculate total products count
   const totalProducts = productsData.length;
 
@@ -307,6 +391,29 @@ const Stock = () => {
     fetchProducts();
     fetchBars();
   }, [fetchBars, fetchProducts, fetchStocksOfBar]);
+
+  // Fetch product data for active recipes and ingredients
+  useEffect(() => {
+    const fetchProductData = async () => {
+      // Fetch product data for active recipes
+      for (const recipe of normalizedRecipesData) {
+        if (recipe.is_active) {
+          await fetchRecipeProduct(recipe.id);
+        }
+      }
+
+      // Fetch product data for active ingredients
+      for (const ingredient of ingredientsData) {
+        if (ingredient.is_active) {
+          await fetchIngredientProduct(ingredient.id);
+        }
+      }
+    };
+
+    if (normalizedRecipesData.length > 0 || ingredientsData.length > 0) {
+      fetchProductData();
+    }
+  }, [normalizedRecipesData, ingredientsData]);
 
   // Validate stock whenever recipe ingredients change
   useEffect(() => {
@@ -483,7 +590,7 @@ const Stock = () => {
       name: "",
       amount: "",
       unit: "ml",
-      stock: ""
+      stock: "",
     });
   };
 
@@ -661,7 +768,8 @@ const Stock = () => {
 
     // Show success message with all selected bars
     toast.success(
-      `${data.quantity} unidades de ${data.product} transferidas de ${data.fromBar
+      `${data.quantity} unidades de ${data.product} transferidas de ${
+        data.fromBar
       } a ${selectedBars.join(", ")}`
     );
     // Aquí iría la lógica para crear la transferencia
@@ -750,10 +858,7 @@ const Stock = () => {
     }
   };
 
-  const handleToggleRecipeActive = async (
-    id: string,
-    checked: boolean
-  ) => {
+  const handleToggleRecipeActive = async (id: string, checked: boolean) => {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/recipes`, {
@@ -788,7 +893,9 @@ const Stock = () => {
             });
 
             if (!updateResponse.ok) {
-              console.error(`Failed to update product ${productData.id}: ${updateResponse.status}`);
+              console.error(
+                `Failed to update product ${productData.id}: ${updateResponse.status}`
+              );
             }
           }
         }
@@ -801,18 +908,13 @@ const Stock = () => {
       fetchRecipes();
       fetchNormalizedRecipes();
     } catch (err) {
-      console.log(
-        err instanceof Error ? err.message : "Error updating recipe"
-      );
+      console.log(err instanceof Error ? err.message : "Error updating recipe");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleToggleIngredientActive = async (
-    id: string,
-    checked: boolean
-  ) => {
+  const handleToggleIngredientActive = async (id: string, checked: boolean) => {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/ingredients`, {
@@ -829,7 +931,9 @@ const Stock = () => {
 
       // Update associated product if it exists
       try {
-        const productResponse = await fetch(`/api/products/by-ingredient/${id}`);
+        const productResponse = await fetch(
+          `/api/products/by-ingredient/${id}`
+        );
 
         if (productResponse.ok) {
           const productData = await productResponse.json();
@@ -847,7 +951,9 @@ const Stock = () => {
             });
 
             if (!updateResponse.ok) {
-              console.error(`Failed to update product ${productData.id}: ${updateResponse.status}`);
+              console.error(
+                `Failed to update product ${productData.id}: ${updateResponse.status}`
+              );
             }
           }
         }
@@ -1138,11 +1244,15 @@ const Stock = () => {
               <Button
                 variant="outline"
                 onClick={() => {
-                  if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+                  if (
+                    user?.role === "barman" ||
+                    user?.role === "client" ||
+                    user?.role === "manager"
+                  ) {
                     toast.error("No tienes permiso para ajustar stock");
                     return;
                   }
-                  setStockAdjustmentOpen(true)
+                  setStockAdjustmentOpen(true);
                 }}
                 className="flex items-center gap-2"
               >
@@ -1243,7 +1353,7 @@ const Stock = () => {
                         seenIds.add(item.id);
                         allItems.push({
                           ...item,
-                          type: "recipe" // Ensure type is set for consistency
+                          type: "recipe", // Ensure type is set for consistency
                         });
                       }
                     });
@@ -1261,9 +1371,10 @@ const Stock = () => {
                   })().map((item) => {
                     const isProduct = item.type === "product";
                     const isRecipe = item.type === "recipe";
-                    const isIngredient = "quantity" in item && !isProduct && !isRecipe;
+                    const isIngredient =
+                      "quantity" in item && !isProduct && !isRecipe;
                     const product = item as any; // Cast to access all properties
-
+                    console.log("item: ", item);
                     return (
                       <TableRow key={item.id}>
                         <TableCell>
@@ -1286,7 +1397,8 @@ const Stock = () => {
                             }
                             className="p-0 h-auto font-medium text-orange-900"
                           >
-                            {item.name} {isRecipe && "(Receta)"} {isIngredient && "(Ingrediente)"}
+                            {item.name} {isRecipe && "(Receta)"}{" "}
+                            {isIngredient && "(Ingrediente)"}
                           </Button>
                         </TableCell>
                         <TableCell>
@@ -1326,92 +1438,56 @@ const Stock = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          {isProduct ? (
-                            item.category || "N/A"
-                          ) : isRecipe ? (
-                            "Receta"
-                          ) : isIngredient ? (
-                            item.type === "ingredient-product" ? "Ingrediente-Producto" : "Ingrediente"
-                          ) : (
-                            "N/A"
-                          )}
+                          {isProduct
+                            ? item.category || "N/A"
+                            : isRecipe
+                              ? "Receta"
+                              : isIngredient
+                                ? item.type === "ingredient-product"
+                                  ? "Ingrediente-Producto"
+                                  : "Ingrediente"
+                                : "N/A"}
                         </TableCell>
                         <TableCell>
-                          {isRecipe ? (
-                            item.sale_price ? (
-                              <span className="font-medium text-blue-600">
-                                ${item.sale_price.toFixed(2)}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )
-                          ) : isIngredient ? (
-                            item.sale_price ? (
+                          <span>
+                            {isProduct && (
                               <span className="font-medium text-green-600">
-                                ${item.sale_price.toFixed(2)}
+                                ${item.sale_price?.toFixed(2) || "0.00"}
                               </span>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
+                            )}
+                            {isRecipe && item.is_active && recipeProducts[item.id] && (
+                              <span className="font-medium text-green-600">
+                                ${recipeProducts[item.id].sale_price?.toFixed(2) || "0.00"}
+                              </span>
+                            )}
+                            {isIngredient && item.is_active && ingredientProducts[item.id] && (
+                              <span className="font-medium text-green-600">
+                                ${ingredientProducts[item.id].sale_price?.toFixed(2) || "0.00"}
+                              </span>
+                            )}
+                          </span>
                         </TableCell>
                         <TableCell>
-                          {isProduct ? (
-                            <span className="font-medium text-green-600">
-                              ${item.purchase_price?.toFixed(2) || "0.00"}
-                            </span>
-                          ) : isIngredient ? (
-                            <span className="font-medium text-green-600">
-                              {item.is_liquid && item.products?.purchase_price ? (
-                                `$${item.products.purchase_price.toFixed(2)}`
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
+                          <span className="font-medium text-green-600">
+                            {isProduct && (
+                              <span className="font-medium text-green-600">
+                                ${item.purchase_price?.toFixed(2) || "0.00"}
+                              </span>
+                            )}
+                            {isIngredient && (
+                              <span className="font-medium text-green-600">
+                                ${calculateIngredientPurchasePrice(item).toFixed(2)}
+                              </span>
+                            )}
+                            {isRecipe && (
+                              <span className="font-medium text-green-600">
+                                ${calculateRecipePurchasePrice(item).toFixed(2)}
+                              </span>
+                            )}
+                          </span>
                         </TableCell>
                         <TableCell>
-                          {isProduct ? (
-                            (() => {
-                              // For products with type="ingredient", also check if they exist in ingredients table
-                              if (item.type === "ingredient") {
-                                // Find corresponding ingredient entry
-                                const correspondingIngredient = ingredientsData.find(ing => ing.product_id === item.id);
-                                if (correspondingIngredient) {
-                                  // Show ingredient stock info
-                                  return correspondingIngredient.is_liquid ? (
-                                    <span className="ml-1">
-                                      {correspondingIngredient.stock}
-                                    </span>
-                                  ) : (
-                                    <span>
-                                      {correspondingIngredient.quantity || 0} {correspondingIngredient.unit || "unidad"}
-                                    </span>
-                                  );
-                                }
-                              }
-                              // Default product stock display
-                              return item.stock || 0;
-                            })()
-                          ) : isIngredient ? (
-                            <span>
-                              {item.is_liquid ? (
-                                <span className="ml-1">
-                                  {item.stock}
-                                </span>
-                              ) : (
-                                <span>
-                                  {item.quantity || 0} {item.unit || "unidad"}
-                                </span>
-                              )}
-                            </span>
-                          ) : (
-                            ""
-                          )}
+                          <span>{item.stock}</span>
                         </TableCell>
                         <TableCell>
                           {stocksData
@@ -1446,17 +1522,21 @@ const Stock = () => {
                               {item.stock > 5 ? "En Stock" : "Falta Stock"}
                             </Badge>
                           ) : isRecipe ? (
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            <Badge
+                              variant="outline"
+                              className="bg-blue-50 text-blue-700 border-blue-200"
+                            >
                               Receta
                             </Badge>
                           ) : isIngredient ? (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            <Badge
+                              variant="outline"
+                              className="bg-green-50 text-green-700 border-green-200"
+                            >
                               Ingrediente
                             </Badge>
                           ) : (
-                            <Badge variant="outline">
-                              N/A
-                            </Badge>
+                            <Badge variant="outline">N/A</Badge>
                           )}
                         </TableCell>
                         {showUnredeemed && "date" in item && (
@@ -1467,39 +1547,48 @@ const Stock = () => {
                       )} */}
                         <TableCell>
                           <div className="flex gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      if (user?.role === "barman" || user?.role === "client") {
-                                        toast.error("No tienes permiso para ajustar stock");
-                                        return;
-                                      }
-                                      handleAssignStock(product)
-                                    }}
-                                  >
-                                    <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                    Asignar
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                                    onClick={() => {
-                                      if (user?.role === "barman" || user?.role === "client") {
-                                        toast.error("No tienes permiso para ajustar stock");
-                                        return;
-                                      }
-                                      handleAdjustStock(product)
-                                    }}
-                                  >
-                                    <PackagePlus className="mr-2 h-4 w-4" />
-                                    Ajustar
-                                  </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (
+                                  user?.role === "barman" ||
+                                  user?.role === "client"
+                                ) {
+                                  toast.error(
+                                    "No tienes permiso para ajustar stock"
+                                  );
+                                  return;
+                                }
+                                handleAssignStock(product);
+                              }}
+                            >
+                              <ArrowRightLeft className="mr-2 h-4 w-4" />
+                              Asignar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                              onClick={() => {
+                                if (
+                                  user?.role === "barman" ||
+                                  user?.role === "client"
+                                ) {
+                                  toast.error(
+                                    "No tienes permiso para ajustar stock"
+                                  );
+                                  return;
+                                }
+                                handleAdjustStock(product);
+                              }}
+                            >
+                              <PackagePlus className="mr-2 h-4 w-4" />
+                              Ajustar
+                            </Button>
 
-
-                              {/* Edit buttons for recipes and ingredients */}
-                              {/* {isRecipe && (
+                            {/* Edit buttons for recipes and ingredients */}
+                            {/* {isRecipe && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1523,31 +1612,37 @@ const Stock = () => {
                                 </Button>
                               )} */}
 
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                                onClick={() => {
-                                  if (user?.role === "barman" || user?.role === "manager" || user?.role === "client") {
-                                    toast.error("No tienes permiso para eliminar productos");
-                                    return;
-                                  }
-                                  handleDeleteClick(product)
-                                }}
-                                disabled={deletingProductId === item.id}
-                              >
-                                {deletingProductId === item.id ? (
-                                  <>
-                                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                                    Eliminando...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Trash className="mr-2 h-4 w-4" />
-                                    Eliminar
-                                  </>
-                                )}
-                              </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                              onClick={() => {
+                                if (
+                                  user?.role === "barman" ||
+                                  user?.role === "manager" ||
+                                  user?.role === "client"
+                                ) {
+                                  toast.error(
+                                    "No tienes permiso para eliminar productos"
+                                  );
+                                  return;
+                                }
+                                handleDeleteClick(product);
+                              }}
+                              disabled={deletingProductId === item.id}
+                            >
+                              {deletingProductId === item.id ? (
+                                <>
+                                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                                  Eliminando...
+                                </>
+                              ) : (
+                                <>
+                                  <Trash className="mr-2 h-4 w-4" />
+                                  Eliminar
+                                </>
+                              )}
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1931,8 +2026,6 @@ const Stock = () => {
         ingredientsData={ingredientsData}
         normalizedRecipesData={normalizedRecipesData}
       />
-
-
 
       {/* Create Recipe Dialog */}
       <Dialog

@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
           quantity,
           stock,
           is_liquid,
-          product_id
+          product_id,
+          purchase_price
         ),
         recipes (
           id,
@@ -40,7 +41,8 @@ export async function GET(request: NextRequest) {
               name,
               unit,
               quantity,
-              stock
+              stock,
+              purchase_price
             )
           )
         )

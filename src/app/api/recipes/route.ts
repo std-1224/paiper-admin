@@ -25,7 +25,8 @@ export async function GET() {
           ingredients (
             name,
             unit,
-            quantity
+            quantity,
+            purchase_price
           )
         )
       `)
@@ -371,7 +372,8 @@ export async function PUT(request: NextRequest) {
           ingredients (
             name,
             unit,
-            quantity
+            quantity,
+            purchase_price
           )
         )
       `)

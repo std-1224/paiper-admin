@@ -438,6 +438,87 @@ export default function StockManagement() {
     fetchNormalizedRecipes
   } = useAppContext();
 
+  // Function to calculate recipe purchase price based on ingredients
+  const calculateRecipePurchasePrice = (recipe: any) => {
+    if (!recipe.recipe_ingredients || !Array.isArray(recipe.recipe_ingredients)) {
+      return 0;
+    }
+
+    let totalPrice = 0;
+    recipe.recipe_ingredients.forEach((recipeIngredient: any) => {
+      const ingredient = recipeIngredient.ingredients;
+      if (ingredient && ingredient.purchase_price && ingredient.quantity && recipeIngredient.deduct_quantity) {
+        // Calculate price per unit: ingredient.purchase_price / ingredient.quantity
+        const pricePerUnit = ingredient.purchase_price / ingredient.quantity;
+        // Calculate total cost for this ingredient: pricePerUnit * quantity used in recipe
+        const ingredientCost = pricePerUnit * recipeIngredient.deduct_quantity;
+        totalPrice += ingredientCost;
+      }
+    });
+
+    return totalPrice;
+  };
+
+  // Function to calculate ingredient purchase price based on recipe ingredients (for compound ingredients)
+  const calculateIngredientPurchasePrice = (ingredient: any) => {
+    if (!ingredient.recipe_ingredients || !Array.isArray(ingredient.recipe_ingredients)) {
+      return ingredient.purchase_price || 0;
+    }
+
+    // If ingredient has recipe ingredients, calculate based on components
+    let totalPrice = 0;
+    ingredient.recipe_ingredients.forEach((recipeIngredient: any) => {
+      const subIngredient = recipeIngredient.ingredients;
+      if (subIngredient && subIngredient.purchase_price && subIngredient.quantity && recipeIngredient.deduct_quantity) {
+        // Calculate price per unit: subIngredient.purchase_price / subIngredient.quantity
+        const pricePerUnit = subIngredient.purchase_price / subIngredient.quantity;
+        // Calculate total cost for this sub-ingredient: pricePerUnit * quantity used
+        const subIngredientCost = pricePerUnit * recipeIngredient.deduct_quantity;
+        totalPrice += subIngredientCost;
+      }
+    });
+
+    return totalPrice > 0 ? totalPrice : (ingredient.purchase_price || 0);
+  };
+
+  // State to store product data for recipes and ingredients
+  const [recipeProducts, setRecipeProducts] = useState<{[key: string]: any}>({});
+  const [ingredientProducts, setIngredientProducts] = useState<{[key: string]: any}>({});
+
+  // Function to fetch product data for a recipe
+  const fetchRecipeProduct = async (recipeId: string) => {
+    if (recipeProducts[recipeId]) return recipeProducts[recipeId];
+
+    try {
+      const response = await fetch(`/api/products/by-recipe/${recipeId}`);
+      if (response.ok) {
+        const productData = await response.json();
+        setRecipeProducts(prev => ({ ...prev, [recipeId]: productData }));
+        return productData;
+      }
+    } catch (error) {
+      console.error('Error fetching recipe product:', error);
+    }
+    return null;
+  };
+
+  // Function to fetch product data for an ingredient
+  const fetchIngredientProduct = async (ingredientId: string) => {
+    if (ingredientProducts[ingredientId]) return ingredientProducts[ingredientId];
+
+    try {
+      const response = await fetch(`/api/products/by-ingredient/${ingredientId}`);
+      if (response.ok) {
+        const productData = await response.json();
+        setIngredientProducts(prev => ({ ...prev, [ingredientId]: productData }));
+        return productData;
+      }
+    } catch (error) {
+      console.error('Error fetching ingredient product:', error);
+    }
+    return null;
+  };
+
   // Helper function to extract quantity and unit from product description
   const extractQuantityAndUnitFromDescription = (description: string): { quantity: string; unit: string } => {
     // Try to extract patterns like "500ml", "2kg", "100g", "1.5L", etc.
@@ -503,6 +584,29 @@ export default function StockManagement() {
     fetchIngredients();
     fetchNormalizedRecipes();
   }, []);
+
+  // Fetch product data for active recipes and ingredients
+  useEffect(() => {
+    const fetchProductData = async () => {
+      // Fetch product data for active recipes
+      for (const recipe of normalizedRecipesData) {
+        if (recipe.is_active) {
+          await fetchRecipeProduct(recipe.id);
+        }
+      }
+
+      // Fetch product data for active ingredients
+      for (const ingredient of ingredientsData) {
+        if (ingredient.is_active) {
+          await fetchIngredientProduct(ingredient.id);
+        }
+      }
+    };
+
+    if (normalizedRecipesData.length > 0 || ingredientsData.length > 0) {
+      fetchProductData();
+    }
+  }, [normalizedRecipesData, ingredientsData]);
 
   // Validate stock whenever recipe ingredients change
   useEffect(() => {
@@ -2977,7 +3081,6 @@ export default function StockManagement() {
                       </td>
 
                       <td className="p-3">
-                        {isProduct ? (
                           <Switch
                             checked={product.is_courtsey}
                             onCheckedChange={(checked) =>
@@ -2988,21 +3091,14 @@ export default function StockManagement() {
                               )
                             }
                           />
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
                       </td>
                       <td className="p-3">
-                        {isProduct ? (
                           <Switch
                             checked={product.is_pr}
                             onCheckedChange={(checked) =>
                               handleToggleActive(product.id, checked, "is_pr")
                             }
                           />
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
                       </td>
                       <td className="p-3">
                         <Badge variant="outline">
@@ -3020,20 +3116,30 @@ export default function StockManagement() {
                         </Badge>
                       </td>
                       <td className="p-3">
-                        {isRecipe ? (
-                          item.sale_price ? `$${item.sale_price.toFixed(2)}` : <span className="text-muted-foreground">-</span>
-                        ) : isIngredient ? (
-                          item.sale_price ? `$${item.sale_price.toFixed(2)}` : <span className="text-muted-foreground">-</span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                        <span className="text-muted-foreground">
+                          {isProduct && (
+                            <span>${item.sale_price?.toFixed(2) || "0.00"}</span>
+                          )}
+                          {isRecipe && item.is_active && recipeProducts[item.id] && (
+                            <span>${recipeProducts[item.id].sale_price?.toFixed(2) || "0.00"}</span>
+                          )}
+                          {isIngredient && item.is_active && ingredientProducts[item.id] && (
+                            <span>${ingredientProducts[item.id].sale_price?.toFixed(2) || "0.00"}</span>
+                          )}
+                        </span>
                       </td>
                       <td className="p-3">
-                        {isProduct && product.sale_price ? (
-                          `$${product?.sale_price || ""}`
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                        <span className="text-muted-foreground">
+                          {isProduct && (
+                            <span>${item.purchase_price?.toFixed(2) || "0.00"}</span>
+                          )}
+                          {isIngredient && (
+                            <span>${calculateIngredientPurchasePrice(item).toFixed(2)}</span>
+                          )}
+                          {isRecipe && (
+                            <span>${calculateRecipePurchasePrice(item).toFixed(2)}</span>
+                          )}
+                        </span>
                       </td>
                       <td className="p-3">
                         {isProduct ? (

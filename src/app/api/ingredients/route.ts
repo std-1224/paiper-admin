@@ -6,6 +6,7 @@ import { supabase as supabaseServerClient } from '@/lib/supabaseClient';
 // GET - Fetch all ingredients
 export async function GET() {
   try {
+    // First get all ingredients
     const { data: ingredients, error } = await supabaseServerClient
       .from('ingredients')
       .select('*')
@@ -19,7 +20,43 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(ingredients);
+    // For each ingredient, check if it has a corresponding product with recipe ingredients
+    const ingredientsWithRecipeData = await Promise.all(
+      ingredients.map(async (ingredient) => {
+        // Check if this ingredient has a product_id (meaning it's linked to a product)
+        if (ingredient.product_id) {
+          try {
+            // Fetch recipe ingredients for this product
+            const { data: recipeIngredients } = await supabaseServerClient
+              .from('recipe_ingredients')
+              .select(`
+                id,
+                deduct_quantity,
+                deduct_stock,
+                ingredients (
+                  name,
+                  unit,
+                  quantity,
+                  purchase_price
+                )
+              `)
+              .eq('product_id', ingredient.product_id)
+              .is('recipe_id', null);
+
+            return {
+              ...ingredient,
+              recipe_ingredients: recipeIngredients || []
+            };
+          } catch (err) {
+            console.error('Error fetching recipe ingredients for ingredient:', err);
+            return ingredient;
+          }
+        }
+        return ingredient;
+      })
+    );
+
+    return NextResponse.json(ingredientsWithRecipeData);
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json(
