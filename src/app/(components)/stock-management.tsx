@@ -3117,23 +3117,23 @@ export default function StockManagement() {
                       </td>
                       <td className="p-3">
                         <span className="text-muted-foreground">
-                          {isProduct && (
+                          {(isProduct || (isIngredient && item.type === "ingredient")) && (
                             <span>${item.sale_price?.toFixed(2) || "0.00"}</span>
                           )}
                           {isRecipe && item.is_active && recipeProducts[item.id] && (
                             <span>${recipeProducts[item.id].sale_price?.toFixed(2) || "0.00"}</span>
                           )}
-                          {isIngredient && item.is_active && ingredientProducts[item.id] && (
+                          {isIngredient && item.type !== "ingredient" && item.is_active && ingredientProducts[item.id] && (
                             <span>${ingredientProducts[item.id].sale_price?.toFixed(2) || "0.00"}</span>
                           )}
                         </span>
                       </td>
                       <td className="p-3">
                         <span className="text-muted-foreground">
-                          {isProduct && (
+                          {(isProduct || (isIngredient && item.type === "ingredient")) && (
                             <span>${item.purchase_price?.toFixed(2) || "0.00"}</span>
                           )}
-                          {isIngredient && (
+                          {isIngredient && item.type !== "ingredient" && (
                             <span>${calculateIngredientPurchasePrice(item).toFixed(2)}</span>
                           )}
                           {isRecipe && (
@@ -3142,7 +3142,7 @@ export default function StockManagement() {
                         </span>
                       </td>
                       <td className="p-3">
-                        {isProduct ? (
+                        {(isProduct || (isIngredient && product.type === "ingredient")) ? (
                           <Badge
                             className={cn(
                               "font-normal",

@@ -1372,9 +1372,8 @@ const Stock = () => {
                     const isProduct = item.type === "product";
                     const isRecipe = item.type === "recipe";
                     const isIngredient =
-                      "quantity" in item && !isProduct && !isRecipe;
+                      item.type === "ingredient" || ("quantity" in item && !isProduct && !isRecipe);
                     const product = item as any; // Cast to access all properties
-                    console.log("item: ", item);
                     return (
                       <TableRow key={item.id}>
                         <TableCell>
@@ -1412,7 +1411,7 @@ const Stock = () => {
                                 )
                               }
                             />
-                          ) : isProduct ? (
+                          ) : (isProduct || item.type ==="ingredient") ? (
                             <Switch
                               checked={product.is_active || false}
                               onCheckedChange={(checked) =>
@@ -1438,53 +1437,53 @@ const Stock = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          {isProduct
-                            ? item.category || "N/A"
-                            : isRecipe
-                              ? "Receta"
-                              : isIngredient
-                                ? item.type === "ingredient-product"
-                                  ? "Ingrediente-Producto"
-                                  : "Ingrediente"
-                                : "N/A"}
+                          <Badge variant="outline">
+                          {isProduct ? (
+                            categoryList.find(
+                              (c) => c.value === product.category
+                            )?.label || product.category
+                          ) : isRecipe ? (
+                            "Receta"
+                          ) : isIngredient ? (
+                            product.type === "ingredient-product" ? "Ingrediente-Producto" : "Ingrediente"
+                          ) : (
+                            product.type || "Otro"
+                          )}
+                        </Badge>
                         </TableCell>
                         <TableCell>
-                          <span>
-                            {isProduct && (
-                              <span className="font-medium text-green-600">
-                                ${item.sale_price?.toFixed(2) || "0.00"}
-                              </span>
-                            )}
-                            {isRecipe && item.is_active && recipeProducts[item.id] && (
-                              <span className="font-medium text-green-600">
-                                ${recipeProducts[item.id].sale_price?.toFixed(2) || "0.00"}
-                              </span>
-                            )}
-                            {isIngredient && item.is_active && ingredientProducts[item.id] && (
-                              <span className="font-medium text-green-600">
-                                ${ingredientProducts[item.id].sale_price?.toFixed(2) || "0.00"}
-                              </span>
-                            )}
-                          </span>
+                          {(isProduct || (isIngredient && product.type === "ingredient" && product.sale_price)) && (
+                            <span className="font-medium text-green-600">
+                              ${product.sale_price?.toFixed(2) || "0.00"}
+                            </span>
+                          )}
+                          {isRecipe && product.is_active && recipeProducts[product.id] && (
+                            <span className="font-medium text-green-600">
+                              ${recipeProducts[product.id].sale_price?.toFixed(2) || "0.00"}
+                            </span>
+                          )}
+                          {isIngredient && product.type !== "ingredient" && product.is_active && ingredientProducts[product.id] && (
+                            <span className="font-medium text-green-600">
+                              ${ingredientProducts[product.id].sale_price?.toFixed(2) || "0.00"}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium text-green-600">
-                            {isProduct && (
-                              <span className="font-medium text-green-600">
-                                ${item.purchase_price?.toFixed(2) || "0.00"}
-                              </span>
-                            )}
-                            {isIngredient && (
-                              <span className="font-medium text-green-600">
-                                ${calculateIngredientPurchasePrice(item).toFixed(2)}
-                              </span>
-                            )}
-                            {isRecipe && (
-                              <span className="font-medium text-green-600">
-                                ${calculateRecipePurchasePrice(item).toFixed(2)}
-                              </span>
-                            )}
-                          </span>
+                          {(isProduct || (isIngredient && product.type === "ingredient" && product.purchase_price)) && (
+                            <span className="font-medium text-green-600">
+                              ${product.purchase_price?.toFixed(2) || "0.00"}
+                            </span>
+                          )}
+                          {isIngredient && product.type !== "ingredient" && (
+                            <span className="font-medium text-green-600">
+                              ${calculateIngredientPurchasePrice(product).toFixed(2)}
+                            </span>
+                          )}
+                          {isRecipe && (
+                            <span className="font-medium text-green-600">
+                              ${calculateRecipePurchasePrice(product).toFixed(2)}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <span>{item.stock}</span>
@@ -1510,7 +1509,7 @@ const Stock = () => {
                             .length > 2 && "..."}
                         </TableCell>
                         <TableCell>
-                          {isProduct ? (
+                          {(isProduct || (isIngredient && item.type === "ingredient")) ? (
                             <Badge
                               variant="outline"
                               className={
@@ -1533,7 +1532,7 @@ const Stock = () => {
                               variant="outline"
                               className="bg-green-50 text-green-700 border-green-200"
                             >
-                              Ingrediente
+                              {item.quantity || 0} {item.unit || "unidad"}
                             </Badge>
                           ) : (
                             <Badge variant="outline">N/A</Badge>
