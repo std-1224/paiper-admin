@@ -1467,9 +1467,6 @@ const Stock = () => {
                       )} */}
                         <TableCell>
                           <div className="flex gap-2">
-                            <>
-                              {isProduct && (
-                                <>
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -1499,11 +1496,10 @@ const Stock = () => {
                                     <PackagePlus className="mr-2 h-4 w-4" />
                                     Ajustar
                                   </Button>
-                                </>
-                              )}
+
 
                               {/* Edit buttons for recipes and ingredients */}
-                              {isRecipe && (
+                              {/* {isRecipe && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1525,7 +1521,7 @@ const Stock = () => {
                                   <Edit className="mr-2 h-4 w-4" />
                                   Editar
                                 </Button>
-                              )}
+                              )} */}
 
                               <Button
                                 variant="outline"
@@ -1552,7 +1548,6 @@ const Stock = () => {
                                   </>
                                 )}
                               </Button>
-                            </>
                           </div>
                         </TableCell>
                       </TableRow>

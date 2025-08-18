@@ -520,7 +520,7 @@ async function deductDirectRecipeSale(
     }
 
     // Update the recipe product stock
-    await updateProductStock(productId, orderQuantity);
+    // await updateProductStock(productId, orderQuantity);
 
     return true;
 

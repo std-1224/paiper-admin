@@ -3029,8 +3029,8 @@ export default function StockManagement() {
                         )}
                       </td>
                       <td className="p-3">
-                        {isProduct ? (
-                          `$${product.sale_price.toFixed(2)}`
+                        {isProduct && product.sale_price ? (
+                          `$${product?.sale_price || ""}`
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
@@ -3321,7 +3321,11 @@ export default function StockManagement() {
                       </CardHeader>
                       <CardContent>
                         <p className="text-xl font-bold">
-                          ${currentProduct.sale_price.toFixed(2)}
+                          {currentProduct.sale_price ? (
+                            `$${currentProduct.sale_price}`
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </p>
                       </CardContent>
                     </Card>
