@@ -2441,9 +2441,9 @@ export default function StockManagement() {
 
   // View product details
   const viewProductDetails = (product: Product) => {
-    const isProduct = "purchase_price" in product;
     const isRecipe = normalizedRecipesData.some(recipe => recipe.id === product.id) || product.type === "recipe";
-    const isIngredient = "quantity" in product && !isProduct && !isRecipe;
+    const isIngredient = ingredientsData.some(ingredient => ingredient.id === product.id) || product.type === "ingredient";
+    const isProduct = !isRecipe && !isIngredient;
 
     if (isRecipe) {
       setSelectedRecipeId(product.id.toString());
@@ -2580,9 +2580,9 @@ export default function StockManagement() {
   const handleExportToExcel = () => {
     const exportData = filteredProducts.map((item) => {
       // Check if it's a product, recipe, or ingredient
-      const isProduct = "purchase_price" in item;
       const isRecipe = item.type === "recipe";
-      const isIngredient = "quantity" in item && !isProduct && !isRecipe;
+      const isIngredient = ingredientsData.some(ingredient => ingredient.id === item.id) || item.type === "ingredient";
+      const isProduct = !isRecipe && !isIngredient;
       const product = item as any; // Cast to any to access all properties
 
       return {
@@ -2913,10 +2913,10 @@ export default function StockManagement() {
                   ))
                 : filteredProducts.map((item) => {
                   const product = item as any; // Cast to access all properties
-                  const isProduct = "purchase_price" in item;
                   // Check if item is from normalized recipes data
                   const isRecipe = normalizedRecipesData.some(recipe => recipe.id === item.id) || item.type === "recipe";
-                  const isIngredient = "quantity" in item && !isProduct && !isRecipe;
+                  const isIngredient = ingredientsData.some(ingredient => ingredient.id === item.id) || item.type === "ingredient";
+                  const isProduct = !isRecipe && !isIngredient;
 
                   return (
                     <tr
