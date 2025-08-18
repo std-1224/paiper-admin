@@ -68,6 +68,7 @@ import {
   BarChart3,
   Loader2,
   X,
+  Edit,
 } from "lucide-react";
 import { ProductDetailModal } from "@/components/products/ProductDetailModal";
 import { useAppContext } from "@/context/AppContext";
@@ -78,6 +79,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { categoryList } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import AddProductModal from "../(components)/add-product-modal";
+import RecipeDetailsModal from "../(components)/recipe-details-modal";
+import IngredientDetailsModal from "../(components)/ingredient-details-modal";
 
 // Mock data for unredeemed
 const unredeemedStockData = [
@@ -152,11 +155,7 @@ const Stock = () => {
     fetchNormalizedRecipes();
   }, [fetchRecipes, fetchIngredients, fetchNormalizedRecipes]);
 
-  // Log normalized recipes data for debugging
-  console.log("normalizedRecipesData in stock page: ", normalizedRecipesData);
-
   // Recipe ingredient states for product modal
-  const [selectedRecipeId, setSelectedRecipeId] = useState<string>("");
   const [recipeIngredients, setRecipeIngredients] = useState<
     {
       name: string;
@@ -230,6 +229,12 @@ const Stock = () => {
     null
   );
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // Recipe and Ingredient edit modal states
+  const [recipeDetailOpen, setRecipeDetailOpen] = useState(false);
+  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
+  const [ingredientDetailOpen, setIngredientDetailOpen] = useState(false);
+  const [selectedIngredientId, setSelectedIngredientId] = useState<string | null>(null);
   const assignForm = useForm({
     defaultValues: {
       quantity: 0,
@@ -329,6 +334,18 @@ const Stock = () => {
   const handleAdjustStock = (product: Product) => {
     setSelectedProduct(product);
     setStockAdjustmentOpen(true);
+  };
+
+  // Handle opening recipe edit modal
+  const handleEditRecipe = (recipeId: string) => {
+    setSelectedRecipeId(recipeId);
+    setRecipeDetailOpen(true);
+  };
+
+  // Handle opening ingredient edit modal
+  const handleEditIngredient = (ingredientId: string) => {
+    setSelectedIngredientId(ingredientId);
+    setIngredientDetailOpen(true);
   };
 
   // Handle opening delete confirmation
@@ -475,25 +492,16 @@ const Stock = () => {
     if (!productToDelete?.id) return;
 
     setDeletingProductId(productToDelete.id);
+    let id = productToDelete.id;
     try {
-      const response = await fetch(`/api/products/${productToDelete.id}`, {
+      const response = await fetch(`/api/products`, {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to delete product");
-      }
-
-      // Refresh the products data
-      await fetchProducts();
-
-      // Show success message
-      toast.success("Producto eliminado exitosamente del inventario");
-
+      if (!response.ok) throw new Error("Failed to delete product");
+      fetchProducts();
       // Close dialog
       setDeleteConfirmOpen(false);
       setProductToDelete(null);
@@ -1251,7 +1259,7 @@ const Stock = () => {
 
                     return allItems;
                   })().map((item) => {
-                    const isProduct = "purchase_price" in item;
+                    const isProduct = item.type === "product";
                     const isRecipe = item.type === "recipe";
                     const isIngredient = "quantity" in item && !isProduct && !isRecipe;
                     const product = item as any; // Cast to access all properties
@@ -1350,13 +1358,17 @@ const Stock = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          {isProduct && item.is_liquid ? (
+                          {isProduct ? (
                             <span className="font-medium text-green-600">
                               ${item.purchase_price?.toFixed(2) || "0.00"}
                             </span>
-                          ) : isIngredient && !item.is_liquid ? (
+                          ) : isIngredient ? (
                             <span className="font-medium text-green-600">
-                              Stock: {item.stock || 0}
+                              {item.is_liquid && item.products?.purchase_price ? (
+                                `$${item.products.purchase_price.toFixed(2)}`
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
@@ -1364,10 +1376,38 @@ const Stock = () => {
                         </TableCell>
                         <TableCell>
                           {isProduct ? (
-                            item.stock || 0
+                            (() => {
+                              // For products with type="ingredient", also check if they exist in ingredients table
+                              if (item.type === "ingredient") {
+                                // Find corresponding ingredient entry
+                                const correspondingIngredient = ingredientsData.find(ing => ing.product_id === item.id);
+                                if (correspondingIngredient) {
+                                  // Show ingredient stock info
+                                  return correspondingIngredient.is_liquid ? (
+                                    <span className="ml-1">
+                                      {correspondingIngredient.stock}
+                                    </span>
+                                  ) : (
+                                    <span>
+                                      {correspondingIngredient.quantity || 0} {correspondingIngredient.unit || "unidad"}
+                                    </span>
+                                  );
+                                }
+                              }
+                              // Default product stock display
+                              return item.stock || 0;
+                            })()
                           ) : isIngredient ? (
                             <span>
-                              {item.is_liquid ? <span className="ml-1 text-blue-600">{item.stock}💧</span> : item.quantity || 0} {item.unit || "unidad"}
+                              {item.is_liquid ? (
+                                <span className="ml-1">
+                                  {item.stock}
+                                </span>
+                              ) : (
+                                <span>
+                                  {item.quantity || 0} {item.unit || "unidad"}
+                                </span>
+                              )}
                             </span>
                           ) : (
                             ""
@@ -1427,64 +1467,92 @@ const Stock = () => {
                       )} */}
                         <TableCell>
                           <div className="flex gap-2">
-                            {isProduct && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (user?.role === "barman" || user?.role === "client") {
-                                      toast.error("No tienes permiso para ajustar stock");
-                                      return;
-                                    }
-                                    handleAssignStock(product)
-                                  }}
-                                >
-                                  <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                  Asignar
-                                </Button>
+                            <>
+                              {isProduct && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (user?.role === "barman" || user?.role === "client") {
+                                        toast.error("No tienes permiso para ajustar stock");
+                                        return;
+                                      }
+                                      handleAssignStock(product)
+                                    }}
+                                  >
+                                    <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                    Asignar
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                                    onClick={() => {
+                                      if (user?.role === "barman" || user?.role === "client") {
+                                        toast.error("No tienes permiso para ajustar stock");
+                                        return;
+                                      }
+                                      handleAdjustStock(product)
+                                    }}
+                                  >
+                                    <PackagePlus className="mr-2 h-4 w-4" />
+                                    Ajustar
+                                  </Button>
+                                </>
+                              )}
+
+                              {/* Edit buttons for recipes and ingredients */}
+                              {isRecipe && (
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                                  onClick={() => {
-                                    if (user?.role === "barman" || user?.role === "client") {
-                                      toast.error("No tienes permiso para ajustar stock");
-                                      return;
-                                    }
-                                    handleAdjustStock(product)
-                                  }}
+                                  onClick={() => handleEditRecipe(item.id?.toString())}
                                 >
-                                  <PackagePlus className="mr-2 h-4 w-4" />
-                                  Ajustar
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Editar
                                 </Button>
+                              )}
+
+                              {isIngredient && (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                                  onClick={() => {
-                                    if (user?.role === "barman" || user?.role === "manager" || user?.role === "client") {
-                                      toast.error("No tienes permiso para eliminar productos");
-                                      return;
-                                    }
-                                    handleDeleteClick(product)
-                                  }}
-                                  disabled={deletingProductId === item.id}
+                                  className="text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
+                                  onClick={() => handleEditIngredient(item.id?.toString())}
                                 >
-                                  {deletingProductId === item.id ? (
-                                    <>
-                                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                                      Eliminando...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Trash className="mr-2 h-4 w-4" />
-                                      Eliminar
-                                    </>
-                                  )}
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Editar
                                 </Button>
-                              </>
-                            )}
+                              )}
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                                onClick={() => {
+                                  if (user?.role === "barman" || user?.role === "manager" || user?.role === "client") {
+                                    toast.error("No tienes permiso para eliminar productos");
+                                    return;
+                                  }
+                                  handleDeleteClick(product)
+                                }}
+                                disabled={deletingProductId === item.id}
+                              >
+                                {deletingProductId === item.id ? (
+                                  <>
+                                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                                    Eliminando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash className="mr-2 h-4 w-4" />
+                                    Eliminar
+                                  </>
+                                )}
+                              </Button>
+                            </>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -2039,6 +2107,35 @@ const Stock = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Recipe Details Modal */}
+      <RecipeDetailsModal
+        isOpen={recipeDetailOpen}
+        onClose={() => {
+          setRecipeDetailOpen(false);
+          setSelectedRecipeId(null);
+        }}
+        recipeId={selectedRecipeId}
+        onEditRecipe={(id) => {
+          // Refresh data after editing
+          fetchRecipes();
+          fetchNormalizedRecipes();
+        }}
+      />
+
+      {/* Ingredient Details Modal */}
+      <IngredientDetailsModal
+        isOpen={ingredientDetailOpen}
+        onClose={() => {
+          setIngredientDetailOpen(false);
+          setSelectedIngredientId(null);
+        }}
+        ingredientId={selectedIngredientId}
+        onEditIngredient={(id) => {
+          // Refresh data after editing
+          fetchIngredients();
+        }}
+      />
     </>
   );
 };

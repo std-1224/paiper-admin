@@ -50,12 +50,13 @@ export async function PUT(
   try {
     const { id } = params;
     const body = await request.json();
-    const { product_id, name, unit, quantity, stock, is_liquid, is_active, sale_price } = body;
+    const { product_id, name, description, unit, quantity, stock, is_liquid, is_active, sale_price } = body;
 
     // Build update object with only provided fields
     const updateData: any = {};
     if (product_id !== undefined) updateData.product_id = product_id;
     if (name !== undefined) updateData.name = name.trim();
+    if (description !== undefined) updateData.description = description?.trim() || null;
     if (unit !== undefined) updateData.unit = unit;
     if (quantity !== undefined) updateData.quantity = parseFloat(quantity);
     if (stock !== undefined) updateData.stock = parseFloat(stock);

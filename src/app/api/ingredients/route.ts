@@ -33,7 +33,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { product_id, name, unit, quantity, stock, is_liquid, is_active, sale_price } = body;
+    const { product_id, name, unit, quantity, stock, purchase_price, is_liquid, is_active, sale_price } = body;
 
     // Validation
     if (!name || !unit || quantity === undefined) {
@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
           quantity: parseFloat(quantity) || 0,
           stock: parseFloat(stock) || 0,
           original_quantity: quantity ? parseFloat(quantity) : parseFloat(quantity) || 0,
+          purchase_price: parseFloat(purchase_price) || 0,
           is_liquid: Boolean(is_liquid),
           is_active: Boolean(is_active),
           // sale_price: sale_price ? parseFloat(sale_price) : null,
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, product_id, name, unit, quantity, stock, is_liquid, is_active } = body;
+    const { id, product_id, name, unit, quantity, stock, purchase_price, is_liquid, is_active } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -113,6 +114,7 @@ export async function PUT(request: NextRequest) {
     if (unit !== undefined) updateData.unit = unit;
     if (quantity !== undefined) updateData.quantity = parseFloat(quantity);
     if (stock !== undefined) updateData.stock = parseFloat(stock);
+    if (purchase_price !== undefined) updateData.purchase_price = parseFloat(purchase_price);
     if (is_liquid !== undefined) updateData.is_liquid = Boolean(is_liquid);
     if (is_active !== undefined) updateData.is_active = Boolean(is_active);
 

@@ -35,7 +35,7 @@ export default function IngredientDetailsModal({
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { uploadImageToSupabase } = useAppContext();
+  const { uploadImageToSupabase, fetchIngredients } = useAppContext();
 
   // Form state for editing
   const [editForm, setEditForm] = useState({
@@ -88,7 +88,7 @@ export default function IngredientDetailsModal({
           is_liquid: ingredientData.is_liquid || false,
           is_active: ingredientData.is_active || false,
           // Product fields
-          purchase_price: productData?.purchase_price?.toString() || "",
+          purchase_price: ingredientData.purchase_price?.toString() || "",
           image_url: productData?.image_url || "",
         });
 
@@ -143,8 +143,27 @@ export default function IngredientDetailsModal({
 
     setSaving(true);
     try {
-      // GET ingredient via API
-      const ingredientResponse = await fetch(`/api/ingredients/${ingredient.id}`);
+      // Update ingredient via API
+      const ingredientUpdateData = {
+        id: ingredient.id,
+        name: editForm.name,
+        quantity: editForm.quantity ? parseFloat(editForm.quantity) : ingredient.quantity,
+        stock: editForm.stock ? parseFloat(editForm.stock) : ingredient.stock,
+        purchase_price: editForm.purchase_price ? parseFloat(editForm.purchase_price) : ingredient.purchase_price,
+        unit: editForm.unit || ingredient.unit,
+        is_liquid: ingredient.is_liquid,
+        is_active: editForm.is_active, // Use the edited value from form
+        product_id: ingredient.product_id,
+        updated_at: new Date().toISOString(),
+      };
+
+      const ingredientResponse = await fetch(`/api/ingredients/${ingredient.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(ingredientUpdateData),
+      });
 
       if (!ingredientResponse.ok) {
         const errorData = await ingredientResponse.json().catch(() => ({}));
@@ -172,7 +191,7 @@ export default function IngredientDetailsModal({
         image_url: imageUrl,
         purchase_price: editForm.purchase_price ? parseFloat(editForm.purchase_price) : null,
         sale_price: editForm.sale_price ? parseFloat(editForm.sale_price) : null,
-        is_active: true,
+        is_active: editForm.is_active, // Match the ingredient's is_active status
         is_pr: false,
         is_courtsey: false,
         type: "product",
@@ -182,40 +201,46 @@ export default function IngredientDetailsModal({
         updated_at: new Date().toISOString(),
       };
 
-      try {
-        let productResponse;
-        if (associatedProduct) {
-          // Update existing product
-          productResponse = await fetch(`/api/products`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              id: associatedProduct.id,
-              ...productData,
-            }),
-          });
-        } else {
-          // Create new product
-          productResponse = await fetch(`/api/products`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(productData),
-          });
-        }
+      // Always update product table when ingredient is active or when product already exists
+      if (editForm.is_active || associatedProduct) {
+        try {
+          let productResponse;
+          if (associatedProduct) {
+            // Update existing product with same is_active status as ingredient
+            productResponse = await fetch(`/api/products`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                id: associatedProduct.id,
+                ...productData,
+              }),
+            });
+          } else if (editForm.is_active) {
+            // Create new product only if ingredient is active
+            productResponse = await fetch(`/api/products`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(productData),
+            });
+          }
 
-        if (productResponse.ok) {
-          const updatedProduct = await productResponse.json();
-          setAssociatedProduct(updatedProduct);
-        } else {
-          const errorData = await productResponse.json().catch(() => ({}));
-          console.error('Failed to save product:', errorData);
+          if (productResponse && productResponse.ok) {
+            const updatedProduct = await productResponse.json();
+            setAssociatedProduct(updatedProduct);
+            console.log('✅ Product updated successfully with is_active:', editForm.is_active);
+          } else if (productResponse) {
+            const errorData = await productResponse.json().catch(() => ({}));
+            console.error('Failed to save product:', errorData);
+            toast.warning('Ingredient updated but product update failed');
+          }
+        } catch (error) {
+          console.error('Error saving product:', error);
+          toast.warning('Ingredient updated but product update failed');
         }
-      } catch (error) {
-        console.error('Error saving product:', error);
       }
 
       setIngredient(updatedIngredient);
@@ -240,6 +265,9 @@ export default function IngredientDetailsModal({
       } catch (error) {
         console.error('Error refetching product data:', error);
       }
+
+      // Refresh ingredients data to reflect changes in the main list
+      await fetchIngredients();
 
       setIsEditing(false);
       setImageFile(null);
@@ -297,15 +325,59 @@ export default function IngredientDetailsModal({
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="ingredient-description">Description</Label>
-                    <Input
-                      id="ingredient-description"
-                      value={editForm.description}
-                      onChange={(e) => handleFormChange('description', e.target.value)}
-                      placeholder="Enter ingredient description"
-                    />
-                  </div>
+                  {editForm.is_active && (
+                    <>
+                      <div>
+                        <Label htmlFor="ingredient-description">Description</Label>
+                        <Input
+                          id="ingredient-description"
+                          value={editForm.description}
+                          onChange={(e) => handleFormChange('description', e.target.value)}
+                          placeholder="Enter ingredient description"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="sale-price">Sale Price</Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Input
+                              id="sale-price"
+                              type="number"
+                              step="0.01"
+                              value={editForm.sale_price}
+                              onChange={(e) => handleFormChange('sale_price', e.target.value)}
+                              placeholder="0.00"
+                              className="pl-10"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="purchase-price">Purchase Price</Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Input
+                              id="purchase-price"
+                              type="number"
+                              step="0.01"
+                              value={editForm.purchase_price}
+                              onChange={(e) => handleFormChange('purchase_price', e.target.value)}
+                              placeholder="0.00"
+                              className="pl-10"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Image</Label>
+                        <ImageUpload
+                          handleSetImageFile={setImageFile}
+                          imageUrl={editForm.image_url}
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -331,47 +403,7 @@ export default function IngredientDetailsModal({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="sale-price">Sale Price</Label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="sale-price"
-                          type="number"
-                          step="0.01"
-                          value={editForm.sale_price}
-                          onChange={(e) => handleFormChange('sale_price', e.target.value)}
-                          placeholder="0.00"
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
 
-                    <div>
-                      <Label htmlFor="purchase-price">Purchase Price</Label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="purchase-price"
-                          type="number"
-                          step="0.01"
-                          value={editForm.purchase_price}
-                          onChange={(e) => handleFormChange('purchase_price', e.target.value)}
-                          placeholder="0.00"
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Image</Label>
-                    <ImageUpload
-                      handleSetImageFile={setImageFile}
-                      imageUrl={editForm.image_url}
-                    />
-                  </div>
                 </div>
               ) : (
                 <div>

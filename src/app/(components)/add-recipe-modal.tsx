@@ -56,11 +56,30 @@ export default function AddRecipeModal({
   const [selectedIngredientId, setSelectedIngredientId] = useState("");
   const [ingredientQuantity, setIngredientQuantity] = useState("");
   const [ingredientUnit, setIngredientUnit] = useState("");
+  const [purchasePrice, setPurchasePrice] = useState("0.00");
   const [loading, setLoading] = useState(false);
   const [ingredientsData, setIngredientsData] = useState<any[]>([]);
   const [loadingIngredients, setLoadingIngredients] = useState(false);
 
   const { fetchRecipes, recipesData } = useAppContext();
+
+  // Calculate total purchase price based on ingredients
+  const calculatePurchasePrice = () => {
+    let totalPrice = 0;
+
+    recipeIngredients.forEach(recipeIngredient => {
+      const ingredient = ingredientsData.find(ing => ing.id === recipeIngredient.ingredient_id);
+      if (ingredient && ingredient.purchase_price && ingredient.quantity && recipeIngredient.deduct_quantity) {
+        // Calculate price per unit: ingredient.purchase_price / ingredient.quantity
+        const pricePerUnit = ingredient.purchase_price / ingredient.quantity;
+        // Calculate total cost for this ingredient: pricePerUnit * quantity used in recipe
+        const ingredientCost = pricePerUnit * recipeIngredient.deduct_quantity;
+        totalPrice += ingredientCost;
+      }
+    });
+
+    return totalPrice;
+  };
 
   // Fetch ingredients from the ingredients API
   const fetchIngredients = async () => {
@@ -97,6 +116,16 @@ export default function AddRecipeModal({
     }
   }, [onIngredientAdded, isOpen]);
 
+  // Auto-calculate purchase price when ingredients change
+  React.useEffect(() => {
+    if (recipeIngredients.length > 0 && ingredientsData.length > 0) {
+      const calculatedPrice = calculatePurchasePrice();
+      setPurchasePrice(calculatedPrice.toFixed(2));
+    } else {
+      setPurchasePrice("0.00");
+    }
+  }, [recipeIngredients, ingredientsData]);
+
   // Effect to populate form when editing a recipe
   React.useEffect(() => {
     if (selectedRecipe && isOpen) {
@@ -124,6 +153,7 @@ export default function AddRecipeModal({
     setSelectedIngredientId("");
     setIngredientQuantity("");
     setIngredientUnit("");
+    setPurchasePrice("0.00");
   };
 
   const handleClose = () => {
@@ -297,7 +327,24 @@ export default function AddRecipeModal({
             </Select>
           </div>
 
-
+          <div className="space-y-2">
+            <Label htmlFor="purchasePrice">Purchase Price ($)</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</span>
+              <Input
+                id="purchasePrice"
+                type="number"
+                step="0.01"
+                value={purchasePrice}
+                readOnly
+                className="pl-8 bg-blue-50"
+                title="Purchase price is automatically calculated based on ingredient costs"
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              Automatically calculated based on ingredient costs
+            </p>
+          </div>
 
           {/* Recipe Ingredients Section */}
           <div className="space-y-4">

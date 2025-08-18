@@ -89,19 +89,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Additional validation: must have either ingredient_id OR recipe_id (not both, not neither)
-    if (!ingredient_id && !recipe_id) {
-      return NextResponse.json(
-        { error: 'Either ingredient_id or recipe_id must be provided' },
-        { status: 400 }
-      );
-    }
+    // Additional validation:
+    // For recipe ingredients: need both recipe_id and ingredient_id
+    // For product-recipe links: need recipe_id and product_id (ingredient_id should be null)
+    // For product-ingredient links: need ingredient_id and product_id (recipe_id should be null)
 
-    if (ingredient_id && recipe_id) {
-      return NextResponse.json(
-        { error: 'Cannot have both ingredient_id and recipe_id - must be one or the other' },
-        { status: 400 }
-      );
+    if (product_id) {
+      // Product-related operations
+      if (!ingredient_id && !recipe_id) {
+        return NextResponse.json(
+          { error: 'For product operations, either ingredient_id or recipe_id must be provided' },
+          { status: 400 }
+        );
+      }
+
+      if (ingredient_id && recipe_id) {
+        return NextResponse.json(
+          { error: 'For product operations, cannot have both ingredient_id and recipe_id' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Recipe ingredient operations - need both recipe_id and ingredient_id
+      if (!recipe_id || !ingredient_id) {
+        return NextResponse.json(
+          { error: 'For recipe ingredients, both recipe_id and ingredient_id are required' },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate recipe if provided
@@ -201,6 +216,78 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(recipeIngredient, { status: 201 });
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Update recipe ingredient
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, deduct_quantity, deduct_stock } = body;
+
+    // Validation
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Recipe ingredient ID is required' },
+        { status: 400 }
+      );
+    }
+
+    if (deduct_quantity === undefined || deduct_stock === undefined) {
+      return NextResponse.json(
+        { error: 'deduct_quantity and deduct_stock are required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if the recipe ingredient exists
+    const { data: existing } = await supabaseServerClient
+      .from('recipe_ingredients')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Recipe ingredient not found' },
+        { status: 404 }
+      );
+    }
+
+    // Update the recipe ingredient
+    const { data: updatedIngredient, error } = await supabaseServerClient
+      .from('recipe_ingredients')
+      .update({
+        deduct_quantity: parseFloat(deduct_quantity),
+        deduct_stock: parseFloat(deduct_stock),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select(`
+        *,
+        ingredients (
+          name,
+          unit,
+          stock
+        )
+      `)
+      .single();
+
+    if (error) {
+      console.error('Error updating recipe ingredient:', error);
+      return NextResponse.json(
+        { error: 'Failed to update recipe ingredient' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(updatedIngredient);
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json(

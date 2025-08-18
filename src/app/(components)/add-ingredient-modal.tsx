@@ -36,6 +36,7 @@ export default function AddIngredientModal({
   const [unit, setUnit] = useState("");
   const [quantity, setQuantity] = useState("");
   const [stock, setStock] = useState("");
+  const [purchasePrice, setPurchasePrice] = useState("");
   const [addingIngredient, setAddingIngredient] = useState(false);
 
   const { fetchProducts } = useAppContext();
@@ -45,6 +46,7 @@ export default function AddIngredientModal({
     setUnit("");
     setQuantity("");
     setStock("");
+    setPurchasePrice("");
   };
 
   const handleClose = () => {
@@ -81,6 +83,7 @@ export default function AddIngredientModal({
           unit: unit,
           quantity: parseFloat(quantity) || 0,
           stock: parseFloat(stock) || 0,
+          purchase_price: parseFloat(purchasePrice) || 0,
           is_liquid: false, // Default to false, can be updated later for product creation
 
         }),
@@ -190,6 +193,21 @@ export default function AddIngredientModal({
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="purchasePrice" className="text-sm font-medium">
+              Purchase Price ($) <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="purchasePrice"
+              placeholder="Enter the purchase price for the total stock"
+              value={purchasePrice}
+              onChange={(e) => setPurchasePrice(e.target.value)}
+              type="number"
+              min="0"
+              step="0.01"
+              className="w-full"
+            />
+          </div>
 
         </div>
 
@@ -204,7 +222,7 @@ export default function AddIngredientModal({
           </Button>
           <Button
             onClick={addNewIngredientToStock}
-            disabled={addingIngredient || !name.trim() || !unit.trim() || !quantity.trim()}
+            disabled={addingIngredient || !name.trim() || !unit.trim() || !quantity.trim() || !purchasePrice.trim()}
             className="flex-1 bg-black text-white hover:bg-gray-800"
           >
             {addingIngredient ? "Saving..." : "Save Ingredient"}

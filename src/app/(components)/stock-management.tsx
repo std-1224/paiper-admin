@@ -2278,10 +2278,6 @@ export default function StockManagement() {
           image_url: uploadedUrl,
           updated_at: new Date().toISOString(),
           has_recipe: hasAnyIngredients,
-          ingredients: ingredientsData
-            ? JSON.stringify(ingredientsData)
-            : editingProduct.ingredients,
-          total_amount: totalAmount,
         }),
       });
 
@@ -2346,7 +2342,7 @@ export default function StockManagement() {
       }
 
       // Update recipe_ingredients table for enhanced ingredients and recipes
-      if (hasAnyIngredients) {
+      if (hasAnyIngredients || editingProduct.has_recipe) {
         try {
           // First, delete existing recipe_ingredients for this product
           const deleteResponse = await fetch(`/api/recipe-ingredients?product_id=${editingProduct.id}`, {
@@ -2366,8 +2362,6 @@ export default function StockManagement() {
                 ingredient_id: ingredient.id,
                 deduct_stock: ingredient.deduct_stock,
                 deduct_quantity: ingredient.deduct_quantity,
-                ingredient_name: ingredient.name,
-                ingredient_unit: ingredient.unit,
               };
 
               const createResponse = await fetch("/api/recipe-ingredients", {
@@ -2391,8 +2385,6 @@ export default function StockManagement() {
                 ingredient_id: null,
                 deduct_stock: recipe.quantityToUse,
                 deduct_quantity: 0,
-                ingredient_name: recipe.name,
-                ingredient_unit: "unidades",
               };
 
               const createResponse = await fetch("/api/recipe-ingredients", {

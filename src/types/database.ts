@@ -7,6 +7,7 @@ export interface Ingredient {
   unit: string;
   quantity: number;
   stock: number;
+  purchase_price?: number;
   is_liquid: boolean;
   is_active?: boolean;
   created_at: string;
