@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS ingredients (
     is_liquid BOOLEAN NOT NULL DEFAULT false,
     is_active BOOLEAN NOT NULL DEFAULT false,
     price DECIMAL(10,2),
+    original_quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
+    purchase_price DECIMAL(10,2),
     product_id UUID REFERENCES products(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -97,6 +99,25 @@ CREATE POLICY "Enable read access for all users" ON recipe_ingredients FOR SELEC
 CREATE POLICY "Enable insert access for all users" ON recipe_ingredients FOR INSERT WITH CHECK (true);
 CREATE POLICY "Enable update access for all users" ON recipe_ingredients FOR UPDATE USING (true);
 CREATE POLICY "Enable delete access for all users" ON recipe_ingredients FOR DELETE USING (true);
+
+-- Simple purchase history table
+CREATE TABLE IF NOT EXISTS stock_purchases (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    ingredient_id UUID REFERENCES ingredients(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+    stock DECIMAL(10,2) NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL,
+    supplier VARCHAR(255),
+    purchase_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    notes TEXT,
+    responsible_user VARCHAR(255),
+    resulting_average_cost DECIMAL(10,2),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_purchases_ingredient_id ON stock_purchases(ingredient_id);
+ALTER TABLE stock_purchases ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all access" ON stock_purchases FOR ALL USING (true);
 
 -- Insert some sample data (optional)
 INSERT INTO ingredients (name, unit, quantity, stock, is_liquid) VALUES

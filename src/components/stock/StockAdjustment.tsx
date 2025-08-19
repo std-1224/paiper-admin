@@ -15,7 +15,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,12 +29,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
-import { ArrowDownUp, PackagePlus, PackageX, Loader2 } from "lucide-react";
+import { ArrowDownUp, PackagePlus, PackageX, Loader2, ScanSearch, CalendarIcon } from "lucide-react";
 import { ProductSearchField } from "@/components/products/ProductSearchField";
 import { MultiSelectBarsField } from "@/components/bars/MultiSelectBarsField";
-import { useAppContext } from "@/context/AppContext";
 import { InventoryData } from "@/types/types";
-import { set } from "date-fns";
+import { StockRepurchase } from "@/app/(components)/stock-repurchase";
+import { useAppContext } from "@/context/AppContext";
 
 interface StockAdjustmentProps {
   open: boolean;
@@ -77,7 +76,9 @@ export function StockAdjustment({
   onSubmitReingress,
   onSubmitLoss,
 }: StockAdjustmentProps) {
-  const [activeTab, setActiveTab] = useState<"reingress" | "loss">("reingress");
+  const [activeTab, setActiveTab] = useState<
+    "reingress" | "loss" | "repurchase"
+  >("reingress");
   const [selectedProductReingress, setSelectedProductReingress] = useState<
     any | null
   >(null);
@@ -90,7 +91,7 @@ export function StockAdjustment({
   const { stocksData, fetchProducts } = useAppContext();
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [fetchProducts]);
   useEffect(() => {
     if (initialStockId) {
       stocksData.forEach((stock) => {
@@ -144,7 +145,7 @@ export function StockAdjustment({
         observations: "",
       });
     }
-  }, [initialProductId, initialQuantity]);
+  }, [initialProductId, initialQuantity, loss, reingress]);
 
   useEffect(() => {
     if (initialStock) {
@@ -167,8 +168,7 @@ export function StockAdjustment({
       });
       setSelectedBars([initialStock.barId.toString()]);
     }
-  }, [initialStock, reingress, loss]);
-
+  }, [initialStock, reingress, loss, initialProductId, initialQuantity]);
 
 
   const handleProductSelectReingress = (product: any) => {
@@ -212,9 +212,7 @@ export function StockAdjustment({
       // If a callback is provided (from bar detail page), use it instead of direct API call
       if (onSubmitReingress) {
         await onSubmitReingress(data);
-        toast.success(
-          `${data.quantity} unidades reingresadas al stock`
-        );
+        toast.success(`${data.quantity} unidades reingresadas al stock`);
       } else {
         // Default behavior for general stock management
         const response = await fetch("/api/adjust", {
@@ -228,7 +226,7 @@ export function StockAdjustment({
             type: "re-entry",
             reason: data.reason || "Re-ingreso de stock",
             destinationBars: data.destinationBars || [],
-            observations: data.observations || ""
+            observations: data.observations || "",
           }),
         });
 
@@ -251,7 +249,9 @@ export function StockAdjustment({
       setSelectedBars([]);
     } catch (error) {
       console.error("Error processing re-entry:", error);
-      toast.error(error instanceof Error ? error.message : "Error al procesar re-ingreso");
+      toast.error(
+        error instanceof Error ? error.message : "Error al procesar re-ingreso"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -286,9 +286,7 @@ export function StockAdjustment({
       // If a callback is provided (from bar detail page), use it instead of direct API call
       if (onSubmitLoss) {
         await onSubmitLoss(data);
-        toast.success(
-          `${data.quantity} unidades registradas como pérdida`
-        );
+        toast.success(`${data.quantity} unidades registradas como pérdida`);
       } else {
         // Default behavior for general stock management
         const response = await fetch("/api/adjust", {
@@ -301,7 +299,7 @@ export function StockAdjustment({
             quantity: data.quantity,
             type: "loss",
             reason: data.reason || "Pérdida de stock",
-            observations: data.observations || ""
+            observations: data.observations || "",
           }),
         });
 
@@ -323,7 +321,9 @@ export function StockAdjustment({
       setSelectedProductLoss(null);
     } catch (error) {
       console.error("Error processing loss:", error);
-      toast.error(error instanceof Error ? error.message : "Error al procesar pérdida");
+      toast.error(
+        error instanceof Error ? error.message : "Error al procesar pérdida"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -342,9 +342,11 @@ export function StockAdjustment({
 
         <Tabs
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value as "reingress" | "loss")}
+          onValueChange={(value) =>
+            setActiveTab(value as "reingress" | "loss" | "repurchase")
+          }
         >
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="reingress" className="flex items-center">
               <PackagePlus className="mr-2 h-4 w-4" />
               Reingreso
@@ -352,6 +354,10 @@ export function StockAdjustment({
             <TabsTrigger value="loss" className="flex items-center">
               <PackageX className="mr-2 h-4 w-4" />
               Pérdida
+            </TabsTrigger>
+            <TabsTrigger value="repurchase" className="flex items-center">
+              <ArrowDownUp className="mr-2 h-4 w-4" />
+              Re-compra
             </TabsTrigger>
           </TabsList>
 
@@ -371,7 +377,9 @@ export function StockAdjustment({
                       <FormControl>
                         <ProductSearchField
                           onSelect={handleProductSelectReingress}
-                          selectedProductId={field.value ? String(field.value) : undefined}
+                          selectedProductId={
+                            field.value ? String(field.value) : undefined
+                          }
                           placeholder="Buscar producto..."
                           disabled={initialStockId ? true : false}
                         />
@@ -472,8 +480,6 @@ export function StockAdjustment({
                   )}
                 />
 
-
-
                 <FormItem>
                   <FormLabel>Barras de destino</FormLabel>
                   <MultiSelectBarsField
@@ -504,10 +510,7 @@ export function StockAdjustment({
                 />
 
                 <DialogFooter>
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
-                  >
+                  <Button type="submit" disabled={isLoading}>
                     {isLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -538,7 +541,9 @@ export function StockAdjustment({
                       <FormControl>
                         <ProductSearchField
                           onSelect={handleProductSelectLoss}
-                          selectedProductId={field.value ? String(field.value) : undefined}
+                          selectedProductId={
+                            field.value ? String(field.value) : undefined
+                          }
                           placeholder="Buscar producto..."
                         />
                       </FormControl>
@@ -639,8 +644,6 @@ export function StockAdjustment({
                   )}
                 />
 
-
-
                 <FormField
                   control={loss.control}
                   name="observations"
@@ -658,8 +661,8 @@ export function StockAdjustment({
                 />
 
                 <DialogFooter>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     variant="destructive"
                     disabled={isLoading}
                   >
@@ -675,6 +678,11 @@ export function StockAdjustment({
                 </DialogFooter>
               </form>
             </Form>
+          </TabsContent>
+
+          {/* Repurchase Form */}
+          <TabsContent value="repurchase" className="h-[80vh] overflow-y-auto">
+           <StockRepurchase />
           </TabsContent>
         </Tabs>
       </DialogContent>
