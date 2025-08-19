@@ -77,6 +77,12 @@ const mainNavItems = [
     icon: Database,
     path: "/stock",
   },
+  {
+    id: "configuration",
+    title: "Configuración",
+    icon: Settings2,
+    path: "/configuration",
+  },
 ];
 interface AppSidebarProps {
   toggleTheme?: () => void;
@@ -155,21 +161,7 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-               <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => {
-                    if (user?.role !== "admin" && user?.role !== "master") {
-                      toast.error("No tienes permiso para acceder a esta sección");
-                      return;
-                    }
-                    window.open("https://v0-venue-app-settings.vercel.app/", "_blank");
-                  }}
-                  className="w-full justify-start text-left"
-                >
-                  <Settings2 className="h-3 w-3" />
-                  <span>Configuración</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+
 
             </SidebarMenu>
           </SidebarGroupContent>
