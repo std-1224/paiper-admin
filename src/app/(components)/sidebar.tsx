@@ -8,11 +8,10 @@ import {
   FileTextIcon,
   QrCodeIcon,
   Database,
-  Settings,
   User,
   SunIcon,
   MoonIcon,
-  Palette,
+  Settings2,
 } from "lucide-react";
 
 import Link from "next/link";
@@ -23,17 +22,16 @@ import {
   SidebarHeader,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 import { ExitIcon } from "@radix-ui/react-icons";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 const mainNavItems = [
   { id: "dashboard", title: "Inicio", icon: HomeIcon, path: "/dashboard" },
@@ -156,6 +154,23 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
                   <span>Logout</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
+               <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => {
+                    if (user?.role !== "admin" && user?.role !== "master") {
+                      toast.error("No tienes permiso para acceder a esta sección");
+                      return;
+                    }
+                    window.open("https://v0-venue-app-settings.vercel.app/", "_blank");
+                  }}
+                  className="w-full justify-start text-left"
+                >
+                  <Settings2 className="h-3 w-3" />
+                  <span>Configuración</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
