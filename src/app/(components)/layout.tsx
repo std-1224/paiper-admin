@@ -201,11 +201,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
-      <AppSidebar />
+      <AppSidebar
+        toggleTheme={toggleTheme}
+        isDarkMode={isDarkMode}
+      />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header
-          toggleTheme={toggleTheme}
-          isDarkMode={isDarkMode}
           setIsNotificationsOpen={setIsNotificationsOpen}
         />
         <main className="overflow-y-auto dark:bg-gray-950 flex-1 p-4 md:p-8 overflow-auto">
