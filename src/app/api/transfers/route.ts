@@ -12,7 +12,6 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       );
     }
-    console.log("userId ------>", userId)
     // Fetch all data in parallel
     const [
       { data: receivedTransfers },
