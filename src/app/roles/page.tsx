@@ -470,7 +470,7 @@ export default function RoleManagement() {
                     </div>
                   </td>
                   <td className="p-3" id={`balance-cell-${user.id}`}>
-                    {user.balance}
+                    {user.balance && Number(user.balance) > 0 ? user.balance : 0}
                   </td>
                   <td className="p-3" id={`spent-cell-${user.id}`}>
                     {user.spent}
