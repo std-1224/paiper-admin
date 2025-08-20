@@ -77,12 +77,6 @@ const mainNavItems = [
     icon: Database,
     path: "/stock",
   },
-  {
-    id: "configuration",
-    title: "Configuración",
-    icon: Settings2,
-    path: "/configuration",
-  },
 ];
 interface AppSidebarProps {
   toggleTheme?: () => void;
@@ -135,6 +129,19 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              {/* Configuration */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/configuration"}>
+                  <Link
+                    href="/configuration"
+                    className="w-full justify-start text-left"
+                  >
+                    <Settings2 className="h-3 w-3" />
+                    <span>Configuración</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               {/* Theme Toggle */}
               <SidebarMenuItem>
                 <SidebarMenuButton
