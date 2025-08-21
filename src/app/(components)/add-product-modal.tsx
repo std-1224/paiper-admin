@@ -219,7 +219,6 @@ export default function AddProductModal({
   const [ingredientUnit, setIngredientUnit] = useState("ml");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [amountPerUnit, setAmountPerUnit] = useState<number>(0);
-  const [showCreateRecipeDialog, setShowCreateRecipeDialog] = useState(false);
 
   // Fetch ingredients and recipes when modal opens
   useEffect(() => {
@@ -469,62 +468,6 @@ export default function AddProductModal({
       setIsLoading(false);
     }
   };
-
-  const handleRecipeSelection = (value: string) => {
-    setSelectedRecipeId(value);
-
-    if (value === "no-recipe" || !value) {
-      setRecipeIngredients([]);
-      setNewProduct({ ...newProduct });
-      return;
-    }
-
-    // Check if it's a recipe or an ingredient
-    const selectedRecipe = recipes.find(recipe => recipe.id === value);
-    const selectedIngredient = ingredients.find(ingredient => ingredient.id === value);
-
-    if (selectedRecipe) {
-      // Handle RECIPE selection - this will set has_recipe: true
-      if (selectedRecipe.recipe_ingredients && selectedRecipe.recipe_ingredients.length > 0) {
-        const recipeIngredients = selectedRecipe.recipe_ingredients.filter(ri => !ri.ingredients.is_liquid).map(ri => ({
-          id: ri.ingredient_id,
-          name: ri.ingredients.name,
-          quantity: ri.deduct_quantity.toString(), // Use deduct_quantity as the quantity
-          unit: ri.ingredients.unit,
-          deduct_quantity: ri.deduct_quantity,
-          deduct_stock: ri.deduct_stock,
-          available_stock: ri.deduct_stock, // Show deduct_stock as available stock
-          total_amount: ri.deduct_quantity, // Show deduct_quantity as total amount
-          requiredQuantity: 1,
-          is_liquid: ri.ingredients.is_liquid || false,
-          isCustom: false,
-        }));
-
-        setRecipeIngredients(recipeIngredients);
-      } else {
-        setRecipeIngredients([]);
-      }
-    } else if (selectedIngredient) {
-      // Handle INDIVIDUAL ingredient selection - this will NOT set has_recipe: true
-      const ingredientData = [{
-        id: selectedIngredient.id,
-        name: selectedIngredient.name,
-        quantity: selectedIngredient.quantity.toString(),
-        unit: selectedIngredient.unit,
-        available_stock: selectedIngredient.stock,
-        total_amount: selectedIngredient.quantity, // Use stock directly without calculation
-        deduct_stock: selectedIngredient.stock, // Available units
-        deduct_quantity: selectedIngredient.quantity, // Use stock directly without calculation
-        requiredQuantity: 1,
-        is_liquid: selectedIngredient.is_liquid,
-        isCustom: false,
-      }];
-
-      setRecipeIngredients(ingredientData);
-      setNewProduct({ ...newProduct });
-    }
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
@@ -699,15 +642,6 @@ export default function AddProductModal({
               <Label className="text-base font-semibold">
                 Ingredientes (Opcional)
               </Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowCreateRecipeDialog(true)}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Crear Receta
-              </Button>
             </div>
 
             {/* Selection Dropdown */}
