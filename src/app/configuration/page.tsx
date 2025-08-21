@@ -8,7 +8,7 @@ import { RoleManagement } from "../../components/role-management"
 import { GeneralSettings } from "../../components/general-settings"
 
 export default function ConfigurationPage() {
-  const [activeTab, setActiveTab] = useState("general")
+  const [activeTab, setActiveTab] = useState("roles")
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -23,13 +23,13 @@ export default function ConfigurationPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="general" className="flex items-center space-x-2">
-            <Settings className="h-4 w-4" />
-            <span>General</span>
-          </TabsTrigger>
           <TabsTrigger value="roles" className="flex items-center space-x-2">
             <Users className="h-4 w-4" />
             <span>Roles y Permisos</span>
+          </TabsTrigger>
+          <TabsTrigger value="general" className="flex items-center space-x-2">
+            <Settings className="h-4 w-4" />
+            <span>General</span>
           </TabsTrigger>
         </TabsList>
 
