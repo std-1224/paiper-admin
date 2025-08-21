@@ -379,7 +379,7 @@ export default function RecipeConfiguration() {
                               : "bg-red-50 text-red-700 border-red-200"
                           )}
                         >
-                          {ingredient.stock > 0 && ingredient.original_quantity > ingredient.quantity ? `${ingredient.stock - 1} unit` : ''}
+                          {ingredient.stock > 0 && ingredient.original_quantity > ingredient.quantity ? `${ingredient.stock} unit` : ''}
                           {ingredient.stock === 0 ? 'Empty' : ''}
                           {ingredient.original_quantity == ingredient.quantity ? `${ingredient.stock} unit` : ''}
                         </Badge>

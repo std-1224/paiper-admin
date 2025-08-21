@@ -2046,9 +2046,9 @@ export default function StockManagement() {
       });
 
     // Add ingredients from ingredientsData that aren't already added
-    // Only show active ingredients in the menu/stock management component
+    // Only show active ingredients that don't have a product_id (standalone ingredients)
     ingredientsData
-      .filter((item) => item.is_active === true)
+      .filter((item) => item.is_active === true && !item.product_id)
       .forEach((item) => {
         if (!seenIds.has(item.id)) {
           seenIds.add(item.id);
@@ -3019,7 +3019,7 @@ export default function StockManagement() {
                   const product = item as any; // Cast to access all properties
                   // Check if item is from normalized recipes data
                   const isRecipe = normalizedRecipesData.some(recipe => recipe.id === item.id) || item.type === "recipe";
-                  const isIngredient = ingredientsData.some(ingredient => ingredient.id === item.id) || item.type === "ingredient";
+                  const isIngredient = ingredientsData.some(ingredient => (ingredient.id === item.id));
                   const isProduct = !isRecipe && !isIngredient;
 
                   return (
@@ -3189,7 +3189,7 @@ export default function StockManagement() {
                           >
                             <Info className="h-4 w-4" />
                           </Button>
-                          {isProduct && (product.type === "product" || (product.type === "ingredient" && product.is_liquid === true)) && (
+                           {isProduct && (product.type === "product" || (product.type === "ingredient")) && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -3544,11 +3544,7 @@ export default function StockManagement() {
                     }
                   />
                 </div>
-
-
-
-
-
+                
                 {/* Ingredient Type Toggle */}
                 <div className="flex items-center justify-between rounded-lg border p-3">
                   <div className="space-y-0.5">
@@ -3800,8 +3796,47 @@ export default function StockManagement() {
               </div>
             </div>
 
-            {/* Product Configuration */}
-            <div className="space-y-4 border rounded-lg p-4">
+            {/* Price Information */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-purchase-price">Precio de Compra</Label>
+                <Input
+                  id="edit-purchase-price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editingProduct?.purchase_price || ""}
+                  onChange={(e) =>
+                    setEditingProduct({
+                      ...editingProduct!,
+                      purchase_price: e.target.value === "" ? 0 : parseFloat(e.target.value),
+                    })
+                  }
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-sale-price">Precio de Venta</Label>
+                <Input
+                  id="edit-sale-price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editingProduct?.sale_price || ""}
+                  onChange={(e) =>
+                    setEditingProduct({
+                      ...editingProduct!,
+                      sale_price: e.target.value === "" ? 0 : parseFloat(e.target.value),
+                    })
+                  }
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            {/* Product Configuration - Hide when product has recipe */}
+            {!editingProduct?.has_recipe && (
+              <div className="space-y-4 border rounded-lg p-4">
               <div className="space-y-4">
                 <h3 className="text-base font-semibold">Configuración del Producto</h3>
 
@@ -3892,6 +3927,7 @@ export default function StockManagement() {
                 )}
               </div>
             </div>
+            )}
 
             {/* Enhanced Recipe/Ingredients Selection Field */}
             <div className="space-y-4 border rounded-lg p-4">
