@@ -12,7 +12,8 @@ export const GET = async (req: Request) => {
             .select("*")
             .order("id", { ascending: true })
             .is('recipe_id', null)
-            .is('ingredient_id', null);
+            .is('ingredient_id', null)
+            .is('deleted_at', null);
 
         // Filter by type if specified
         if (type) {
@@ -152,10 +153,10 @@ export const DELETE = async (req: Request) => {
             return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
         }
 
-        // First, get the product to check if it's an ingredient-type product
+        // First, get the product to check if it's an ingredient-type product or ingredient being sold as product
         const { data: product, error: fetchError } = await supabaseServerClient
             .from('products')
-            .select('id, type, name')
+            .select('id, type, name, ingredient_id, recipe_id')
             .eq('id', id)
             .single();
 
@@ -164,65 +165,105 @@ export const DELETE = async (req: Request) => {
             return NextResponse.json({ error: 'Product not found' }, { status: 404 });
         }
 
-        // Delete related records first
-        const res = await supabaseServerClient.from('order_items').delete().eq('product_id', id);
+        // Initialize tracking variables for soft deletion
+        const deletedAt = new Date().toISOString();
+        let softDeletedItems = {
+            products: 0,
+            ingredients: 0,
+            recipes: 0,
+            recipeIngredients: 0
+        };
+
+        // Delete inventory records (safe to delete as they're just stock tracking)
         const invRes = await supabaseServerClient.from('inventory').delete().eq('product_id', id);
 
-        if (res.error || invRes.error) {
-            throw res.error || invRes.error;
+        if (invRes.error) {
+            console.error('Error deleting inventory records:', invRes.error);
+            // Continue with deletion, inventory records are not critical
         }
 
-        // If the product is an ingredient-type product, also delete from ingredients table
-        if (product.type === 'ingredient') {
-            console.log(`Deleting ingredient-type product: ${product.name} (ID: ${id})`);
+        // Handle different product types with soft deletion
+        console.log(`Starting soft deletion of product: ${product.name} (ID: ${id})`);
 
-            // Delete from ingredients table where product_id matches
+        // 1. Soft delete the product itself
+        const { error: productDeleteError } = await supabaseServerClient
+            .from('products')
+            .update({ deleted_at: deletedAt })
+            .eq('id', id);
+
+        if (productDeleteError) {
+            console.error('Error soft deleting product:', productDeleteError);
+            return NextResponse.json(
+                { error: 'Failed to delete product' },
+                { status: 500 }
+            );
+        } else {
+            softDeletedItems.products++;
+            console.log(`Soft deleted product: ${product.name}`);
+        }
+
+        // 2. Handle ingredient-type product (has ingredient_id)
+        if (product.ingredient_id) {
+            console.log(`Product is ingredient-type, soft deleting ingredient: ${product.ingredient_id}`);
+
+            // Soft delete the ingredient
             const { error: ingredientDeleteError } = await supabaseServerClient
                 .from('ingredients')
-                .delete()
-                .eq('product_id', id);
+                .update({ deleted_at: deletedAt })
+                .eq('id', product.ingredient_id);
 
             if (ingredientDeleteError) {
-                console.error('Error deleting from ingredients table:', ingredientDeleteError);
-                // Don't throw here, continue with product deletion
-                // The ingredient deletion is not critical for the main operation
+                console.error('Error soft deleting ingredient:', ingredientDeleteError);
             } else {
-                console.log(`Successfully deleted ingredient record for product ID: ${id}`);
+                softDeletedItems.ingredients++;
+                console.log(`Soft deleted ingredient with ID: ${product.ingredient_id}`);
+            }
+
+            // Soft delete recipe_ingredients that reference this ingredient
+            const { data: riData, error: riDeleteError } = await supabaseServerClient
+                .from('recipe_ingredients')
+                .update({ deleted_at: deletedAt })
+                .eq('ingredient_id', product.ingredient_id)
+                .select('id');
+
+            if (riDeleteError) {
+                console.error('Error soft deleting recipe ingredients:', riDeleteError);
+            } else if (riData) {
+                softDeletedItems.recipeIngredients += riData.length;
+                console.log(`Soft deleted ${riData.length} recipe ingredients for ingredient`);
+            }
+        }
+        // 3. Handle regular ingredient-type product (type === 'ingredient')
+        if (product.type === 'ingredient') {
+            console.log(`Product is ingredient-type, soft deleting associated ingredient`);
+
+            // Soft delete ingredient where product_id matches
+            const { data: ingredientData, error: ingredientDeleteError } = await supabaseServerClient
+                .from('ingredients')
+                .update({ deleted_at: deletedAt })
+                .eq('product_id', id)
+                .select('id');
+
+            if (ingredientDeleteError) {
+                console.error('Error soft deleting ingredient:', ingredientDeleteError);
+            } else if (ingredientData && ingredientData.length > 0) {
+                softDeletedItems.ingredients += ingredientData.length;
+                console.log(`Soft deleted ${ingredientData.length} ingredients for ingredient-type product`);
             }
         }
 
-        // Delete recipe ingredients if any exist
-        const { error: recipeIngredientsDeleteError } = await supabaseServerClient
-            .from('recipe_ingredients')
-            .delete()
-            .eq('product_id', id);
-
-        if (recipeIngredientsDeleteError) {
-            console.error('Error deleting recipe ingredients:', recipeIngredientsDeleteError);
-            // Continue with deletion, this is not critical
-        }
-
-        // Finally, delete the product from the products table
-        const { data, error } = await supabaseServerClient
-            .from('products')
-            .delete()
-            .eq('id', id);
-
-        if (error) {
-            throw error;
-        }
-
-        console.log(`Successfully deleted product: ${product.name} (ID: ${id}, Type: ${product.type})`);
+        console.log(`Soft deletion completed for product: ${product.name}`);
+        console.log('Soft deletion summary:', softDeletedItems);
 
         return NextResponse.json({
-            message: 'Product deleted successfully',
-            data,
+            message: 'Product soft deleted successfully',
             deletedProduct: {
                 id: product.id,
                 name: product.name,
-                type: product.type,
-                ingredientDeleted: product.type === 'ingredient'
-            }
+                type: product.type
+            },
+            softDeletedItems: softDeletedItems,
+            deletedAt: deletedAt
         }, { status: 200 });
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

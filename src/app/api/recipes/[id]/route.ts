@@ -27,7 +27,9 @@ export async function GET(
           )
         )
       `).eq('id', id)
+      .is('deleted_at', null)
       .is('recipe_ingredients.product_id', null)
+      .is('recipe_ingredients.deleted_at', null)
       .single();
 
     if (error) {

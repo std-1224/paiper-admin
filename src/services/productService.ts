@@ -4,7 +4,10 @@ import { Product } from '../types/types';
 
 export class ProductService {
 	static async getAllProducts(): Promise<Product[]> {
-		const { data, error } = await supabase.from('products').select('*');
+		const { data, error } = await supabase
+			.from('products')
+			.select('*')
+			.is('deleted_at', null);
 		if (error) throw error;
 		return data as Product[];
 	}

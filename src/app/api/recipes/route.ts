@@ -30,7 +30,9 @@ export async function GET() {
           )
         )
       `)
+      .is('deleted_at', null)
       .is('recipe_ingredients.product_id', null)
+      .is('recipe_ingredients.deleted_at', null)
       .order('name', { ascending: true });
 
     if (error) {
@@ -382,6 +384,8 @@ export async function PUT(request: NextRequest) {
         )
       `)
       .eq('id', id)
+      .is('deleted_at', null)
+      .is('recipe_ingredients.deleted_at', null)
       .single();
 
     if (fetchError) {
@@ -424,134 +428,103 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Recipe not found' }, { status: 404 });
     }
 
-    console.log(`Starting deletion of recipe: ${recipe.name} (ID: ${id})`);
+    console.log(`Starting soft deletion of recipe: ${recipe.name} (ID: ${id})`);
 
-    // Step 1: Get all recipe ingredients that use this recipe
-    const { data: recipeIngredients, error: riError } = await supabaseServerClient
-      .from('recipe_ingredients')
-      .select(`
-        id,
-        ingredient_id,
-        ingredients (
-          id,
-          name,
-          product_id
-        )
-      `)
-      .eq('recipe_id', id)
-      .is('product_id', null); // Only get base recipe ingredients, not product associations
+    // Initialize soft deletion tracking
+    const deletedAt = new Date().toISOString();
+    const softDeletedItems = {
+      recipes: 0,
+      products: 0,
+      recipeIngredients: 0
+    };
 
-    if (riError) {
-      console.error('Error fetching recipe ingredients:', riError);
-      return NextResponse.json(
-        { error: 'Failed to fetch recipe ingredients' },
-        { status: 500 }
-      );
-    }
-
-    const deletedIngredientProducts: Array<{id: string, name: string, type: string}> = [];
-
-    // Step 2: For each ingredient used by this recipe, check if it's an ingredient-type product
-    if (recipeIngredients && recipeIngredients.length > 0) {
-      for (const ri of recipeIngredients) {
-        const ingredient = ri.ingredients as { id: string; name: string; product_id?: string } | { id: string; name: string; product_id?: string }[] | null;
-        const ingredientData = Array.isArray(ingredient) ? ingredient[0] : ingredient;
-        if (ingredientData && ingredientData.product_id) {
-          // This ingredient has an associated product, check if it's ingredient-type
-          const { data: product, error: productError } = await supabaseServerClient
-            .from('products')
-            .select('id, name, type')
-            .eq('id', ingredientData.product_id)
-            .single();
-
-          if (!productError && product && product.type === 'ingredient') {
-            console.log(`Found ingredient-type product to delete: ${product.name} (ID: ${product.id})`);
-
-            // Delete the ingredient-type product
-            const { error: productDeleteError } = await supabaseServerClient
-              .from('products')
-              .delete()
-              .eq('id', product.id);
-
-            if (productDeleteError) {
-              console.error(`Error deleting ingredient-type product ${product.id}:`, productDeleteError);
-              // Continue with deletion, don't fail the entire operation
-            } else {
-              deletedIngredientProducts.push(product);
-              console.log(`Successfully deleted ingredient-type product: ${product.name}`);
-            }
-          }
-        }
-      }
-    }
-
-    // Step 3: Delete all recipe_ingredients entries for this recipe
-    const { error: deleteRIError } = await supabaseServerClient
-      .from('recipe_ingredients')
-      .delete()
-      .eq('recipe_id', id);
-
-    if (deleteRIError) {
-      console.error('Error deleting recipe ingredients:', deleteRIError);
-      return NextResponse.json(
-        { error: 'Failed to delete recipe ingredients' },
-        { status: 500 }
-      );
-    }
-
-    console.log(`Deleted ${recipeIngredients?.length || 0} recipe ingredient relationships`);
-
-    // Step 4: Check if this recipe is being sold as a product and delete it from products table
-    let deletedRecipeProduct = null;
-    const { data: recipeProduct, error: recipeProductError } = await supabaseServerClient
+    // Step 0: Check if recipe is being sold as a product and handle it
+    const { data: recipeProductCheck, error: recipeProductCheckError } = await supabaseServerClient
       .from('products')
-      .select('id, name, type')
+      .select('id, name')
       .eq('recipe_id', id)
       .single();
 
-    if (!recipeProductError && recipeProduct) {
-      console.log(`Found recipe being sold as product: ${recipeProduct.name} (ID: ${recipeProduct.id})`);
+    if (!recipeProductCheckError && recipeProductCheck) {
+      // Check if this recipe product is used in orders
+      const { data: orderItems, error: orderCheckError } = await supabaseServerClient
+        .from('order_items')
+        .select('id, order_id')
+        .eq('product_id', recipeProductCheck.id);
 
-      // Delete the product that represents this recipe
+      if (orderCheckError) {
+        console.error('Error checking order references for recipe product:', orderCheckError);
+        return NextResponse.json(
+          { error: 'Failed to check order references' },
+          { status: 500 }
+        );
+      }
+
+      // For sale case: soft delete the recipe product
+      if (orderItems && orderItems.length > 0) {
+        console.log(`Recipe ${recipe.name} product has been used in orders. Soft deleting recipe product.`);
+      }
+
+      // Soft delete the recipe product
       const { error: productDeleteError } = await supabaseServerClient
         .from('products')
-        .delete()
-        .eq('id', recipeProduct.id);
+        .update({ deleted_at: deletedAt })
+        .eq('id', recipeProductCheck.id);
 
       if (productDeleteError) {
-        console.error(`Error deleting recipe product ${recipeProduct.id}:`, productDeleteError);
-        // Continue with deletion, don't fail the entire operation
+        console.error('Error soft deleting recipe product:', productDeleteError);
+        return NextResponse.json(
+          { error: 'Failed to soft delete recipe product' },
+          { status: 500 }
+        );
       } else {
-        deletedRecipeProduct = recipeProduct;
-        console.log(`Successfully deleted recipe product: ${recipeProduct.name}`);
+        softDeletedItems.products++;
+        console.log(`Soft deleted recipe product: ${recipeProductCheck.name}`);
       }
     }
 
-    // Step 5: Finally, delete the recipe itself
-    const { error: deleteRecipeError } = await supabaseServerClient
+    // Step 1: Soft delete the recipe itself
+    const { error: recipeDeleteError } = await supabaseServerClient
       .from('recipes')
-      .delete()
+      .update({ deleted_at: deletedAt })
       .eq('id', id);
 
-    if (deleteRecipeError) {
-      console.error('Error deleting recipe:', deleteRecipeError);
+    if (recipeDeleteError) {
+      console.error('Error soft deleting recipe:', recipeDeleteError);
       return NextResponse.json(
-        { error: 'Failed to delete recipe' },
+        { error: 'Failed to soft delete recipe' },
         { status: 500 }
       );
+    } else {
+      softDeletedItems.recipes++;
+      console.log(`Soft deleted recipe: ${recipe.name}`);
     }
 
-    console.log(`Successfully deleted recipe: ${recipe.name} (ID: ${id})`);
+    // Step 2: Soft delete all recipe_ingredients for this recipe
+    const { data: riData, error: riDeleteError } = await supabaseServerClient
+      .from('recipe_ingredients')
+      .update({ deleted_at: deletedAt })
+      .eq('recipe_id', id)
+      .select('id');
+
+    if (riDeleteError) {
+      console.error('Error soft deleting recipe ingredients:', riDeleteError);
+    } else if (riData && riData.length > 0) {
+      softDeletedItems.recipeIngredients += riData.length;
+      console.log(`Soft deleted ${riData.length} recipe ingredients`);
+    }
+
+    console.log(`Soft deletion completed for recipe: ${recipe.name}`);
+    console.log('Soft deletion summary:', softDeletedItems);
 
     return NextResponse.json({
-      message: 'Recipe deleted successfully',
+      message: 'Recipe soft deleted successfully',
       deletedRecipe: {
         id: recipe.id,
         name: recipe.name
       },
-      deletedIngredientProducts: deletedIngredientProducts,
-      deletedRecipeProduct: deletedRecipeProduct,
-      deletedRecipeIngredients: recipeIngredients?.length || 0
+      softDeletedItems: softDeletedItems,
+      deletedAt: deletedAt
     });
   } catch (error) {
     console.error('Unexpected error:', error);

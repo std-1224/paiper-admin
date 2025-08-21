@@ -13,6 +13,7 @@ export const GET = async (req: Request, { params }: { params: { id: string } }) 
             .from("products")
             .select("*")
             .eq('recipe_id', id)
+            .is('deleted_at', null)
             .single();
 
         if (error) {

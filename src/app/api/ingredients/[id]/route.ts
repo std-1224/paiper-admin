@@ -15,6 +15,7 @@ export async function GET(
       .from('ingredients')
       .select('*')
       .eq('id', id)
+      .is('deleted_at', null)
       .single();
 
     if (error) {

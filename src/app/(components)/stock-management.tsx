@@ -2205,6 +2205,24 @@ export default function StockManagement() {
 
       if (!response.ok) {
         const errorData = await response.json();
+
+        // Handle specific conflict errors (409) with detailed messages
+        if (response.status === 409) {
+          const errorMessage = errorData.details || errorData.error || `No se puede eliminar ${deletionInfo.type}`;
+          const suggestion = errorData.suggestion || '';
+          const references = errorData.references || [];
+
+          let fullMessage = errorMessage;
+          if (references.length > 0) {
+            fullMessage += '\n\nRazones:\n• ' + references.join('\n• ');
+          }
+          if (suggestion) {
+            fullMessage += '\n\n' + suggestion;
+          }
+
+          throw new Error(fullMessage);
+        }
+
         throw new Error(errorData.error || `Failed to delete ${deletionInfo.type}`);
       }
 
@@ -2219,25 +2237,26 @@ export default function StockManagement() {
       let successMessage = '';
       switch (deletionInfo.type) {
         case 'recipe':
-          successMessage = `Receta "${deletionInfo.itemName}" eliminada exitosamente.`;
-          if (result.deletedIngredientProducts?.length > 0) {
-            successMessage += ` También se eliminaron ${result.deletedIngredientProducts.length} productos de ingredientes asociados.`;
-          }
-          if (result.deletedRecipeProduct) {
-            successMessage += ` También se eliminó el producto de venta asociado.`;
+          successMessage = `Receta "${deletionInfo.itemName}" marcada como eliminada exitosamente.`;
+          if (result.softDeletedItems) {
+            if (result.softDeletedItems.products > 0) {
+              successMessage += ` También se marcaron como eliminados ${result.softDeletedItems.products} productos asociados.`;
+            }
+            if (result.softDeletedItems.recipeIngredients > 0) {
+              successMessage += ` Se marcaron como eliminadas ${result.softDeletedItems.recipeIngredients} relaciones de ingredientes.`;
+            }
           }
           break;
 
         case 'ingredient':
-          successMessage = `Ingrediente "${deletionInfo.itemName}" eliminado exitosamente.`;
-          if (result.deletedRecipes?.length > 0) {
-            successMessage += ` También se eliminaron ${result.deletedRecipes.length} recetas que lo usaban.`;
-          }
-          if (result.deletedProduct) {
-            successMessage += ` También se eliminó el producto asociado.`;
-          }
-          if (result.deletedIngredientProduct) {
-            successMessage += ` También se eliminó el producto de venta asociado.`;
+          successMessage = `Ingrediente "${deletionInfo.itemName}" marcado como eliminado exitosamente.`;
+          if (result.softDeletedItems) {
+            if (result.softDeletedItems.products > 0) {
+              successMessage += ` También se marcaron como eliminados ${result.softDeletedItems.products} productos asociados.`;
+            }
+            if (result.softDeletedItems.recipeIngredients > 0) {
+              successMessage += ` Se marcaron como eliminadas ${result.softDeletedItems.recipeIngredients} relaciones de recetas.`;
+            }
           }
           break;
 
@@ -2249,7 +2268,18 @@ export default function StockManagement() {
           break;
 
         default:
-          successMessage = `Producto "${deletionInfo.itemName}" eliminado exitosamente.`;
+          successMessage = `Producto "${deletionInfo.itemName}" marcado como eliminado exitosamente.`;
+          if (result.softDeletedItems) {
+            if (result.softDeletedItems.ingredients > 0) {
+              successMessage += ` También se marcaron como eliminados ${result.softDeletedItems.ingredients} ingredientes asociados.`;
+            }
+            if (result.softDeletedItems.recipes > 0) {
+              successMessage += ` Se marcaron como eliminadas ${result.softDeletedItems.recipes} recetas asociadas.`;
+            }
+            if (result.softDeletedItems.recipeIngredients > 0) {
+              successMessage += ` Se marcaron como eliminadas ${result.softDeletedItems.recipeIngredients} relaciones de ingredientes.`;
+            }
+          }
           break;
       }
 

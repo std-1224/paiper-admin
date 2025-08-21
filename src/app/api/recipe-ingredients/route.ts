@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
             )
           )
         )
-      `);
+      `)
+      .is('deleted_at', null);
 
     // Add appropriate filter based on provided parameter
     if (recipeId) {

@@ -6,10 +6,11 @@ import { supabase as supabaseServerClient } from '@/lib/supabaseClient';
 // GET - Fetch all ingredients
 export async function GET() {
   try {
-    // First get all ingredients
+    // First get all active ingredients (not soft deleted)
     const { data: ingredients, error } = await supabaseServerClient
       .from('ingredients')
       .select('*')
+      .is('deleted_at', null)
       .order('name', { ascending: true });
 
     if (error) {
@@ -41,7 +42,8 @@ export async function GET() {
                 )
               `)
               .eq('product_id', ingredient.product_id)
-              .is('recipe_id', null);
+              .is('recipe_id', null)
+              .is('deleted_at', null);
 
             return {
               ...ingredient,
@@ -224,8 +226,59 @@ export async function DELETE(request: NextRequest) {
 
     console.log(`Starting deletion of ingredient: ${ingredient.name} (ID: ${id})`);
 
-    // Step 1: Find all recipes that use this ingredient
-    const { data: recipesUsingIngredient, error: recipesError } = await supabaseServerClient
+    // Step 0: Check if ingredient or its associated products are referenced in orders
+    const referencesCheck = [];
+
+    // Check if the ingredient's associated product (product_id) is used in orders
+    if (ingredient.product_id) {
+      const { data: orderItemsWithProduct, error: orderCheckError1 } = await supabaseServerClient
+        .from('order_items')
+        .select('id')
+        .eq('product_id', ingredient.product_id)
+        .limit(1);
+
+      if (orderCheckError1) {
+        console.error('Error checking order references for associated product:', orderCheckError1);
+        return NextResponse.json(
+          { error: 'Failed to check order references' },
+          { status: 500 }
+        );
+      }
+
+      if (orderItemsWithProduct && orderItemsWithProduct.length > 0) {
+        referencesCheck.push(`El producto asociado "${ingredient.name}" ha sido usado en órdenes`);
+      }
+    }
+
+    // Check if the ingredient is being sold as a product (ingredient_id reference) and used in orders
+    const { data: ingredientProductCheck, error: ingredientProductCheckError } = await supabaseServerClient
+      .from('products')
+      .select('id, name')
+      .eq('ingredient_id', id)
+      .single();
+
+    if (!ingredientProductCheckError && ingredientProductCheck) {
+      const { data: orderItemsWithIngredientProduct, error: orderCheckError2 } = await supabaseServerClient
+        .from('order_items')
+        .select('id')
+        .eq('product_id', ingredientProductCheck.id)
+        .limit(1);
+
+      if (orderCheckError2) {
+        console.error('Error checking order references for ingredient product:', orderCheckError2);
+        return NextResponse.json(
+          { error: 'Failed to check order references' },
+          { status: 500 }
+        );
+      }
+
+      if (orderItemsWithIngredientProduct && orderItemsWithIngredientProduct.length > 0) {
+        referencesCheck.push(`El ingrediente "${ingredient.name}" se vende como producto y ha sido usado en órdenes`);
+      }
+    }
+
+    // Check if any recipes using this ingredient have products that are used in orders
+    const { data: recipesUsingIngredientCheck, error: recipesCheckError } = await supabaseServerClient
       .from('recipe_ingredients')
       .select(`
         recipe_id,
@@ -235,146 +288,138 @@ export async function DELETE(request: NextRequest) {
         )
       `)
       .eq('ingredient_id', id)
-      .is('product_id', null); // Only get base recipe relationships, not product associations
+      .is('product_id', null);
 
-    if (recipesError) {
-      console.error('Error fetching recipes using ingredient:', recipesError);
+    if (recipesCheckError) {
+      console.error('Error fetching recipes using ingredient:', recipesCheckError);
       return NextResponse.json(
         { error: 'Failed to fetch recipes using this ingredient' },
         { status: 500 }
       );
     }
 
-    const deletedRecipes: Array<{id: string, name: string}> = [];
-
-    // Step 2: Delete all recipes that use this ingredient
-    if (recipesUsingIngredient && recipesUsingIngredient.length > 0) {
-      const uniqueRecipeIds = Array.from(new Set(recipesUsingIngredient.map(ri => ri.recipe_id)));
+    if (recipesUsingIngredientCheck && recipesUsingIngredientCheck.length > 0) {
+      const uniqueRecipeIds = Array.from(new Set(recipesUsingIngredientCheck.map(ri => ri.recipe_id)));
 
       for (const recipeId of uniqueRecipeIds) {
-        const recipeInfo = recipesUsingIngredient.find(ri => ri.recipe_id === recipeId);
+        // Check if this recipe has an associated product that's used in orders
+        const { data: recipeProduct, error: recipeProductError } = await supabaseServerClient
+          .from('products')
+          .select('id, name')
+          .eq('recipe_id', recipeId)
+          .single();
 
-        if (recipeInfo && recipeInfo.recipes) {
-          const recipe = recipeInfo.recipes as { id: string; name: string } | { id: string; name: string }[];
-          const recipeData = Array.isArray(recipe) ? recipe[0] : recipe;
+        if (!recipeProductError && recipeProduct) {
+          const { data: orderItemsWithRecipeProduct, error: orderCheckError3 } = await supabaseServerClient
+            .from('order_items')
+            .select('id')
+            .eq('product_id', recipeProduct.id)
+            .limit(1);
 
-          console.log(`Deleting recipe that uses ingredient: ${recipeData.name} (ID: ${recipeId})`);
+          if (orderCheckError3) {
+            console.error('Error checking order references for recipe product:', orderCheckError3);
+            return NextResponse.json(
+              { error: 'Failed to check order references' },
+              { status: 500 }
+            );
+          }
 
-          // Delete the recipe (this will also delete its recipe_ingredients due to foreign key constraints)
-          const { error: recipeDeleteError } = await supabaseServerClient
-            .from('recipes')
-            .delete()
-            .eq('id', recipeId);
-
-          if (recipeDeleteError) {
-            console.error(`Error deleting recipe ${recipeId}:`, recipeDeleteError);
-            // Continue with deletion, don't fail the entire operation
-          } else {
-            deletedRecipes.push({
-              id: recipeId,
-              name: recipeData.name
-            });
-            console.log(`Successfully deleted recipe: ${recipeData.name}`);
+          if (orderItemsWithRecipeProduct && orderItemsWithRecipeProduct.length > 0) {
+            const recipeInfo = recipesUsingIngredientCheck.find(ri => ri.recipe_id === recipeId);
+            const recipe = recipeInfo?.recipes as { id: string; name: string } | { id: string; name: string }[];
+            const recipeData = Array.isArray(recipe) ? recipe[0] : recipe;
+            referencesCheck.push(`La receta "${recipeData?.name}" que usa este ingrediente ha sido vendida en órdenes`);
           }
         }
       }
     }
 
-    // Step 3: Delete all recipe_ingredients entries for this ingredient
-    const { error: deleteRIError } = await supabaseServerClient
-      .from('recipe_ingredients')
-      .delete()
-      .eq('ingredient_id', id);
+    // Initialize soft deletion tracking
+    const deletedAt = new Date().toISOString();
+    let softDeletedItems = {
+      ingredients: 0,
+      products: 0,
+      recipeIngredients: 0
+    };
 
-    if (deleteRIError) {
-      console.error('Error deleting recipe ingredients:', deleteRIError);
-      return NextResponse.json(
-        { error: 'Failed to delete recipe ingredients' },
-        { status: 500 }
-      );
-    }
+    console.log(`Starting soft deletion of ingredient: ${ingredient.name} (ID: ${id})`);
 
-    console.log(`Deleted recipe ingredient relationships for ingredient: ${ingredient.name}`);
-
-    // Step 4: If this ingredient has an associated product, delete it too
-    let deletedProduct = null;
-    if (ingredient.product_id) {
-      const { data: product, error: productFetchError } = await supabaseServerClient
-        .from('products')
-        .select('id, name, type')
-        .eq('id', ingredient.product_id)
-        .single();
-
-      if (!productFetchError && product) {
-        console.log(`Deleting associated product: ${product.name} (ID: ${product.id})`);
-
-        const { error: productDeleteError } = await supabaseServerClient
-          .from('products')
-          .delete()
-          .eq('id', product.id);
-
-        if (productDeleteError) {
-          console.error(`Error deleting associated product ${product.id}:`, productDeleteError);
-          // Continue with deletion, don't fail the entire operation
-        } else {
-          deletedProduct = product;
-          console.log(`Successfully deleted associated product: ${product.name}`);
-        }
-      }
-    }
-
-    // Step 5: Check if this ingredient is being sold as a product (ingredient_id reference) and delete it from products table
-    let deletedIngredientProduct = null;
-    const { data: ingredientProduct, error: ingredientProductError } = await supabaseServerClient
-      .from('products')
-      .select('id, name, type')
-      .eq('ingredient_id', id)
-      .single();
-
-    if (!ingredientProductError && ingredientProduct) {
-      console.log(`Found ingredient being sold as product: ${ingredientProduct.name} (ID: ${ingredientProduct.id})`);
-
-      // Delete the product that represents this ingredient
-      const { error: productDeleteError } = await supabaseServerClient
-        .from('products')
-        .delete()
-        .eq('id', ingredientProduct.id);
-
-      if (productDeleteError) {
-        console.error(`Error deleting ingredient product ${ingredientProduct.id}:`, productDeleteError);
-        // Continue with deletion, don't fail the entire operation
-      } else {
-        deletedIngredientProduct = ingredientProduct;
-        console.log(`Successfully deleted ingredient product: ${ingredientProduct.name}`);
-      }
-    }
-
-    // Step 5: Finally, delete the ingredient itself
-    const { error: deleteIngredientError } = await supabaseServerClient
+    // 1. Soft delete the ingredient itself
+    const { error: ingredientDeleteError } = await supabaseServerClient
       .from('ingredients')
-      .delete()
+      .update({ deleted_at: deletedAt })
       .eq('id', id);
 
-    if (deleteIngredientError) {
-      console.error('Error deleting ingredient:', deleteIngredientError);
+    if (ingredientDeleteError) {
+      console.error('Error soft deleting ingredient:', ingredientDeleteError);
       return NextResponse.json(
-        { error: 'Failed to delete ingredient' },
+        { error: 'Failed to soft delete ingredient' },
         { status: 500 }
       );
+    } else {
+      softDeletedItems.ingredients++;
+      console.log(`Soft deleted ingredient: ${ingredient.name}`);
     }
 
-    console.log(`Successfully deleted ingredient: ${ingredient.name} (ID: ${id})`);
+    // 2. Soft delete all recipe_ingredients that use this ingredient
+    const { data: riData, error: riDeleteError } = await supabaseServerClient
+      .from('recipe_ingredients')
+      .update({ deleted_at: deletedAt })
+      .eq('ingredient_id', id)
+      .select('id');
+
+    if (riDeleteError) {
+      console.error('Error soft deleting recipe ingredients:', riDeleteError);
+    } else if (riData && riData.length > 0) {
+      softDeletedItems.recipeIngredients += riData.length;
+      console.log(`Soft deleted ${riData.length} recipe ingredients that used this ingredient`);
+    }
+
+    // 3. Handle ingredient's associated product (product_id) - for sale case
+    if (ingredient.product_id) {
+      console.log(`Ingredient has associated product, soft deleting product: ${ingredient.product_id}`);
+
+      const { error: productDeleteError } = await supabaseServerClient
+        .from('products')
+        .update({ deleted_at: deletedAt })
+        .eq('id', ingredient.product_id);
+
+      if (productDeleteError) {
+        console.error('Error soft deleting associated product:', productDeleteError);
+      } else {
+        softDeletedItems.products++;
+        console.log(`Soft deleted associated product: ${ingredient.product_id}`);
+      }
+    }
+
+    // 4. Handle ingredient sold as product (ingredient_id reference) - for sale case
+    if (ingredientProductCheck) {
+      console.log(`Ingredient is sold as product, soft deleting product: ${ingredientProductCheck.id}`);
+
+      const { error: ingredientProductDeleteError } = await supabaseServerClient
+        .from('products')
+        .update({ deleted_at: deletedAt })
+        .eq('id', ingredientProductCheck.id);
+
+      if (ingredientProductDeleteError) {
+        console.error('Error soft deleting ingredient product:', ingredientProductDeleteError);
+      } else {
+        softDeletedItems.products++;
+        console.log(`Soft deleted ingredient product: ${ingredientProductCheck.id}`);
+      }
+    }
+
+    console.log(`Soft deletion completed for ingredient: ${ingredient.name}`);
+    console.log('Soft deletion summary:', softDeletedItems);
 
     return NextResponse.json({
-      message: 'Ingredient deleted successfully',
+      message: 'Ingredient soft deleted successfully',
       deletedIngredient: {
         id: ingredient.id,
         name: ingredient.name
       },
-      deletedRecipes: deletedRecipes,
-      deletedProduct: deletedProduct,
-      deletedIngredientProduct: deletedIngredientProduct,
-      deletedRecipeIngredients: recipesUsingIngredient?.length || 0
+      softDeletedItems: softDeletedItems,
+      deletedAt: deletedAt
     });
   } catch (error) {
     console.error('Unexpected error:', error);

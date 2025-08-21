@@ -8,6 +8,7 @@ export const GET = async () => {
             .from('products')
             .select('*')
             .in('type', ['recipe', 'ingredient'])
+            .is('deleted_at', null)
             .order('id', { ascending: true });
         if (error) {
             throw error;
