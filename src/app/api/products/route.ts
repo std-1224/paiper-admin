@@ -152,6 +152,19 @@ export const DELETE = async (req: Request) => {
             return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
         }
 
+        // First, get the product to check if it's an ingredient-type product
+        const { data: product, error: fetchError } = await supabaseServerClient
+            .from('products')
+            .select('id, type, name')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) {
+            console.error('Error fetching product:', fetchError);
+            return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+        }
+
+        // Delete related records first
         const res = await supabaseServerClient.from('order_items').delete().eq('product_id', id);
         const invRes = await supabaseServerClient.from('inventory').delete().eq('product_id', id);
 
@@ -159,19 +172,61 @@ export const DELETE = async (req: Request) => {
             throw res.error || invRes.error;
         }
 
-        // Delete the user from the 'profiles' table
-        const { data, error } = await supabaseServerClient
-            .from('products') // Replace 'profiles' with your actual table name
+        // If the product is an ingredient-type product, also delete from ingredients table
+        if (product.type === 'ingredient') {
+            console.log(`Deleting ingredient-type product: ${product.name} (ID: ${id})`);
+
+            // Delete from ingredients table where product_id matches
+            const { error: ingredientDeleteError } = await supabaseServerClient
+                .from('ingredients')
+                .delete()
+                .eq('product_id', id);
+
+            if (ingredientDeleteError) {
+                console.error('Error deleting from ingredients table:', ingredientDeleteError);
+                // Don't throw here, continue with product deletion
+                // The ingredient deletion is not critical for the main operation
+            } else {
+                console.log(`Successfully deleted ingredient record for product ID: ${id}`);
+            }
+        }
+
+        // Delete recipe ingredients if any exist
+        const { error: recipeIngredientsDeleteError } = await supabaseServerClient
+            .from('recipe_ingredients')
             .delete()
-            .eq('id', id); // Match the user by ID
+            .eq('product_id', id);
+
+        if (recipeIngredientsDeleteError) {
+            console.error('Error deleting recipe ingredients:', recipeIngredientsDeleteError);
+            // Continue with deletion, this is not critical
+        }
+
+        // Finally, delete the product from the products table
+        const { data, error } = await supabaseServerClient
+            .from('products')
+            .delete()
+            .eq('id', id);
 
         if (error) {
             throw error;
         }
 
-        return NextResponse.json({ message: 'Product deleted successfully', data }, { status: 200 });
-    } catch (error: any) {
-        console.error('Error deleting product:', error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.log(`Successfully deleted product: ${product.name} (ID: ${id}, Type: ${product.type})`);
+
+        return NextResponse.json({
+            message: 'Product deleted successfully',
+            data,
+            deletedProduct: {
+                id: product.id,
+                name: product.name,
+                type: product.type,
+                ingredientDeleted: product.type === 'ingredient'
+            }
+        }, { status: 200 });
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        console.error('Error deleting product:', errorMessage);
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 };

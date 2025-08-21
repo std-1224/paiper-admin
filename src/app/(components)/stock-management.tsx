@@ -82,6 +82,8 @@ export default function StockManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string; type?: string; recipe_id?: string; ingredient_id?: string } | null>(null);
   const { user } = useAuth()
   // Modal states
   const [showAddProductModal, setShowAddProductModal] = useState(false);
@@ -2114,20 +2116,151 @@ export default function StockManagement() {
         : [...prev, id]
     );
   }, []);
-  // API operations
-  const deleteProductFromList = async (id: string) => {
+  // Determine item type and get appropriate deletion info
+  const determineItemTypeAndDeletionInfo = (item: {
+    id: string;
+    name: string;
+    type?: string;
+    recipe_id?: string;
+    ingredient_id?: string;
+  }) => {
+    // Check if it's a recipe (has recipe_id or is from recipes data)
+    if (item.recipe_id || normalizedRecipesData.find(r => r.id === item.id)) {
+      return {
+        type: 'recipe',
+        apiEndpoint: '/api/recipes',
+        itemName: item.name,
+        confirmationMessage: 'Esta receta y todos sus ingredientes asociados serán eliminados.'
+      };
+    }
+
+    // Check if it's an ingredient (has ingredient_id or is from ingredients data)
+    if (item.ingredient_id || ingredientsData.find(i => i.id === item.id)) {
+      return {
+        type: 'ingredient',
+        apiEndpoint: '/api/ingredients',
+        itemName: item.name,
+        confirmationMessage: 'Este ingrediente y todas las recetas que lo usan serán eliminados.'
+      };
+    }
+
+    // Check if it's an ingredient-type product
+    if (item.type === 'ingredient') {
+      return {
+        type: 'ingredient-type-product',
+        apiEndpoint: '/api/products',
+        itemName: item.name,
+        confirmationMessage: 'Este producto de tipo ingrediente y su ingrediente asociado serán eliminados.'
+      };
+    }
+
+    // Default to regular product
+    return {
+      type: 'product',
+      apiEndpoint: '/api/products',
+      itemName: item.name,
+      confirmationMessage: 'Este producto será eliminado del inventario.'
+    };
+  };
+
+  // Handle opening delete confirmation
+  const handleDeleteClick = (item: { id: string; name: string; type?: string; recipe_id?: string; ingredient_id?: string }) => {
+    setItemToDelete(item);
+    setDeleteConfirmOpen(true);
+  };
+
+  // API operations - Smart deletion based on item type
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete?.id) return;
+
     try {
       setIsDeleting(true);
-      const response = await fetch(`/api/products`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
 
-      if (!response.ok) throw new Error("Failed to delete product");
+      // Determine what type of item we're deleting
+      const deletionInfo = determineItemTypeAndDeletionInfo(itemToDelete);
+      const id = itemToDelete.id;
+
+      console.log(`Deleting ${deletionInfo.type}: ${deletionInfo.itemName} (ID: ${id})`);
+
+      // Call the appropriate API endpoint
+      let response;
+      if (deletionInfo.type === 'recipe') {
+        response = await fetch(`${deletionInfo.apiEndpoint}?id=${id}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        });
+      } else if (deletionInfo.type === 'ingredient') {
+        response = await fetch(`${deletionInfo.apiEndpoint}?id=${id}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        });
+      } else {
+        // For products (including ingredient-type products)
+        response = await fetch(deletionInfo.apiEndpoint, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        });
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to delete ${deletionInfo.type}`);
+      }
+
+      const result = await response.json();
+
+      // Refresh all related data
       fetchProducts();
+      fetchIngredients();
+      fetchNormalizedRecipes();
+
+      // Show appropriate success message based on deletion type
+      let successMessage = '';
+      switch (deletionInfo.type) {
+        case 'recipe':
+          successMessage = `Receta "${deletionInfo.itemName}" eliminada exitosamente.`;
+          if (result.deletedIngredientProducts?.length > 0) {
+            successMessage += ` También se eliminaron ${result.deletedIngredientProducts.length} productos de ingredientes asociados.`;
+          }
+          if (result.deletedRecipeProduct) {
+            successMessage += ` También se eliminó el producto de venta asociado.`;
+          }
+          break;
+
+        case 'ingredient':
+          successMessage = `Ingrediente "${deletionInfo.itemName}" eliminado exitosamente.`;
+          if (result.deletedRecipes?.length > 0) {
+            successMessage += ` También se eliminaron ${result.deletedRecipes.length} recetas que lo usaban.`;
+          }
+          if (result.deletedProduct) {
+            successMessage += ` También se eliminó el producto asociado.`;
+          }
+          if (result.deletedIngredientProduct) {
+            successMessage += ` También se eliminó el producto de venta asociado.`;
+          }
+          break;
+
+        case 'ingredient-type-product':
+          successMessage = `Producto de ingrediente "${deletionInfo.itemName}" eliminado exitosamente.`;
+          if (result.deletedProduct?.ingredientDeleted) {
+            successMessage += ` También se eliminó el ingrediente asociado.`;
+          }
+          break;
+
+        default:
+          successMessage = `Producto "${deletionInfo.itemName}" eliminado exitosamente.`;
+          break;
+      }
+
+      console.log(successMessage);
+
+      // Close dialog
+      setDeleteConfirmOpen(false);
+      setItemToDelete(null);
+
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error deleting product");
+      setError(err instanceof Error ? err.message : "Error deleting item");
     } finally {
       setIsDeleting(false);
     }
@@ -3349,7 +3482,7 @@ export default function StockManagement() {
                                     variant="destructive"
                                     size="sm"
                                     onClick={() =>
-                                      deleteProductFromList(product.id)
+                                      handleDeleteClick(product)
                                     }
                                     disabled={isDeleting}
                                   >
@@ -5227,6 +5360,70 @@ export default function StockManagement() {
           setSelectedIngredientId("");
         }}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              Confirmar Eliminación
+            </DialogTitle>
+            <DialogDescription>
+              {(() => {
+                if (!itemToDelete) return null;
+
+                const deletionInfo = determineItemTypeAndDeletionInfo(itemToDelete);
+
+                return (
+                  <>
+                    ¿Estás seguro de que deseas eliminar {deletionInfo.type === 'recipe' ? 'la receta' : deletionInfo.type === 'ingredient' ? 'el ingrediente' : 'el producto'} &quot;
+                    {itemToDelete.name}&quot;?
+                    <br />
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                      <span className="text-yellow-800 font-medium text-sm">
+                        ⚠️ {deletionInfo.confirmationMessage}
+                      </span>
+                    </div>
+                    <span className="text-red-600 font-medium">
+                      Esta acción no se puede deshacer y eliminará permanentemente el elemento y todos sus datos asociados.
+                    </span>
+                  </>
+                );
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                setItemToDelete(null);
+              }}
+              disabled={isDeleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Eliminar {itemToDelete?.type === 'recipe' ? 'Receta' : itemToDelete?.type === 'ingredient' ? 'Ingrediente' : 'Producto'}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

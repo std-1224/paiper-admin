@@ -292,7 +292,11 @@ export async function PUT(request: NextRequest) {
     }
 
     // Build update object with only provided fields (excluding ingredients)
-    const updateData: any = {};
+    const updateData: {
+      name?: string;
+      type?: string;
+      is_active?: boolean;
+    } = {};
     if (name !== undefined) updateData.name = name.trim();
     if (type !== undefined) updateData.type = type;
     if (is_active !== undefined) updateData.is_active = is_active;
@@ -395,7 +399,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Delete recipe
+// DELETE - Delete recipe with cascading deletion
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -408,20 +412,147 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const { error } = await supabaseServerClient
+    // First, get the recipe details for logging
+    const { data: recipe, error: fetchError } = await supabaseServerClient
+      .from('recipes')
+      .select('id, name')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching recipe:', fetchError);
+      return NextResponse.json({ error: 'Recipe not found' }, { status: 404 });
+    }
+
+    console.log(`Starting deletion of recipe: ${recipe.name} (ID: ${id})`);
+
+    // Step 1: Get all recipe ingredients that use this recipe
+    const { data: recipeIngredients, error: riError } = await supabaseServerClient
+      .from('recipe_ingredients')
+      .select(`
+        id,
+        ingredient_id,
+        ingredients (
+          id,
+          name,
+          product_id
+        )
+      `)
+      .eq('recipe_id', id)
+      .is('product_id', null); // Only get base recipe ingredients, not product associations
+
+    if (riError) {
+      console.error('Error fetching recipe ingredients:', riError);
+      return NextResponse.json(
+        { error: 'Failed to fetch recipe ingredients' },
+        { status: 500 }
+      );
+    }
+
+    const deletedIngredientProducts: Array<{id: string, name: string, type: string}> = [];
+
+    // Step 2: For each ingredient used by this recipe, check if it's an ingredient-type product
+    if (recipeIngredients && recipeIngredients.length > 0) {
+      for (const ri of recipeIngredients) {
+        const ingredient = ri.ingredients as { id: string; name: string; product_id?: string } | { id: string; name: string; product_id?: string }[] | null;
+        const ingredientData = Array.isArray(ingredient) ? ingredient[0] : ingredient;
+        if (ingredientData && ingredientData.product_id) {
+          // This ingredient has an associated product, check if it's ingredient-type
+          const { data: product, error: productError } = await supabaseServerClient
+            .from('products')
+            .select('id, name, type')
+            .eq('id', ingredientData.product_id)
+            .single();
+
+          if (!productError && product && product.type === 'ingredient') {
+            console.log(`Found ingredient-type product to delete: ${product.name} (ID: ${product.id})`);
+
+            // Delete the ingredient-type product
+            const { error: productDeleteError } = await supabaseServerClient
+              .from('products')
+              .delete()
+              .eq('id', product.id);
+
+            if (productDeleteError) {
+              console.error(`Error deleting ingredient-type product ${product.id}:`, productDeleteError);
+              // Continue with deletion, don't fail the entire operation
+            } else {
+              deletedIngredientProducts.push(product);
+              console.log(`Successfully deleted ingredient-type product: ${product.name}`);
+            }
+          }
+        }
+      }
+    }
+
+    // Step 3: Delete all recipe_ingredients entries for this recipe
+    const { error: deleteRIError } = await supabaseServerClient
+      .from('recipe_ingredients')
+      .delete()
+      .eq('recipe_id', id);
+
+    if (deleteRIError) {
+      console.error('Error deleting recipe ingredients:', deleteRIError);
+      return NextResponse.json(
+        { error: 'Failed to delete recipe ingredients' },
+        { status: 500 }
+      );
+    }
+
+    console.log(`Deleted ${recipeIngredients?.length || 0} recipe ingredient relationships`);
+
+    // Step 4: Check if this recipe is being sold as a product and delete it from products table
+    let deletedRecipeProduct = null;
+    const { data: recipeProduct, error: recipeProductError } = await supabaseServerClient
+      .from('products')
+      .select('id, name, type')
+      .eq('recipe_id', id)
+      .single();
+
+    if (!recipeProductError && recipeProduct) {
+      console.log(`Found recipe being sold as product: ${recipeProduct.name} (ID: ${recipeProduct.id})`);
+
+      // Delete the product that represents this recipe
+      const { error: productDeleteError } = await supabaseServerClient
+        .from('products')
+        .delete()
+        .eq('id', recipeProduct.id);
+
+      if (productDeleteError) {
+        console.error(`Error deleting recipe product ${recipeProduct.id}:`, productDeleteError);
+        // Continue with deletion, don't fail the entire operation
+      } else {
+        deletedRecipeProduct = recipeProduct;
+        console.log(`Successfully deleted recipe product: ${recipeProduct.name}`);
+      }
+    }
+
+    // Step 5: Finally, delete the recipe itself
+    const { error: deleteRecipeError } = await supabaseServerClient
       .from('recipes')
       .delete()
       .eq('id', id);
 
-    if (error) {
-      console.error('Error deleting recipe:', error);
+    if (deleteRecipeError) {
+      console.error('Error deleting recipe:', deleteRecipeError);
       return NextResponse.json(
         { error: 'Failed to delete recipe' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ message: 'Recipe deleted successfully' });
+    console.log(`Successfully deleted recipe: ${recipe.name} (ID: ${id})`);
+
+    return NextResponse.json({
+      message: 'Recipe deleted successfully',
+      deletedRecipe: {
+        id: recipe.id,
+        name: recipe.name
+      },
+      deletedIngredientProducts: deletedIngredientProducts,
+      deletedRecipeProduct: deletedRecipeProduct,
+      deletedRecipeIngredients: recipeIngredients?.length || 0
+    });
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json(
