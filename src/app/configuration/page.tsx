@@ -2,8 +2,7 @@
 
 import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Settings, Users, Palette, CreditCard } from "lucide-react"
+import { Settings, Users, } from "lucide-react"
 import { RoleManagement } from "../../components/role-management"
 import { GeneralSettings } from "../../components/general-settings"
 
