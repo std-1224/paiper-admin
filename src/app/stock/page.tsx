@@ -160,23 +160,31 @@ const Stock = () => {
     }[]
   >([]);
   const [selectedEditRecipeId, setSelectedEditRecipeId] = useState<string>("");
-  const [editUseCustomIngredients, setEditUseCustomIngredients] = useState<boolean>(false);
-  const [originalIngredientQuantities, setOriginalIngredientQuantities] = useState<{[key: string]: number}>({});
+  const [editUseCustomIngredients, setEditUseCustomIngredients] =
+    useState<boolean>(false);
+  const [originalIngredientQuantities, setOriginalIngredientQuantities] =
+    useState<{ [key: string]: number }>({});
 
   // Enhanced edit modal selection states (matching stock-management)
-  const [editSelectedItemForPreview, setEditSelectedItemForPreview] = useState<string>('');
-  const [editSelectedItemType, setEditSelectedItemType] = useState<'recipe' | 'ingredient' | null>(null);
-  const [editAddedIngredientsList, setEditAddedIngredientsList] = useState<any[]>([]);
+  const [editSelectedItemForPreview, setEditSelectedItemForPreview] =
+    useState<string>("");
+  const [editSelectedItemType, setEditSelectedItemType] = useState<
+    "recipe" | "ingredient" | null
+  >(null);
+  const [editAddedIngredientsList, setEditAddedIngredientsList] = useState<
+    any[]
+  >([]);
   const [editAddedRecipesList, setEditAddedRecipesList] = useState<any[]>([]);
   const [editQuantityToCreate, setEditQuantityToCreate] = useState<number>(1);
-  const [editCustomQuantityPerUnit, setEditCustomQuantityPerUnit] = useState<number>(0);
+  const [editCustomQuantityPerUnit, setEditCustomQuantityPerUnit] =
+    useState<number>(0);
   const [editIngredientUnit, setEditIngredientUnit] = useState<string>("ml");
-  const [editIngredientRequiredQuantity, setEditIngredientRequiredQuantity] = useState<number>(1);
-  const [editCustomIngredientName, setEditCustomIngredientName] = useState<string>("");
-  const [editIngredientQuantity, setEditIngredientQuantity] = useState<string>("");
-
-  // Edit modal dialog states
-  const [showCreateRecipeDialogEdit, setShowCreateRecipeDialogEdit] = useState(false);
+  const [editIngredientRequiredQuantity, setEditIngredientRequiredQuantity] =
+    useState<number>(1);
+  const [editCustomIngredientName, setEditCustomIngredientName] =
+    useState<string>("");
+  const [editIngredientQuantity, setEditIngredientQuantity] =
+    useState<string>("");
   const {
     recipesData,
     fetchRecipes,
@@ -338,14 +346,22 @@ const Stock = () => {
 
   // Function to calculate recipe purchase price based on ingredients
   const calculateRecipePurchasePrice = (recipe: any) => {
-    if (!recipe.recipe_ingredients || !Array.isArray(recipe.recipe_ingredients)) {
+    if (
+      !recipe.recipe_ingredients ||
+      !Array.isArray(recipe.recipe_ingredients)
+    ) {
       return 0;
     }
 
     let totalPrice = 0;
     recipe.recipe_ingredients.forEach((recipeIngredient: any) => {
       const ingredient = recipeIngredient.ingredients;
-      if (ingredient && ingredient.purchase_price && ingredient.quantity && recipeIngredient.deduct_quantity) {
+      if (
+        ingredient &&
+        ingredient.purchase_price &&
+        ingredient.quantity &&
+        recipeIngredient.deduct_quantity
+      ) {
         // Calculate price per unit: ingredient.purchase_price / ingredient.quantity
         const pricePerUnit = ingredient.purchase_price / ingredient.quantity;
         // Calculate total cost for this ingredient: pricePerUnit * quantity used in recipe
@@ -359,7 +375,10 @@ const Stock = () => {
 
   // Function to calculate ingredient purchase price based on recipe ingredients (for compound ingredients)
   const calculateIngredientPurchasePrice = (ingredient: any) => {
-    if (!ingredient.recipe_ingredients || !Array.isArray(ingredient.recipe_ingredients)) {
+    if (
+      !ingredient.recipe_ingredients ||
+      !Array.isArray(ingredient.recipe_ingredients)
+    ) {
       return ingredient.purchase_price || 0;
     }
 
@@ -367,21 +386,32 @@ const Stock = () => {
     let totalPrice = 0;
     ingredient.recipe_ingredients.forEach((recipeIngredient: any) => {
       const subIngredient = recipeIngredient.ingredients;
-      if (subIngredient && subIngredient.purchase_price && subIngredient.quantity && recipeIngredient.deduct_quantity) {
+      if (
+        subIngredient &&
+        subIngredient.purchase_price &&
+        subIngredient.quantity &&
+        recipeIngredient.deduct_quantity
+      ) {
         // Calculate price per unit: subIngredient.purchase_price / subIngredient.quantity
-        const pricePerUnit = subIngredient.purchase_price / subIngredient.quantity;
+        const pricePerUnit =
+          subIngredient.purchase_price / subIngredient.quantity;
         // Calculate total cost for this sub-ingredient: pricePerUnit * quantity used
-        const subIngredientCost = pricePerUnit * recipeIngredient.deduct_quantity;
+        const subIngredientCost =
+          pricePerUnit * recipeIngredient.deduct_quantity;
         totalPrice += subIngredientCost;
       }
     });
 
-    return totalPrice > 0 ? totalPrice : (ingredient.purchase_price || 0);
+    return totalPrice > 0 ? totalPrice : ingredient.purchase_price || 0;
   };
 
   // State to store product data for recipes and ingredients
-  const [recipeProducts, setRecipeProducts] = useState<{[key: string]: any}>({});
-  const [ingredientProducts, setIngredientProducts] = useState<{[key: string]: any}>({});
+  const [recipeProducts, setRecipeProducts] = useState<{ [key: string]: any }>(
+    {}
+  );
+  const [ingredientProducts, setIngredientProducts] = useState<{
+    [key: string]: any;
+  }>({});
 
   // Function to fetch product data for a recipe
   const fetchRecipeProduct = async (recipeId: string) => {
@@ -391,28 +421,34 @@ const Stock = () => {
       const response = await fetch(`/api/products/by-recipe/${recipeId}`);
       if (response.ok) {
         const productData = await response.json();
-        setRecipeProducts(prev => ({ ...prev, [recipeId]: productData }));
+        setRecipeProducts((prev) => ({ ...prev, [recipeId]: productData }));
         return productData;
       }
     } catch (error) {
-      console.error('Error fetching recipe product:', error);
+      console.error("Error fetching recipe product:", error);
     }
     return null;
   };
 
   // Function to fetch product data for an ingredient
   const fetchIngredientProduct = async (ingredientId: string) => {
-    if (ingredientProducts[ingredientId]) return ingredientProducts[ingredientId];
+    if (ingredientProducts[ingredientId])
+      return ingredientProducts[ingredientId];
 
     try {
-      const response = await fetch(`/api/products/by-ingredient/${ingredientId}`);
+      const response = await fetch(
+        `/api/products/by-ingredient/${ingredientId}`
+      );
       if (response.ok) {
         const productData = await response.json();
-        setIngredientProducts(prev => ({ ...prev, [ingredientId]: productData }));
+        setIngredientProducts((prev) => ({
+          ...prev,
+          [ingredientId]: productData,
+        }));
         return productData;
       }
     } catch (error) {
-      console.error('Error fetching ingredient product:', error);
+      console.error("Error fetching ingredient product:", error);
     }
     return null;
   };
@@ -495,8 +531,12 @@ const Stock = () => {
 
   // View product details function (similar to stock management)
   const viewProductDetails = (product: Product) => {
-    const isRecipe = normalizedRecipesData.some(recipe => recipe.id === product.id) || product.type === "recipe";
-    const isIngredient = ingredientsData.some(ingredient => ingredient.id === product.id) || product.type === "ingredient";
+    const isRecipe =
+      normalizedRecipesData.some((recipe) => recipe.id === product.id) ||
+      product.type === "recipe";
+    const isIngredient =
+      ingredientsData.some((ingredient) => ingredient.id === product.id) ||
+      product.type === "ingredient";
 
     if (isRecipe) {
       setSelectedRecipeId(product.id.toString());
@@ -520,21 +560,23 @@ const Stock = () => {
 
     // Try to extract quantity and unit from description
     // Look for patterns like "500ml", "1L", "250 ml", etc.
-    const match = description.match(/(\d+(?:\.\d+)?)\s*(ml|l|g|kg|oz|units?|unidades?)/i);
+    const match = description.match(
+      /(\d+(?:\.\d+)?)\s*(ml|l|g|kg|oz|units?|unidades?)/i
+    );
 
     if (match) {
       quantity = parseFloat(match[1]);
       unit = match[2].toLowerCase();
 
       // Convert liters to ml for consistency
-      if (unit === 'l') {
+      if (unit === "l") {
         quantity = quantity * 1000;
-        unit = 'ml';
+        unit = "ml";
       }
       // Convert kg to g for consistency
-      if (unit === 'kg') {
+      if (unit === "kg") {
         quantity = quantity * 1000;
-        unit = 'g';
+        unit = "g";
       }
     }
 
@@ -551,24 +593,38 @@ const Stock = () => {
     }
 
     // Check if it's a recipe or an ingredient
-    const selectedRecipe = normalizedRecipesData.find(recipe => recipe.id === value);
-    const selectedIngredient = ingredientsData.find(ingredient => ingredient.id === value);
+    const selectedRecipe = normalizedRecipesData.find(
+      (recipe) => recipe.id === value
+    );
+    const selectedIngredient = ingredientsData.find(
+      (ingredient) => ingredient.id === value
+    );
 
     if (selectedRecipe) {
-      setEditSelectedItemType('recipe');
+      setEditSelectedItemType("recipe");
     } else if (selectedIngredient) {
-      setEditSelectedItemType('ingredient');
+      setEditSelectedItemType("ingredient");
     }
   };
 
   // Add ingredient to the edit list
   const addEditIngredientToList = () => {
-    const selectedIngredient = ingredientsData.find(ing => ing.id === editSelectedItemForPreview);
-    if (selectedIngredient && !editAddedIngredientsList.find(item => item.id === selectedIngredient.id)) {
-      const quantityToUse = editCustomQuantityPerUnit || selectedIngredient.quantity;
+    const selectedIngredient = ingredientsData.find(
+      (ing) => ing.id === editSelectedItemForPreview
+    );
+    if (
+      selectedIngredient &&
+      !editAddedIngredientsList.find(
+        (item) => item.id === selectedIngredient.id
+      )
+    ) {
+      const quantityToUse =
+        editCustomQuantityPerUnit || selectedIngredient.quantity;
 
       // Calculate deduction logic: amount per unit / per unit
-      const deductStock = Math.floor(quantityToUse / selectedIngredient.quantity);
+      const deductStock = Math.floor(
+        quantityToUse / selectedIngredient.quantity
+      );
       const deductQuantity = quantityToUse % selectedIngredient.quantity;
 
       const newIngredient = {
@@ -576,10 +632,10 @@ const Stock = () => {
         customQuantityPerUnit: quantityToUse,
         deduct_stock: deductStock,
         deduct_quantity: deductQuantity,
-        totalQuantityNeeded: quantityToUse
+        totalQuantityNeeded: quantityToUse,
       };
       setEditAddedIngredientsList([...editAddedIngredientsList, newIngredient]);
-      setEditSelectedItemForPreview('');
+      setEditSelectedItemForPreview("");
       setEditSelectedItemType(null);
       setEditCustomQuantityPerUnit(0);
     }
@@ -587,14 +643,19 @@ const Stock = () => {
 
   // Add recipe to the edit list
   const addEditRecipeToList = () => {
-    const selectedRecipe = normalizedRecipesData.find(recipe => recipe.id === editSelectedItemForPreview);
-    if (selectedRecipe && !editAddedRecipesList.find(item => item.id === selectedRecipe.id)) {
+    const selectedRecipe = normalizedRecipesData.find(
+      (recipe) => recipe.id === editSelectedItemForPreview
+    );
+    if (
+      selectedRecipe &&
+      !editAddedRecipesList.find((item) => item.id === selectedRecipe.id)
+    ) {
       const newRecipe = {
         ...selectedRecipe,
-        quantityToUse: editQuantityToCreate
+        quantityToUse: editQuantityToCreate,
       };
       setEditAddedRecipesList([...editAddedRecipesList, newRecipe]);
-      setEditSelectedItemForPreview('');
+      setEditSelectedItemForPreview("");
       setEditSelectedItemType(null);
       setEditQuantityToCreate(1);
     }
@@ -602,12 +663,16 @@ const Stock = () => {
 
   // Remove ingredient from edit list
   const removeEditIngredientFromList = (ingredientId: string) => {
-    setEditAddedIngredientsList(editAddedIngredientsList.filter(item => item.id !== ingredientId));
+    setEditAddedIngredientsList(
+      editAddedIngredientsList.filter((item) => item.id !== ingredientId)
+    );
   };
 
   // Remove recipe from edit list
   const removeEditRecipeFromList = (recipeId: string) => {
-    setEditAddedRecipesList(editAddedRecipesList.filter(item => item.id !== recipeId));
+    setEditAddedRecipesList(
+      editAddedRecipesList.filter((item) => item.id !== recipeId)
+    );
   };
 
   // Handle product update (matching stock-management implementation)
@@ -634,10 +699,10 @@ const Stock = () => {
       const hasAnyIngredients = hasIngredients || hasRecipes;
 
       // Calculate total_amount for ingredient-type products
-      let totalAmount = null;
-      if (editingProduct.type === "ingredient") {
-        totalAmount = (editingProduct.stock || 0) * amountPerUnit;
-      }
+      // let totalAmount = null;
+      // if (editingProduct.type === "ingredient") {
+      //   totalAmount = (editingProduct.stock || 0) * amountPerUnit;
+      // }
 
       const response = await fetch(`/api/products`, {
         method: "PUT",
@@ -647,13 +712,99 @@ const Stock = () => {
           image_url: uploadedUrl,
           updated_at: new Date().toISOString(),
           has_recipe: hasAnyIngredients,
-          total_amount: totalAmount,
+          // total_amount: totalAmount,
         }),
       });
 
       if (!response.ok) throw new Error("Failed to update product");
 
-      toast.success("Producto actualizado exitosamente");
+      // Update ingredient table if this product is type "ingredient"
+      if (editingProduct.type === "ingredient") {
+        try {
+          // First, find the existing ingredient by product_id
+          const findResponse = await fetch(`/api/ingredients`);
+          if (findResponse.ok) {
+            const existingIngredients = await findResponse.json();
+            const existingIngredient = existingIngredients.find(
+              (ing: any) => ing.product_id === editingProduct.id
+            );
+
+            if (existingIngredient) {
+              // Update existing ingredient
+              const ingredientData = {
+                id: existingIngredient.id,
+                product_id: editingProduct.id,
+                name: editingProduct.name.trim(),
+                unit: "ml", // Always ml as specified
+                quantity: amountPerUnit, // quantity per unit
+                stock: editingProduct.stock || 0, // product stock
+                is_liquid: true, // Always true as specified
+                is_active:
+                  editingProduct.is_active !== undefined
+                    ? editingProduct.is_active
+                    : true,
+                original_quantity: amountPerUnit,
+                purchase_price: editingProduct.purchase_price || 0,
+              };
+
+              const updateResponse = await fetch("/api/ingredients", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(ingredientData),
+              });
+
+              if (!updateResponse.ok) {
+                console.error(
+                  "Failed to update ingredient entry, but product was updated successfully"
+                );
+              } else {
+                toast.success(
+                  "Producto e ingrediente actualizados exitosamente"
+                );
+              }
+            } else {
+              // Create new ingredient if none exists
+              const ingredientData = {
+                product_id: editingProduct.id,
+                name: editingProduct.name.trim(),
+                unit: "ml", // Always ml as specified
+                quantity: amountPerUnit, // quantity per unit
+                stock: editingProduct.stock || 0, // product stock
+                is_liquid: true, // Always true as specified
+                is_active:
+                  editingProduct.is_active !== undefined
+                    ? editingProduct.is_active
+                    : true,
+                original_quantity: amountPerUnit,
+                purchase_price: editingProduct.purchase_price || 0,
+              };
+
+              const createResponse = await fetch("/api/ingredients", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(ingredientData),
+              });
+
+              if (!createResponse.ok) {
+                console.error(
+                  "Failed to create ingredient entry, but product was updated successfully"
+                );
+                toast.success("Producto actualizado exitosamente");
+              } else {
+                toast.success(
+                  "Producto actualizado e ingrediente creado exitosamente"
+                );
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error updating ingredient entry:", error);
+          toast.success("Producto actualizado exitosamente");
+          // Continue execution as product was updated successfully
+        }
+      } else {
+        toast.success("Producto actualizado exitosamente");
+      }
 
       // Reset edit modal states (enhanced version)
       setEditingProduct(null);
@@ -664,7 +815,7 @@ const Stock = () => {
       setEditCustomIngredients([]);
 
       // Reset enhanced edit modal states
-      setEditSelectedItemForPreview('');
+      setEditSelectedItemForPreview("");
       setEditSelectedItemType(null);
       setEditAddedIngredientsList([]);
       setEditAddedRecipesList([]);
@@ -678,8 +829,11 @@ const Stock = () => {
       setOriginalIngredientQuantities({});
 
       fetchProducts();
+      fetchIngredients(); // Refresh ingredients data to show updated values
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error updating product");
+      toast.error(
+        err instanceof Error ? err.message : "Error updating product"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -833,41 +987,44 @@ const Stock = () => {
     ingredient_id?: string;
   }) => {
     // Check if it's a recipe (has recipe_id or is from recipes data)
-    if (item.recipe_id || normalizedRecipesData.find(r => r.id === item.id)) {
+    if (item.recipe_id || normalizedRecipesData.find((r) => r.id === item.id)) {
       return {
-        type: 'recipe',
-        apiEndpoint: '/api/recipes',
+        type: "recipe",
+        apiEndpoint: "/api/recipes",
         itemName: item.name,
-        confirmationMessage: 'Esta receta y todos sus ingredientes asociados serán eliminados.'
+        confirmationMessage:
+          "Esta receta y todos sus ingredientes asociados serán eliminados.",
       };
     }
 
     // Check if it's an ingredient (has ingredient_id or is from ingredients data)
-    if (item.ingredient_id || ingredientsData.find(i => i.id === item.id)) {
+    if (item.ingredient_id || ingredientsData.find((i) => i.id === item.id)) {
       return {
-        type: 'ingredient',
-        apiEndpoint: '/api/ingredients',
+        type: "ingredient",
+        apiEndpoint: "/api/ingredients",
         itemName: item.name,
-        confirmationMessage: 'Este ingrediente y todas las recetas que lo usan serán eliminados.'
+        confirmationMessage:
+          "Este ingrediente y todas las recetas que lo usan serán eliminados.",
       };
     }
 
     // Check if it's an ingredient-type product
-    if (item.type === 'ingredient') {
+    if (item.type === "ingredient") {
       return {
-        type: 'ingredient-type-product',
-        apiEndpoint: '/api/products',
+        type: "ingredient-type-product",
+        apiEndpoint: "/api/products",
         itemName: item.name,
-        confirmationMessage: 'Este producto de tipo ingrediente y su ingrediente asociado serán eliminados.'
+        confirmationMessage:
+          "Este producto de tipo ingrediente y su ingrediente asociado serán eliminados.",
       };
     }
 
     // Default to regular product
     return {
-      type: 'product',
-      apiEndpoint: '/api/products',
+      type: "product",
+      apiEndpoint: "/api/products",
       itemName: item.name,
-      confirmationMessage: 'Este producto será eliminado del inventario.'
+      confirmationMessage: "Este producto será eliminado del inventario.",
     };
   };
 
@@ -882,16 +1039,18 @@ const Stock = () => {
       // Determine what type of item we're deleting
       const deletionInfo = determineItemTypeAndDeletionInfo(productToDelete);
 
-      console.log(`Deleting ${deletionInfo.type}: ${deletionInfo.itemName} (ID: ${id})`);
+      console.log(
+        `Deleting ${deletionInfo.type}: ${deletionInfo.itemName} (ID: ${id})`
+      );
 
       // Call the appropriate API endpoint
       let response;
-      if (deletionInfo.type === 'recipe') {
+      if (deletionInfo.type === "recipe") {
         response = await fetch(`${deletionInfo.apiEndpoint}?id=${id}`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
         });
-      } else if (deletionInfo.type === 'ingredient') {
+      } else if (deletionInfo.type === "ingredient") {
         response = await fetch(`${deletionInfo.apiEndpoint}?id=${id}`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
@@ -910,22 +1069,27 @@ const Stock = () => {
 
         // Handle specific conflict errors (409) with detailed messages
         if (response.status === 409) {
-          const errorMessage = errorData.details || errorData.error || `No se puede eliminar ${deletionInfo.type}`;
-          const suggestion = errorData.suggestion || '';
+          const errorMessage =
+            errorData.details ||
+            errorData.error ||
+            `No se puede eliminar ${deletionInfo.type}`;
+          const suggestion = errorData.suggestion || "";
           const references = errorData.references || [];
 
           let fullMessage = errorMessage;
           if (references.length > 0) {
-            fullMessage += '\n\nRazones:\n• ' + references.join('\n• ');
+            fullMessage += "\n\nRazones:\n• " + references.join("\n• ");
           }
           if (suggestion) {
-            fullMessage += '\n\n' + suggestion;
+            fullMessage += "\n\n" + suggestion;
           }
 
           throw new Error(fullMessage);
         }
 
-        throw new Error(errorData.error || `Failed to delete ${deletionInfo.type}`);
+        throw new Error(
+          errorData.error || `Failed to delete ${deletionInfo.type}`
+        );
       }
 
       const result = await response.json();
@@ -936,9 +1100,9 @@ const Stock = () => {
       fetchNormalizedRecipes();
 
       // Show appropriate success message based on deletion type
-      let successMessage = '';
+      let successMessage = "";
       switch (deletionInfo.type) {
-        case 'recipe':
+        case "recipe":
           successMessage = `Receta "${deletionInfo.itemName}" marcada como eliminada exitosamente.`;
           if (result.softDeletedItems) {
             if (result.softDeletedItems.products > 0) {
@@ -950,7 +1114,7 @@ const Stock = () => {
           }
           break;
 
-        case 'ingredient':
+        case "ingredient":
           successMessage = `Ingrediente "${deletionInfo.itemName}" marcado como eliminado exitosamente.`;
           if (result.softDeletedItems) {
             if (result.softDeletedItems.products > 0) {
@@ -962,7 +1126,7 @@ const Stock = () => {
           }
           break;
 
-        case 'ingredient-type-product':
+        case "ingredient-type-product":
           successMessage = `Producto de ingrediente "${deletionInfo.itemName}" eliminado exitosamente.`;
           if (result.deletedProduct?.ingredientDeleted) {
             successMessage += ` También se eliminó el ingrediente asociado.`;
@@ -1738,19 +1902,22 @@ const Stock = () => {
 
                     // Add ALL ingredients from ingredientsData that aren't already added
                     // Stock page shows all ingredients regardless of is_active status
-                    ingredientsData.filter((item) => !item.product_id).forEach((item) => {
-                      if (!seenIds.has(item.id)) {
-                        seenIds.add(item.id);
-                        allItems.push(item);
-                      }
-                    });
+                    ingredientsData
+                      .filter((item) => !item.product_id)
+                      .forEach((item) => {
+                        if (!seenIds.has(item.id)) {
+                          seenIds.add(item.id);
+                          allItems.push(item);
+                        }
+                      });
 
                     return allItems;
                   })().map((item) => {
                     const isProduct = item.type === "product";
                     const isRecipe = item.type === "recipe";
                     const isIngredient =
-                      item.type === "ingredient" || ("quantity" in item && !isProduct && !isRecipe);
+                      item.type === "ingredient" ||
+                      ("quantity" in item && !isProduct && !isRecipe);
                     const product = item as any; // Cast to access all properties
                     return (
                       <TableRow key={item.id}>
@@ -1789,7 +1956,7 @@ const Stock = () => {
                                 )
                               }
                             />
-                          ) : (isProduct || item.type ==="ingredient") ? (
+                          ) : isProduct || item.type === "ingredient" ? (
                             <Switch
                               checked={product.is_active || false}
                               onCheckedChange={(checked) =>
@@ -1816,50 +1983,71 @@ const Stock = () => {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                          {isProduct ? (
-                            categoryList.find(
-                              (c) => c.value === product.category
-                            )?.label || product.category
-                          ) : isRecipe ? (
-                            "Receta"
-                          ) : isIngredient ? (
-                            product.type === "ingredient-product" ? "Ingrediente-Producto" : "Ingrediente"
-                          ) : (
-                            product.type || "Otro"
-                          )}
-                        </Badge>
+                            {isProduct
+                              ? categoryList.find(
+                                  (c) => c.value === product.category
+                                )?.label || product.category
+                              : isRecipe
+                                ? "Receta"
+                                : isIngredient
+                                  ? product.type === "ingredient-product"
+                                    ? "Ingrediente-Producto"
+                                    : "Ingrediente"
+                                  : product.type || "Otro"}
+                          </Badge>
                         </TableCell>
                         <TableCell>
-                          {(isProduct || (isIngredient && product.type === "ingredient" && product.sale_price)) && (
+                          {(isProduct ||
+                            (isIngredient &&
+                              product.type === "ingredient" &&
+                              product.sale_price)) && (
                             <span className="font-medium text-green-600">
                               ${product.sale_price?.toFixed(2) || "0.00"}
                             </span>
                           )}
-                          {isRecipe && product.is_active && recipeProducts[product.id] && (
-                            <span className="font-medium text-green-600">
-                              ${recipeProducts[product.id].sale_price?.toFixed(2) || "0.00"}
-                            </span>
-                          )}
-                          {isIngredient && product.type !== "ingredient" && product.is_active && ingredientProducts[product.id] && (
-                            <span className="font-medium text-green-600">
-                              ${ingredientProducts[product.id].sale_price?.toFixed(2) || "0.00"}
-                            </span>
-                          )}
+                          {isRecipe &&
+                            product.is_active &&
+                            recipeProducts[product.id] && (
+                              <span className="font-medium text-green-600">
+                                $
+                                {recipeProducts[product.id].sale_price?.toFixed(
+                                  2
+                                ) || "0.00"}
+                              </span>
+                            )}
+                          {isIngredient &&
+                            product.type !== "ingredient" &&
+                            product.is_active &&
+                            ingredientProducts[product.id] && (
+                              <span className="font-medium text-green-600">
+                                $
+                                {ingredientProducts[
+                                  product.id
+                                ].sale_price?.toFixed(2) || "0.00"}
+                              </span>
+                            )}
                         </TableCell>
                         <TableCell>
-                          {(isProduct || (isIngredient && product.type === "ingredient" && product.purchase_price)) && (
+                          {(isProduct ||
+                            (isIngredient &&
+                              product.type === "ingredient" &&
+                              product.purchase_price)) && (
                             <span className="font-medium text-green-600">
                               ${product.purchase_price?.toFixed(2) || "0.00"}
                             </span>
                           )}
                           {isIngredient && product.type !== "ingredient" && (
                             <span className="font-medium text-green-600">
-                              ${calculateIngredientPurchasePrice(product).toFixed(2)}
+                              $
+                              {calculateIngredientPurchasePrice(
+                                product
+                              ).toFixed(2)}
                             </span>
                           )}
                           {isRecipe && (
                             <span className="font-medium text-green-600">
-                              ${calculateRecipePurchasePrice(product).toFixed(2)}
+                              $
+                              {calculateRecipePurchasePrice(product).toFixed(2)}
                             </span>
                           )}
                         </TableCell>
@@ -1887,7 +2075,8 @@ const Stock = () => {
                             .length > 2 && "..."}
                         </TableCell>
                         <TableCell>
-                          {(isProduct || (isIngredient && item.type === "ingredient")) ? (
+                          {isProduct ||
+                          (isIngredient && item.type === "ingredient") ? (
                             <Badge
                               variant="outline"
                               className={
@@ -1969,34 +2158,54 @@ const Stock = () => {
                               variant="ghost"
                               size="icon"
                               onClick={async () => {
-                                const isRecipe = normalizedRecipesData.some(recipe => recipe.id === item.id) || item.type === "recipe";
-                                const isIngredient = ingredientsData.some(ingredient => ingredient.id === item.id) || item.type === "ingredient";
-                                const isProduct = productsData.some(product => product.id === item.id) || item.type === "product";
-
+                                const isRecipe =
+                                  normalizedRecipesData.some(
+                                    (recipe) => recipe.id === item.id
+                                  ) || item.type === "recipe";
+                                const isIngredient =
+                                  ingredientsData.some(
+                                    (ingredient) => ingredient.id === item.id
+                                  ) || item.type === "ingredient";
+                                const isProduct =
+                                  productsData.some(
+                                    (product) => product.id === item.id
+                                  ) || item.type === "product";
+                                if (product.type === "ingredient") {
+                                  // Find the ingredient by product_id to get original_quantity
+                                  const ingredient = ingredientsData.find(
+                                    (ing) => ing.product_id === product.id
+                                  );
+                                  setAmountPerUnit(
+                                    ingredient?.original_quantity || 0
+                                  );
+                                } else {
+                                  setAmountPerUnit(0);
+                                }
                                 if (isRecipe) {
                                   handleEditRecipe(item.id?.toString() || "");
                                 } else if (isIngredient) {
                                   // Check if ingredient has an associated product
-                                  const ingredientProduct = productsData.find(p => p.id === item.id);
+                                  const ingredientProduct = productsData.find(
+                                    (p) => p.id === item.id
+                                  );
                                   if (ingredientProduct) {
                                     // If ingredient has associated product, show product edit modal
                                     setEditingProduct(ingredientProduct);
                                   } else {
                                     // Otherwise show ingredient edit modal
-                                    handleEditIngredient(item.id?.toString() || "");
+                                    handleEditIngredient(
+                                      item.id?.toString() || ""
+                                    );
                                   }
                                 } else if (isProduct) {
                                   // For products (including ingredient-type products), open the edit product modal
-                                  const product = productsData.find(p => p.id === item.id);
+                                  const product = productsData.find(
+                                    (p) => p.id === item.id
+                                  );
                                   if (product) {
                                     setEditingProduct(product);
 
                                     // Initialize amountPerUnit for ingredient-type products
-                                    if (product.type === "ingredient" && (product as any).total_amount && product.stock) {
-                                      setAmountPerUnit((product as any).total_amount / product.stock);
-                                    } else {
-                                      setAmountPerUnit(0);
-                                    }
 
                                     // Load ALL ingredients and recipes that this product has (Enhanced Version)
                                     try {
@@ -2004,78 +2213,148 @@ const Stock = () => {
                                       let loadedRecipes: any[] = [];
 
                                       // 1. Fetch recipe ingredients from recipe_ingredients table
-                                      const response = await fetch(`/api/recipe-ingredients?product_id=${product.id}`);
+                                      const response = await fetch(
+                                        `/api/recipe-ingredients?product_id=${product.id}`
+                                      );
                                       if (response.ok) {
-                                        const productRecipeIngredients = await response.json();
+                                        const productRecipeIngredients =
+                                          await response.json();
 
-                                        if (productRecipeIngredients && productRecipeIngredients.length > 0) {
+                                        if (
+                                          productRecipeIngredients &&
+                                          productRecipeIngredients.length > 0
+                                        ) {
                                           // Separate individual ingredients from recipes
-                                          productRecipeIngredients.forEach((ri: any) => {
-                                            if (ri.recipe_id) {
-                                              // This is a recipe entry
-                                              const recipeData = normalizedRecipesData.find(r => r.id === ri.recipe_id);
-                                              if (recipeData) {
-                                                loadedRecipes.push({
-                                                  ...recipeData,
-                                                  quantityToUse: ri.deduct_stock,
-                                                  id: ri.recipe_id
-                                                });
-                                              }
-                                            } else if (ri.ingredient_id) {
-                                              // This is an individual ingredient entry
-                                              const ingredientData = ingredientsData.find(ing => ing.id === ri.ingredient_id);
-                                              if (ingredientData) {
-                                                loadedIngredients.push({
-                                                  ...ingredientData,
-                                                  customQuantityPerUnit: ri.deduct_quantity + (ri.deduct_stock * ingredientData.quantity),
-                                                  deduct_stock: ri.deduct_stock,
-                                                  deduct_quantity: ri.deduct_quantity,
-                                                  totalQuantityNeeded: ri.deduct_quantity + (ri.deduct_stock * ingredientData.quantity),
-                                                  id: ri.ingredient_id
-                                                });
+                                          productRecipeIngredients.forEach(
+                                            (ri: any) => {
+                                              if (ri.recipe_id) {
+                                                // This is a recipe entry
+                                                const recipeData =
+                                                  normalizedRecipesData.find(
+                                                    (r) => r.id === ri.recipe_id
+                                                  );
+                                                if (recipeData) {
+                                                  loadedRecipes.push({
+                                                    ...recipeData,
+                                                    quantityToUse:
+                                                      ri.deduct_stock,
+                                                    id: ri.recipe_id,
+                                                  });
+                                                }
+                                              } else if (ri.ingredient_id) {
+                                                // This is an individual ingredient entry
+                                                const ingredientData =
+                                                  ingredientsData.find(
+                                                    (ing) =>
+                                                      ing.id ===
+                                                      ri.ingredient_id
+                                                  );
+                                                if (ingredientData) {
+                                                  loadedIngredients.push({
+                                                    ...ingredientData,
+                                                    customQuantityPerUnit:
+                                                      ri.deduct_quantity +
+                                                      ri.deduct_stock *
+                                                        ingredientData.quantity,
+                                                    deduct_stock:
+                                                      ri.deduct_stock,
+                                                    deduct_quantity:
+                                                      ri.deduct_quantity,
+                                                    totalQuantityNeeded:
+                                                      ri.deduct_quantity +
+                                                      ri.deduct_stock *
+                                                        ingredientData.quantity,
+                                                    id: ri.ingredient_id,
+                                                  });
+                                                }
                                               }
                                             }
-                                          });
+                                          );
                                         }
                                       }
 
                                       // 2. Set the loaded ingredients and recipes to the enhanced lists
-                                      setEditAddedIngredientsList(loadedIngredients);
+                                      setEditAddedIngredientsList(
+                                        loadedIngredients
+                                      );
                                       setEditAddedRecipesList(loadedRecipes);
 
                                       // 3. Also check legacy product.ingredients field for backward compatibility
-                                      if (product.has_recipe && (product as any).ingredients && loadedIngredients.length === 0 && loadedRecipes.length === 0) {
+                                      if (
+                                        product.has_recipe &&
+                                        (product as any).ingredients &&
+                                        loadedIngredients.length === 0 &&
+                                        loadedRecipes.length === 0
+                                      ) {
                                         try {
-                                          const storedIngredients = JSON.parse((product as any).ingredients);
-                                          if (storedIngredients && storedIngredients.length > 0) {
+                                          const storedIngredients = JSON.parse(
+                                            (product as any).ingredients
+                                          );
+                                          if (
+                                            storedIngredients &&
+                                            storedIngredients.length > 0
+                                          ) {
                                             // Convert legacy format to new enhanced format
-                                            const legacyIngredients = storedIngredients
-                                              .filter((ing: any) => ing.productId) // Only custom ingredients
-                                              .map((ing: any) => {
-                                                const ingredientData = ingredientsData.find(ingData => ingData.id === ing.productId);
-                                                if (ingredientData) {
-                                                  return {
-                                                    ...ingredientData,
-                                                    customQuantityPerUnit: parseFloat(ing.quantity),
-                                                    deduct_stock: Math.floor(parseFloat(ing.quantity) / ingredientData.quantity),
-                                                    deduct_quantity: parseFloat(ing.quantity) % ingredientData.quantity,
-                                                    totalQuantityNeeded: parseFloat(ing.quantity),
-                                                    id: ing.productId
-                                                  };
-                                                }
-                                                return null;
-                                              })
-                                              .filter(Boolean);
+                                            const legacyIngredients =
+                                              storedIngredients
+                                                .filter(
+                                                  (ing: any) => ing.productId
+                                                ) // Only custom ingredients
+                                                .map((ing: any) => {
+                                                  const ingredientData =
+                                                    ingredientsData.find(
+                                                      (ingData) =>
+                                                        ingData.id ===
+                                                        ing.productId
+                                                    );
+                                                  if (ingredientData) {
+                                                    return {
+                                                      ...ingredientData,
+                                                      customQuantityPerUnit:
+                                                        parseFloat(
+                                                          ing.quantity
+                                                        ),
+                                                      deduct_stock: Math.floor(
+                                                        parseFloat(
+                                                          ing.quantity
+                                                        ) /
+                                                          ingredientData.quantity
+                                                      ),
+                                                      deduct_quantity:
+                                                        parseFloat(
+                                                          ing.quantity
+                                                        ) %
+                                                        ingredientData.quantity,
+                                                      totalQuantityNeeded:
+                                                        parseFloat(
+                                                          ing.quantity
+                                                        ),
+                                                      id: ing.productId,
+                                                    };
+                                                  }
+                                                  return null;
+                                                })
+                                                .filter(Boolean);
 
-                                            setEditAddedIngredientsList(legacyIngredients);
-                                            setEditCustomIngredients(storedIngredients); // Keep for backward compatibility
+                                            setEditAddedIngredientsList(
+                                              legacyIngredients
+                                            );
+                                            setEditCustomIngredients(
+                                              storedIngredients
+                                            ); // Keep for backward compatibility
                                           }
                                         } catch (error) {
-                                          console.error("Error parsing product.ingredients:", error);
+                                          console.error(
+                                            "Error parsing product.ingredients:",
+                                            error
+                                          );
                                         }
                                       }
                                     } catch (error) {
-                                      console.error("Error loading product ingredients/recipes:", error);
+                                      console.error(
+                                        "Error loading product ingredients/recipes:",
+                                        error
+                                      );
                                     }
                                   }
                                 }
@@ -2444,11 +2723,18 @@ const Stock = () => {
               {(() => {
                 if (!productToDelete) return null;
 
-                const deletionInfo = determineItemTypeAndDeletionInfo(productToDelete);
+                const deletionInfo =
+                  determineItemTypeAndDeletionInfo(productToDelete);
 
                 return (
                   <>
-                    ¿Estás seguro de que deseas eliminar {deletionInfo.type === 'recipe' ? 'la receta' : deletionInfo.type === 'ingredient' ? 'el ingrediente' : 'el producto'} &quot;
+                    ¿Estás seguro de que deseas eliminar{" "}
+                    {deletionInfo.type === "recipe"
+                      ? "la receta"
+                      : deletionInfo.type === "ingredient"
+                        ? "el ingrediente"
+                        : "el producto"}{" "}
+                    &quot;
                     {productToDelete.name}&quot;?
                     <br />
                     <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
@@ -2457,7 +2743,8 @@ const Stock = () => {
                       </span>
                     </div>
                     <span className="text-red-600 font-medium">
-                      Esta acción no se puede deshacer y eliminará permanentemente el elemento y todos sus datos asociados.
+                      Esta acción no se puede deshacer y eliminará
+                      permanentemente el elemento y todos sus datos asociados.
                     </span>
                   </>
                 );
@@ -2821,7 +3108,9 @@ const Stock = () => {
             {!editingProduct?.has_recipe && (
               <div className="space-y-4 border rounded-lg p-4">
                 <div className="space-y-4">
-                  <h3 className="text-base font-semibold">Configuración del Producto</h3>
+                  <h3 className="text-base font-semibold">
+                    Configuración del Producto
+                  </h3>
 
                   {/* Ingredient Type Toggle */}
                   <div className="flex items-center justify-between rounded-lg border p-3">
@@ -2830,8 +3119,10 @@ const Stock = () => {
                         ¿Usar este producto como ingrediente en recetas?
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        Al activar esta opción, se creará automáticamente una entrada en la tabla de ingredientes
-                        con el ID del producto, permitiendo usar este producto como ingrediente en otras recetas.
+                        Al activar esta opción, se creará automáticamente una
+                        entrada en la tabla de ingredientes con el ID del
+                        producto, permitiendo usar este producto como
+                        ingrediente en otras recetas.
                       </p>
                     </div>
                     <Switch
@@ -2840,7 +3131,6 @@ const Stock = () => {
                         setEditingProduct({
                           ...editingProduct!,
                           type: checked ? "ingredient" : "product",
-                          is_liquid: checked,
                         });
                       }}
                     />
@@ -2851,11 +3141,14 @@ const Stock = () => {
                     <Input
                       id="stock"
                       type="number"
-                      value={editingProduct?.stock === 0 ? "" : editingProduct?.stock}
+                      value={
+                        editingProduct?.stock === 0 ? "" : editingProduct?.stock
+                      }
                       onChange={(e) =>
                         setEditingProduct({
                           ...editingProduct!,
-                          stock: e.target.value === "" ? 0 : Number(e.target.value),
+                          stock:
+                            e.target.value === "" ? 0 : Number(e.target.value),
                         })
                       }
                       placeholder="Cantidad en stock"
@@ -2873,7 +3166,8 @@ const Stock = () => {
                         {/* Amount per unit input */}
                         <div className="space-y-2">
                           <Label htmlFor="amount_per_unit" className="text-sm">
-                            Cantidad por unidad {editingProduct?.is_liquid ? "(ml)" : ""}
+                            Cantidad por unidad{" "}
+                            {editingProduct?.is_liquid ? "(ml)" : ""}
                           </Label>
                           <Input
                             id="amount_per_unit"
@@ -2881,16 +3175,24 @@ const Stock = () => {
                             min="0"
                             step="0.01"
                             value={amountPerUnit === 0 ? "" : amountPerUnit}
-                            placeholder={editingProduct?.is_liquid ? "Ej: 500 ml por botella" : "Ej: 1 unidad"}
-                            onChange={(e) => setAmountPerUnit(parseFloat(e.target.value) || 0)}
+                            placeholder={
+                              editingProduct?.is_liquid
+                                ? "Ej: 500 ml por botella"
+                                : "Ej: 1 unidad"
+                            }
+                            onChange={(e) =>
+                              setAmountPerUnit(parseFloat(e.target.value) || 0)
+                            }
                             className="h-9"
                           />
                         </div>
 
-                        <div className="pt-2 border-t border-blue-200">
+                        <div className="pt-2 border-t border-blue-200 flex justify-between">
                           <span className="text-blue-900 font-semibold">
-                            Total Amount (producto): {((editingProduct?.stock || 0) * amountPerUnit)}
-                            {editingProduct?.is_liquid ? " ml" : " unidades"}
+                            Stock: {editingProduct?.stock || 0}
+                          </span>
+                          <span className="text-blue-900 font-semibold">
+                            Per Unit: {amountPerUnit}
                           </span>
                         </div>
                       </div>
@@ -2900,282 +3202,58 @@ const Stock = () => {
               </div>
             )}
 
-            {/* Enhanced Recipe/Ingredients Selection Field */}
-            <div className="space-y-4 border rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">
-                  Ingredientes (Opcional)
-                </Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowCreateRecipeDialogEdit(true)}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Crear Receta
-                </Button>
-              </div>
-
-              {/* Show disabled message when ingredient toggle is enabled */}
-              {editingProduct?.type === "ingredient" && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-800">
-                    <Info className="h-4 w-4 inline mr-2" />
-                    Los productos de tipo ingrediente no pueden tener recetas asociadas.
-                    Para agregar ingredientes, desactive la opción "Usar como ingrediente" arriba.
-                  </p>
-                </div>
-              )}
-
-              {/* Enhanced Selection Dropdown */}
-              <Select
-                value={editSelectedItemForPreview || "no-selection"}
-                onValueChange={handleEditItemSelection}
-                disabled={editingProduct?.type === "ingredient"}
-              >
-                <SelectTrigger className={editingProduct?.type === "ingredient" ? "opacity-50 cursor-not-allowed" : ""}>
-                  <SelectValue placeholder="Seleccionar receta o ingrediente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="no-selection">
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-500">Sin selección</span>
-                    </div>
-                  </SelectItem>
-
-                  {/* Recipes Section */}
-                  {normalizedRecipesData.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">
-                        Recetas Disponibles
-                      </div>
-                      {normalizedRecipesData.map((recipe) => (
-                        <SelectItem key={`recipe-${recipe.id}`} value={recipe.id}>
-                          <div className="flex items-center gap-2">
-                            <ChefHat className="h-4 w-4 text-blue-600" />
-                            <span>{recipe.name}</span>
-                            <span className="text-xs text-gray-500">(Receta)</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-
-                  {/* Ingredients Section */}
-                  {ingredientsData.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">
-                        Ingredientes Disponibles
-                      </div>
-                      {ingredientsData.map((ingredient) => (
-                        <SelectItem key={`ingredient-${ingredient.id}`} value={ingredient.id}>
-                          <div className="flex items-center gap-2">
-                            <Package className="h-4 w-4 text-emerald-600" />
-                            <span>{ingredient.name}</span>
-                            <span className="text-xs text-gray-500">
-                              ({ingredient.quantity} {ingredient.unit})
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-
-              {/* Detailed Preview Section for Ingredients */}
-              {editSelectedItemType === 'ingredient' && (() => {
-                const selectedIngredient = ingredientsData.find(ing => ing.id === editSelectedItemForPreview);
-                if (!selectedIngredient) return null;
-
-                return (
-                  <div className="border rounded-lg p-4 bg-gray-50">
-                    <div className="mb-3">
-                      <h4 className="font-medium text-gray-900">Ingrediente Seleccionado:</h4>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-lg">{selectedIngredient.name}</span>
-                        <div className="text-right">
-                          <div className="text-green-600 font-semibold">
-                            Stock Total: {selectedIngredient.stock} unidades
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            Total: {selectedIngredient.quantity} {selectedIngredient.unit}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="edit-custom-quantity-per-unit" className="text-sm font-medium">Cantidad por unidad</Label>
-                          <Input
-                            id="edit-custom-quantity-per-unit"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={editCustomQuantityPerUnit}
-                            onChange={(e) => setEditCustomQuantityPerUnit(parseFloat(e.target.value) || 0)}
-                            className="h-8"
-                            placeholder={`${selectedIngredient.quantity}`}
-                          />
-                          <div className="text-xs text-gray-500 mt-1">
-                            Por defecto: {selectedIngredient.quantity} {selectedIngredient.unit}
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium">Unidad</Label>
-                          <div className="text-lg font-semibold">
-                            {selectedIngredient.unit}
-                          </div>
-                        </div>
-                      </div>
-                      {editCustomQuantityPerUnit > 0 && (
-                        <div className="p-3 bg-blue-50 rounded border border-blue-300">
-                          <div className="flex items-center justify-between mb-3">
-                            <h5 className="font-medium text-blue-900">Cálculo de Deducción:</h5>
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={addEditIngredientToList}
-                              className="gap-2"
-                            >
-                              <Plus className="h-4 w-4" />
-                              Agregar
-                            </Button>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <span className="text-blue-700">deduct_stock:</span>
-                              <p className="font-semibold text-blue-900">
-                                {Math.floor(editCustomQuantityPerUnit / selectedIngredient.quantity)} unidades
-                              </p>
-                            </div>
-                            <div>
-                              <span className="text-blue-700">deduct_quantity:</span>
-                              <p className="font-semibold text-blue-900">
-                                {editCustomQuantityPerUnit % selectedIngredient.quantity} {selectedIngredient.unit}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Recipe Preview Section */}
-              {editSelectedItemType === 'recipe' && (() => {
-                const selectedRecipe = normalizedRecipesData.find(recipe => recipe.id === editSelectedItemForPreview);
-                if (!selectedRecipe) return null;
-
-                return (
-                  <div className="border rounded-lg p-4 bg-gray-50">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-gray-900">Receta Seleccionada:</h4>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={addEditRecipeToList}
-                        className="gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Agregar
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-lg">{selectedRecipe.name}</span>
-                        <div className="text-right">
-                          <div className="text-blue-600 font-semibold">
-                            Tipo: {selectedRecipe.type}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-sm font-medium">Nombre de la Receta</Label>
-                          <div className="text-lg font-semibold text-blue-600">
-                            {selectedRecipe.name}
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-recipe-quantity-to-create" className="text-sm font-medium">Cantidad a crear</Label>
-                          <Input
-                            id="edit-recipe-quantity-to-create"
-                            type="number"
-                            min="1"
-                            value={editQuantityToCreate}
-                            onChange={(e) => setEditQuantityToCreate(parseInt(e.target.value) || 1)}
-                            className="h-8"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Recipe Ingredients */}
-                      {selectedRecipe.recipe_ingredients && selectedRecipe.recipe_ingredients.length > 0 && (
-                        <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                          <h5 className="font-medium text-blue-900 mb-2">Ingredientes de la Receta:</h5>
-                          <div className="space-y-2">
-                            {selectedRecipe.recipe_ingredients.map((recipeIngredient, index) => {
-                              // Find the ingredient details from ingredientsData
-                              const ingredientDetails = ingredientsData.find(ing => ing.id === recipeIngredient.ingredient_id);
-                              return (
-                                <div key={index} className="flex justify-between items-center text-sm">
-                                  <span className="font-medium">
-                                    {ingredientDetails?.name || recipeIngredient.ingredient_name || 'Ingrediente desconocido'}
-                                  </span>
-                                  <span className="text-blue-600">
-                                    {recipeIngredient.deduct_quantity} {ingredientDetails?.unit || recipeIngredient.ingredient_unit || 'ml'}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
             {/* Compact Added Ingredients List */}
             {editAddedIngredientsList.length > 0 && (
               <div className="border rounded-lg p-3 bg-emerald-50/50">
                 <div className="flex items-center gap-2 mb-3">
                   <Package className="h-4 w-4 text-emerald-600" />
-                  <h4 className="font-medium text-emerald-900">Ingredientes Agregados</h4>
-                  <Badge variant="secondary" className="ml-auto bg-emerald-100 text-emerald-700 text-xs">
+                  <h4 className="font-medium text-emerald-900">
+                    Ingredientes Agregados
+                  </h4>
+                  <Badge
+                    variant="secondary"
+                    className="ml-auto bg-emerald-100 text-emerald-700 text-xs"
+                  >
                     {editAddedIngredientsList.length}
                   </Badge>
                 </div>
                 <div className="space-y-2">
                   {editAddedIngredientsList.map((ingredient, index) => (
-                    <div key={index} className="flex justify-between items-center bg-white p-2 rounded border group hover:bg-emerald-50 transition-colors">
+                    <div
+                      key={index}
+                      className="flex justify-between items-center bg-white p-2 rounded border group hover:bg-emerald-50 transition-colors"
+                    >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">{ingredient.name}</span>
-                          <Badge variant="outline" className="text-xs bg-red-50 text-red-700">
+                          <span className="font-medium text-sm">
+                            {ingredient.name}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-red-50 text-red-700"
+                          >
                             {ingredient.totalQuantityNeeded} {ingredient.unit}
                           </Badge>
                         </div>
                         <div className="flex gap-3 text-xs text-gray-600">
-                          <span>Por unidad: {ingredient.customQuantityPerUnit} {ingredient.unit}</span>
+                          <span>
+                            Por unidad: {ingredient.customQuantityPerUnit}{" "}
+                            {ingredient.unit}
+                          </span>
                           <span>Stock: {ingredient.deduct_stock}</span>
-                          <span>Cantidad: {ingredient.deduct_quantity} {ingredient.unit}</span>
+                          <span>
+                            Cantidad: {ingredient.deduct_quantity}{" "}
+                            {ingredient.unit}
+                          </span>
                         </div>
                       </div>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeEditIngredientFromList(ingredient.id)}
+                        onClick={() =>
+                          removeEditIngredientFromList(ingredient.id)
+                        }
                         className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-800 h-6 w-6 p-0"
                       >
                         <X className="h-3 w-3" />
@@ -3191,17 +3269,27 @@ const Stock = () => {
               <div className="border rounded-lg p-3 bg-blue-50/50">
                 <div className="flex items-center gap-2 mb-3">
                   <ChefHat className="h-4 w-4 text-blue-600" />
-                  <h4 className="font-medium text-blue-900">Recetas Agregadas</h4>
-                  <Badge variant="secondary" className="ml-auto bg-blue-100 text-blue-700 text-xs">
+                  <h4 className="font-medium text-blue-900">
+                    Recetas Agregadas
+                  </h4>
+                  <Badge
+                    variant="secondary"
+                    className="ml-auto bg-blue-100 text-blue-700 text-xs"
+                  >
                     {editAddedRecipesList.length}
                   </Badge>
                 </div>
                 <div className="space-y-2">
                   {editAddedRecipesList.map((recipe, index) => (
-                    <div key={index} className="bg-white p-2 rounded border group hover:bg-blue-50 transition-colors">
+                    <div
+                      key={index}
+                      className="bg-white p-2 rounded border group hover:bg-blue-50 transition-colors"
+                    >
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">{recipe.name}</span>
+                          <span className="font-medium text-sm">
+                            {recipe.name}
+                          </span>
                           <Badge className="bg-indigo-100 text-indigo-700 text-xs">
                             {recipe.quantityToUse} unidades
                           </Badge>
@@ -3216,20 +3304,35 @@ const Stock = () => {
                           <X className="h-3 w-3" />
                         </Button>
                       </div>
-                      {recipe.recipe_ingredients && recipe.recipe_ingredients.length > 0 && (
-                        <div className="text-xs text-gray-600">
-                          <div className="flex flex-wrap gap-2">
-                            {recipe.recipe_ingredients.map((ri: any, riIndex: number) => {
-                              const ingredientDetails = ingredientsData.find(ing => ing.id === ri.ingredient_id);
-                              return (
-                                <span key={riIndex} className="bg-gray-100 px-2 py-1 rounded">
-                                  {ingredientDetails?.name || ri.ingredient_name}: {ri.deduct_quantity * recipe.quantityToUse} {ingredientDetails?.unit || ri.ingredient_unit}
-                                </span>
-                              );
-                            })}
+                      {recipe.recipe_ingredients &&
+                        recipe.recipe_ingredients.length > 0 && (
+                          <div className="text-xs text-gray-600">
+                            <div className="flex flex-wrap gap-2">
+                              {recipe.recipe_ingredients.map(
+                                (ri: any, riIndex: number) => {
+                                  const ingredientDetails =
+                                    ingredientsData.find(
+                                      (ing) => ing.id === ri.ingredient_id
+                                    );
+                                  return (
+                                    <span
+                                      key={riIndex}
+                                      className="bg-gray-100 px-2 py-1 rounded"
+                                    >
+                                      {ingredientDetails?.name ||
+                                        ri.ingredient_name}
+                                      :{" "}
+                                      {ri.deduct_quantity *
+                                        recipe.quantityToUse}{" "}
+                                      {ingredientDetails?.unit ||
+                                        ri.ingredient_unit}
+                                    </span>
+                                  );
+                                }
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
                     </div>
                   ))}
                 </div>
@@ -3237,45 +3340,46 @@ const Stock = () => {
             )}
 
             {/* Compact Summary Section */}
-            {(editAddedIngredientsList.length > 0 || editAddedRecipesList.length > 0) && (
+            {(editAddedIngredientsList.length > 0 ||
+              editAddedRecipesList.length > 0) && (
               <div className="border rounded-lg p-3 bg-gray-50">
                 <div className="flex items-center gap-2 mb-2">
                   <Info className="h-4 w-4 text-gray-600" />
-                  <h4 className="font-medium text-gray-900 text-sm">Resumen de Actualización</h4>
+                  <h4 className="font-medium text-gray-900 text-sm">
+                    Resumen de Actualización
+                  </h4>
                 </div>
                 <div className="text-xs text-gray-600 space-y-2">
                   <div className="flex gap-4">
                     <span className="flex items-center gap-1">
                       <Package className="h-3 w-3 text-emerald-600" />
-                      <strong>Ingredientes:</strong> {editAddedIngredientsList.length}
+                      <strong>Ingredientes:</strong>{" "}
+                      {editAddedIngredientsList.length}
                     </span>
                     <span className="flex items-center gap-1">
                       <ChefHat className="h-3 w-3 text-blue-600" />
                       <strong>Recetas:</strong> {editAddedRecipesList.length}
                     </span>
                   </div>
-                  <p className="text-gray-500">
-                    Al guardar, este producto tendrá recetas asociadas y se marcará como "has_recipe: true"
-                  </p>
                 </div>
               </div>
             )}
           </div>
 
-            {/* Description Field */}
+          {/* Description Field */}
           <div className="space-y-2">
-              <Label htmlFor="description">Descripción</Label>
-              <Textarea
-                id="description"
-                value={editingProduct?.description || ""}
-                onChange={(e) =>
-                  setEditingProduct({
-                    ...editingProduct!,
-                    description: e.target.value,
-                  })
-                }
-                placeholder="Descripción del producto"
-              />
+            <Label htmlFor="description">Descripción</Label>
+            <Textarea
+              id="description"
+              value={editingProduct?.description || ""}
+              onChange={(e) =>
+                setEditingProduct({
+                  ...editingProduct!,
+                  description: e.target.value,
+                })
+              }
+              placeholder="Descripción del producto"
+            />
           </div>
           <DialogFooter>
             <Button
@@ -3287,10 +3391,7 @@ const Stock = () => {
             >
               Cancelar
             </Button>
-            <Button
-              onClick={handleUpdateProduct}
-              disabled={isLoading}
-            >
+            <Button onClick={handleUpdateProduct} disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

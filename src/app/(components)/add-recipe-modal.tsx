@@ -427,7 +427,7 @@ export default function AddRecipeModal({
                           <div className="flex justify-between items-center w-full gap-2">
                             <span className="flex-1">{ingredient.name}</span>
                             <div className="flex items-center gap-1">
-                              <span className="text-xs text-gray-500">{ingredient.quantity} {ingredient.unit || ""}</span>
+                              <span className="text-xs text-gray-500">{ingredient.original_quantity} {ingredient.unit || ""}</span>
                               <span className={`text-xs px-1 py-0.5 rounded ${ingredient.stock > 10 ? 'bg-green-100 text-green-800' :
                                   ingredient.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
                                     'bg-red-100 text-red-800'

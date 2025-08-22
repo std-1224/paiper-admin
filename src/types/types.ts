@@ -260,8 +260,8 @@ export interface Product {
 	is_active?: boolean;
 	is_pr?: boolean;
 	is_courtsey?: boolean;
-	is_liquid?: boolean; // Toggle for liquid products
-	quantity?: number; // Total amount calculated as (total amount * stock) for ingredient-type products
+	// is_liquid?: boolean; // Toggle for liquid products
+	// quantity?: number; // Total amount calculated as (total amount * stock) for ingredient-type products
 	ingredient_id?: string; // Reference to ingredient when product is created from an active ingredient
 	recipe_id?: string; // Reference to recipe when product is created from an active recipe
 }
