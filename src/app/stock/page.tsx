@@ -132,7 +132,6 @@ const Stock = () => {
     sale_price: 0,
     type: "product", // Default type is "product"
     has_recipe: false,
-    is_liquid: false,
   });
   const [amountPerUnit, setAmountPerUnit] = useState<number>(0);
 
@@ -956,7 +955,6 @@ const Stock = () => {
       sale_price: 0,
       has_recipe: false,
       type: "product",
-      is_liquid: false,
     });
     setAmountPerUnit(0);
     setSelectedRecipeId("");
@@ -3167,7 +3165,6 @@ const Stock = () => {
                         <div className="space-y-2">
                           <Label htmlFor="amount_per_unit" className="text-sm">
                             Cantidad por unidad{" "}
-                            {editingProduct?.is_liquid ? "(ml)" : ""}
                           </Label>
                           <Input
                             id="amount_per_unit"
@@ -3175,11 +3172,7 @@ const Stock = () => {
                             min="0"
                             step="0.01"
                             value={amountPerUnit === 0 ? "" : amountPerUnit}
-                            placeholder={
-                              editingProduct?.is_liquid
-                                ? "Ej: 500 ml por botella"
-                                : "Ej: 1 unidad"
-                            }
+                            placeholder="Ej: 1 unidad"
                             onChange={(e) =>
                               setAmountPerUnit(parseFloat(e.target.value) || 0)
                             }

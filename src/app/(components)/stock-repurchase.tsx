@@ -115,7 +115,6 @@ export function StockRepurchase() {
     // Add products (except those with is_liquid: false)
     if (productsData) {
       productsData
-        .filter((product) => product.is_liquid !== false)
         .forEach((product) => {
           items.push({
             id: product.id,
