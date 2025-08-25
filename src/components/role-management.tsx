@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Dialog,
@@ -129,177 +129,47 @@ const mockStaff: Staff[] = [
 
 const permissionModules = [
   {
-    // dashboard page
     id: "dashboard",
     name: "Dashboard",
     icon: "📊",
-    permissions: [
-      { id: "dashboard_view", name: "Ver Dashboard", description: "Acceso al panel principal" }, // dashboard page permissions: READ
-      { id: "dashboard_analytics", name: "Ver Analíticas", description: "Acceso a métricas y reportes" }, // dashboard page permissions: READ
-      { id: "dashboard_export", name: "Exportar Datos", description: "Descargar reportes y datos" }, // dashboard page permissions: EXPORT
-    ],
+    description: "Acceso al panel principal y métricas"
   },
   {
-    // roles page
-    id: "users",
-    name: "Gestión de Usuarios",
+    id: "orders",
+    name: "Orders",
+    icon: "📋",
+    description: "Gestión de pedidos y órdenes"
+  },
+  {
+    id: "roles",
+    name: "Roles",
     icon: "👥",
-    permissions: [
-      { id: "users_view", name: "Ver Usuarios", description: "Listar y buscar usuarios" }, // roles page, permisisons: READ
-      { id: "users_create", name: "Crear Usuarios", description: "Registrar nuevos usuarios" }, //
-      { id: "users_edit", name: "Editar Usuarios", description: "Modificar información de usuarios" },
-      { id: "users_delete", name: "Eliminar Usuarios", description: "Desactivar o eliminar usuarios" },
-      { id: "users_roles", name: "Asignar Roles", description: "Cambiar roles de usuarios" },
-    ],
+    description: "Gestión de roles y permisos de usuarios"
   },
   {
-    // finances page
-    id: "payments",
-    name: "Sistema de Pagos",
-    icon: "💳",
-    permissions: [
-      { id: "payments_view", name: "Ver Transacciones", description: "Consultar historial de pagos" },
-      { id: "payments_process", name: "Procesar Pagos", description: "Realizar cobros y recargas" },
-      { id: "payments_refund", name: "Reembolsos", description: "Procesar devoluciones" },
-      { id: "payments_reports", name: "Reportes Financieros", description: "Generar reportes de ventas" },
-      { id: "payments_config", name: "Configurar Pagos", description: "Modificar métodos y límites" },
-    ],
+    id: "menu",
+    name: "Menu",
+    icon: "🍽️",
+    description: "Gestión del menú y productos"
   },
-  // stock page
   {
-    id: "inventory",
-    name: "Inventario",
+    id: "qr-tracking",
+    name: "QR Tracking",
+    icon: "📱",
+    description: "Seguimiento y campañas QR"
+  },
+  {
+    id: "stock",
+    name: "Stock",
     icon: "📦",
-    permissions: [
-      { id: "inventory_view", name: "Ver Inventario", description: "Consultar stock y productos" }, //stock page, menu page, permission: READ
-      { id: "inventory_edit", name: "Editar Inventario", description: "Modificar cantidades y productos" }, // stock page, menu page permission: CREATE, UPDATE, DELETE
-      { id: "inventory_orders", name: "Gestionar Pedidos", description: "Crear y gestionar órdenes" }, // orders page permission: CREATE, UPDATE, DELETE
-      { id: "inventory_suppliers", name: "Proveedores", description: "Gestionar proveedores" }, // orders page
-    ],
-  },
-  // {
-
-  //   id: "pos",
-  //   name: "Punto de Venta",
-  //   icon: "🛒",
-  //   permissions: [
-  //     { id: "pos_sales", name: "Realizar Ventas", description: "Procesar ventas en el POS" },
-  //     { id: "pos_discounts", name: "Aplicar Descuentos", description: "Autorizar descuentos especiales" },
-  //     { id: "pos_voids", name: "Anular Ventas", description: "Cancelar transacciones" },
-  //     { id: "pos_reports", name: "Reportes de Ventas", description: "Ver reportes del POS" },
-  //   ],
-  // },
-  {
-    // qr-tracking page
-    id: "events",
-    name: "Eventos y PR",
-    icon: "🎉",
-    permissions: [
-      { id: "events_view", name: "Ver Eventos", description: "Consultar calendario de eventos" },
-      { id: "events_create", name: "Crear Eventos", description: "Programar nuevos eventos" },
-      { id: "events_manage", name: "Gestionar Eventos", description: "Modificar eventos existentes" },
-      { id: "events_guestlist", name: "Lista de Invitados", description: "Gestionar accesos VIP" },
-      { id: "events_campaigns", name: "Campañas QR", description: "Crear campañas promocionales" },
-    ],
+    description: "Gestión de inventario y stock"
   },
   {
-    id: "settings",
-    name: "Configuración",
-    icon: "⚙️",
-    permissions: [
-      { id: "settings_view", name: "Ver Configuración", description: "Acceso a configuraciones" },
-      { id: "settings_edit", name: "Editar Configuración", description: "Modificar configuraciones" },
-      { id: "settings_roles", name: "Gestionar Roles", description: "Crear y editar roles" },
-      { id: "settings_system", name: "Configuración del Sistema", description: "Configuraciones avanzadas" },
-    ],
-  },
-]
-
-const mockRoles: Role[] = [
-  {
-    id: 1,
-    name: "Administrador",
-    description: "Acceso completo al sistema",
-    permissions: [
-      "dashboard_view",
-      "dashboard_analytics",
-      "dashboard_export",
-      "users_view",
-      "users_create",
-      "users_edit",
-      "users_delete",
-      "users_roles",
-      "payments_view",
-      "payments_process",
-      "payments_refund",
-      "payments_reports",
-      "payments_config",
-      "settings_view",
-      "settings_edit",
-      "settings_roles",
-      "settings_system",
-    ],
-    color: "bg-red-100 text-red-800",
-    accessLevel: "full",
-    canOverride: true,
-    maxTransactionAmount: 10000,
-    workingHours: { start: "00:00", end: "23:59" },
-    allowedDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
-  },
-  {
-    id: 2,
-    name: "Bar Manager",
-    description: "Gestión completa del área de bar",
-    permissions: [
-      "dashboard_view",
-      "inventory_view",
-      "inventory_edit",
-      "inventory_orders",
-      "pos_sales",
-      "pos_discounts",
-      "pos_reports",
-      "payments_view",
-      "payments_process",
-    ],
-    color: "bg-blue-100 text-blue-800",
-    accessLevel: "department",
-    canOverride: true,
-    maxTransactionAmount: 5000,
-    workingHours: { start: "16:00", end: "04:00" },
-    allowedDays: ["wednesday", "thursday", "friday", "saturday", "sunday"],
-  },
-  {
-    id: 3,
-    name: "Barman",
-    description: "Operación del bar y punto de venta",
-    permissions: ["pos_sales", "inventory_view", "payments_view", "payments_process"],
-    color: "bg-green-100 text-green-800",
-    accessLevel: "limited",
-    canOverride: false,
-    maxTransactionAmount: 1000,
-    workingHours: { start: "18:00", end: "04:00" },
-    allowedDays: ["thursday", "friday", "saturday", "sunday"],
-  },
-  {
-    id: 4,
-    name: "PR Manager",
-    description: "Gestión de eventos y relaciones públicas",
-    permissions: [
-      "dashboard_view",
-      "events_view",
-      "events_create",
-      "events_manage",
-      "events_guestlist",
-      "events_campaigns",
-      "users_view",
-    ],
-    color: "bg-purple-100 text-purple-800",
-    accessLevel: "department",
-    canOverride: false,
-    maxTransactionAmount: 2000,
-    workingHours: { start: "14:00", end: "02:00" },
-    allowedDays: ["wednesday", "thursday", "friday", "saturday", "sunday"],
-  },
+    id: "finances",
+    name: "Finances",
+    icon: "💰",
+    description: "Gestión financiera y reportes"
+  }
 ]
 
 // Añadamos los datos de ejemplo para el historial de cambios después de la constante mockRoles
@@ -362,6 +232,34 @@ export function RoleManagement() {
   const [currentStep, setCurrentStep] = useState(1)
   const totalSteps = 3
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
+  const [roles, setRoles] = useState<Role[]>([]) // Initialize with empty array
+  const [isLoadingRoles, setIsLoadingRoles] = useState(false)
+  const [expandedRolePermissions, setExpandedRolePermissions] = useState<Set<string | number>>(new Set())
+
+  // Fetch roles from API
+  const fetchRoles = async () => {
+    setIsLoadingRoles(true)
+    try {
+      const response = await fetch('/api/roles')
+      if (response.ok) {
+        const fetchedRoles = await response.json()
+        setRoles(fetchedRoles)
+      } else {
+        console.error('Failed to fetch roles')
+        setRoles([]) // Set empty array if API fails
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error)
+      setRoles([]) // Set empty array if API fails
+    } finally {
+      setIsLoadingRoles(false)
+    }
+  }
+
+  // Fetch roles on component mount
+  useEffect(() => {
+    fetchRoles()
+  }, [])
 
   // Form state for role editing
   const [roleForm, setRoleForm] = useState({
@@ -418,7 +316,7 @@ export function RoleManagement() {
     setRoleForm({
       name: '',
       description: '',
-      accessLevel: 'Acceso Completo',
+      accessLevel: 'full',
       maxTransactionAmount: 10000,
       canOverride: false,
       workingHours: {
@@ -498,7 +396,7 @@ export function RoleManagement() {
     setRoleForm({
       name: '',
       description: '',
-      accessLevel: 'Acceso Completo',
+      accessLevel: 'full',
       maxTransactionAmount: 10000,
       canOverride: false,
       workingHours: {
@@ -594,27 +492,95 @@ export function RoleManagement() {
     try {
       // Create the role data from form
       const roleData = {
-        ...roleForm,
-        id: selectedRole?.id || Date.now(), // Generate ID for new roles
+        name: roleForm.name,
+        description: roleForm.description,
+        accessLevel: roleForm.accessLevel,
+        maxTransactionAmount: roleForm.maxTransactionAmount,
         permissions: selectedPermissions, // Use selected permissions from wizard
-        color: selectedRole?.color || 'bg-blue-100 text-blue-800',
-        workingHours: roleForm.workingHours,
-        allowedDays: roleForm.allowedDays
       }
 
-      // Here you would implement the actual save logic
-      console.log('Saving role:', roleData)
+      let response
+      if (selectedRole) {
+        // Update existing role
+        response = await fetch('/api/roles', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: selectedRole.id,
+            ...roleData
+          }),
+        })
+      } else {
+        // Create new role
+        response = await fetch('/api/roles', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(roleData),
+        })
+      }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save role')
+      }
+
+      const savedRole = await response.json()
+      console.log('Role saved successfully:', savedRole)
 
       setSuccessMessage(`${selectedRole ? 'Rol actualizado' : 'Rol creado'} exitosamente`)
       handleCloseRoleDialog()
+
+      // Refresh the roles list
+      await fetchRoles()
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (error) {
       console.error('Error saving role:', error)
+      setSuccessMessage(`Error: ${error instanceof Error ? error.message : 'Failed to save role'}`)
+      setTimeout(() => setSuccessMessage(null), 5000)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const toggleRolePermissions = (roleId: string | number) => {
+    const newExpanded = new Set(expandedRolePermissions)
+    if (newExpanded.has(roleId)) {
+      newExpanded.delete(roleId)
+    } else {
+      newExpanded.add(roleId)
+    }
+    setExpandedRolePermissions(newExpanded)
+  }
+
+  const handleDeleteRole = async (roleId: number) => {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/roles?id=${roleId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete role')
+      }
+
+      setSuccessMessage('Rol eliminado exitosamente')
+
+      // Refresh the roles list
+      await fetchRoles()
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(null), 3000)
+    } catch (error) {
+      console.error('Error deleting role:', error)
+      setSuccessMessage(`Error: ${error instanceof Error ? error.message : 'Failed to delete role'}`)
+      setTimeout(() => setSuccessMessage(null), 5000)
     } finally {
       setIsLoading(false)
     }
@@ -628,11 +594,6 @@ export function RoleManagement() {
       staff.role.toLowerCase().includes(search)
     )
   })
-
-  const getRoleColor = (role: string) => {
-    const roleObj = mockRoles.find((r) => r.name === role)
-    return roleObj ? roleObj.color : "bg-gray-100 text-gray-800"
-  }
 
   return (
     <div className="space-y-6">
@@ -726,7 +687,7 @@ export function RoleManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getRoleColor(staff.role)}>{staff.role}</Badge>
+                        <Badge className="bg-gray-100 text-gray-800">{staff.role}</Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant={staff.status === "active" ? "default" : "secondary"}>
@@ -758,8 +719,28 @@ export function RoleManagement() {
         </TabsContent>
 
         <TabsContent value="roles" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {mockRoles.map((role) => (
+          {isLoadingRoles ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <p className="text-muted-foreground">Cargando roles...</p>
+              </div>
+            </div>
+          ) : roles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+                <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-muted-foreground mb-2">No hay roles disponibles</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Aún no se han creado roles en el sistema.
+                </p>
+                <Button onClick={handleCreateRole} className="flex items-center space-x-2">
+                  <Plus className="h-4 w-4" />
+                  <span>Crear Primer Rol</span>
+                </Button>
+              </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {roles.map((role) => (
               <Card key={role.id} className="relative">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -768,7 +749,6 @@ export function RoleManagement() {
                       {role.name}
                     </CardTitle>
                     <div className="flex items-center space-x-2">
-                      <Badge variant="outline">{mockStaff.filter((s) => s.role === role.name).length} usuarios</Badge>
                       <Button variant="ghost" size="icon" onClick={() => handleEditRole(role)}>
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -810,24 +790,45 @@ export function RoleManagement() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Permisos principales:</Label>
+                    <Label className="text-sm font-medium">Módulos de acceso:</Label>
                     <div className="flex flex-wrap gap-1">
-                      {role.permissions.slice(0, 3).map((permission) => (
-                        <Badge key={permission} variant="outline" className="text-xs">
-                          {permission.replace("_", " ")}
-                        </Badge>
-                      ))}
-                      {role.permissions.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{role.permissions.length - 3} más
-                        </Badge>
-                      )}
+                      {(() => {
+                        const isExpanded = expandedRolePermissions.has(role.id)
+                        const displayPermissions = isExpanded ? role.permissions : role.permissions.slice(0, 4)
+
+                        return (
+                          <>
+                            {displayPermissions.map((moduleId) => {
+                              const moduleData = permissionModules.find(m => m.id === moduleId)
+                              return (
+                                <Badge key={moduleId} variant="outline" className="text-xs flex items-center">
+                                  <span className="mr-1">{moduleData?.icon}</span>
+                                  {moduleData?.name || moduleId}
+                                </Badge>
+                              )
+                            })}
+                            {role.permissions.length > 4 && (
+                              <Badge
+                                variant="secondary"
+                                className="text-xs cursor-pointer hover:bg-gray-200 transition-colors"
+                                onClick={() => toggleRolePermissions(role.id)}
+                              >
+                                {isExpanded
+                                  ? "Ver menos"
+                                  : `+${role.permissions.length - 4} más`
+                                }
+                              </Badge>
+                            )}
+                          </>
+                        )
+                      })()}
                     </div>
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
+          )}
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
@@ -1037,20 +1038,12 @@ export function RoleManagement() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Nombre Completo</Label>
-                <Input id="name" defaultValue={selectedStaff?.name || ""} placeholder="Ingrese el nombre completo" />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" defaultValue={selectedStaff?.email || ""} placeholder="correo@ejemplo.com" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Teléfono</Label>
                 <Input id="phone" defaultValue={selectedStaff?.phone || ""} placeholder="+52 555 123 4567" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="department">Departamento</Label>
-                <Input id="department" defaultValue={selectedStaff?.department || ""} placeholder="Ej: Administración" />
               </div>
             </div>
 
@@ -1062,11 +1055,17 @@ export function RoleManagement() {
                     <SelectValue placeholder="Selecciona un rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockRoles.map((role) => (
-                      <SelectItem key={role.id} value={role.name}>
-                        {role.name}
+                    {roles.length > 0 ? (
+                      roles.map((role) => (
+                        <SelectItem key={role.id} value={role.name}>
+                          {role.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>
+                        No hay roles disponibles
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -1194,9 +1193,9 @@ export function RoleManagement() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Acceso Completo">Acceso Completo</SelectItem>
-                        <SelectItem value="Acceso Departamental">Acceso Departamental</SelectItem>
-                        <SelectItem value="Acceso Limitado">Acceso Limitado</SelectItem>
+                        <SelectItem value="full">Acceso Completo</SelectItem>
+                        <SelectItem value="departmental">Acceso Departamental</SelectItem>
+                        <SelectItem value="limited">Acceso Limitado</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1245,36 +1244,28 @@ export function RoleManagement() {
 
             {/* Step 2: Permissions */}
             {currentStep === 2 && (
-              <div className="space-y-6">
-                {permissionModules.map((module) => (
-                  <Card key={module.id}>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="flex items-center text-lg">
-                        <span className="mr-2">{module.icon}</span>
-                        {module.name}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {module.permissions.map((permission) => (
-                          <div key={permission.id} className="flex items-start space-x-3 p-3 border rounded-lg">
-                            <Checkbox
-                              id={permission.id}
-                              checked={selectedPermissions.includes(permission.id)}
-                              onCheckedChange={(checked) => handlePermissionChange(permission.id, checked as boolean)}
-                            />
-                            <div className="flex-1">
-                              <Label htmlFor={permission.id} className="font-medium cursor-pointer">
-                                {permission.name}
-                              </Label>
-                              <p className="text-sm text-muted-foreground mt-1">{permission.description}</p>
-                            </div>
-                          </div>
-                        ))}
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground mb-4">
+                  Selecciona los módulos a los que este rol tendrá acceso:
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {permissionModules.map((module) => (
+                    <div key={module.id} className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-gray-50">
+                      <Checkbox
+                        id={module.id}
+                        checked={selectedPermissions.includes(module.id)}
+                        onCheckedChange={(checked) => handlePermissionChange(module.id, checked as boolean)}
+                      />
+                      <div className="flex-1">
+                        <Label htmlFor={module.id} className="font-medium cursor-pointer flex items-center">
+                          <span className="mr-2">{module.icon}</span>
+                          {module.name}
+                        </Label>
+                        <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -1315,21 +1306,20 @@ export function RoleManagement() {
                     </div>
 
                     <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Permisos Seleccionados</Label>
+                      <Label className="text-sm font-medium text-muted-foreground">Módulos Seleccionados</Label>
                       <div className="flex flex-wrap gap-2 mt-2">
                         {selectedPermissions.length > 0 ? (
-                          selectedPermissions.map((permissionId) => {
-                            const permission = permissionModules
-                              .flatMap(module => module.permissions)
-                              .find(p => p.id === permissionId)
+                          selectedPermissions.map((moduleId) => {
+                            const moduleData = permissionModules.find(m => m.id === moduleId)
                             return (
-                              <Badge key={permissionId} variant="outline" className="text-xs">
-                                {permission?.name || permissionId}
+                              <Badge key={moduleId} variant="outline" className="text-xs flex items-center">
+                                <span className="mr-1">{moduleData?.icon}</span>
+                                {moduleData?.name || moduleId}
                               </Badge>
                             )
                           })
                         ) : (
-                          <p className="text-sm text-muted-foreground">No se han seleccionado permisos</p>
+                          <p className="text-sm text-muted-foreground">No se han seleccionado módulos</p>
                         )}
                       </div>
                     </div>
