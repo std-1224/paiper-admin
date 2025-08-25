@@ -129,28 +129,31 @@ const mockStaff: Staff[] = [
 
 const permissionModules = [
   {
+    // dashboard page
     id: "dashboard",
     name: "Dashboard",
     icon: "📊",
     permissions: [
-      { id: "dashboard_view", name: "Ver Dashboard", description: "Acceso al panel principal" },
-      { id: "dashboard_analytics", name: "Ver Analíticas", description: "Acceso a métricas y reportes" },
-      { id: "dashboard_export", name: "Exportar Datos", description: "Descargar reportes y datos" },
+      { id: "dashboard_view", name: "Ver Dashboard", description: "Acceso al panel principal" }, // dashboard page permissions: READ
+      { id: "dashboard_analytics", name: "Ver Analíticas", description: "Acceso a métricas y reportes" }, // dashboard page permissions: READ
+      { id: "dashboard_export", name: "Exportar Datos", description: "Descargar reportes y datos" }, // dashboard page permissions: EXPORT
     ],
   },
   {
+    // roles page
     id: "users",
     name: "Gestión de Usuarios",
     icon: "👥",
     permissions: [
-      { id: "users_view", name: "Ver Usuarios", description: "Listar y buscar usuarios" },
-      { id: "users_create", name: "Crear Usuarios", description: "Registrar nuevos usuarios" },
+      { id: "users_view", name: "Ver Usuarios", description: "Listar y buscar usuarios" }, // roles page, permisisons: READ
+      { id: "users_create", name: "Crear Usuarios", description: "Registrar nuevos usuarios" }, //
       { id: "users_edit", name: "Editar Usuarios", description: "Modificar información de usuarios" },
       { id: "users_delete", name: "Eliminar Usuarios", description: "Desactivar o eliminar usuarios" },
       { id: "users_roles", name: "Asignar Roles", description: "Cambiar roles de usuarios" },
     ],
   },
   {
+    // finances page
     id: "payments",
     name: "Sistema de Pagos",
     icon: "💳",
@@ -162,29 +165,32 @@ const permissionModules = [
       { id: "payments_config", name: "Configurar Pagos", description: "Modificar métodos y límites" },
     ],
   },
+  // stock page
   {
     id: "inventory",
     name: "Inventario",
     icon: "📦",
     permissions: [
-      { id: "inventory_view", name: "Ver Inventario", description: "Consultar stock y productos" },
-      { id: "inventory_edit", name: "Editar Inventario", description: "Modificar cantidades y productos" },
-      { id: "inventory_orders", name: "Gestionar Pedidos", description: "Crear y gestionar órdenes" },
-      { id: "inventory_suppliers", name: "Proveedores", description: "Gestionar proveedores" },
+      { id: "inventory_view", name: "Ver Inventario", description: "Consultar stock y productos" }, //stock page, menu page, permission: READ
+      { id: "inventory_edit", name: "Editar Inventario", description: "Modificar cantidades y productos" }, // stock page, menu page permission: CREATE, UPDATE, DELETE
+      { id: "inventory_orders", name: "Gestionar Pedidos", description: "Crear y gestionar órdenes" }, // orders page permission: CREATE, UPDATE, DELETE
+      { id: "inventory_suppliers", name: "Proveedores", description: "Gestionar proveedores" }, // orders page
     ],
   },
+  // {
+
+  //   id: "pos",
+  //   name: "Punto de Venta",
+  //   icon: "🛒",
+  //   permissions: [
+  //     { id: "pos_sales", name: "Realizar Ventas", description: "Procesar ventas en el POS" },
+  //     { id: "pos_discounts", name: "Aplicar Descuentos", description: "Autorizar descuentos especiales" },
+  //     { id: "pos_voids", name: "Anular Ventas", description: "Cancelar transacciones" },
+  //     { id: "pos_reports", name: "Reportes de Ventas", description: "Ver reportes del POS" },
+  //   ],
+  // },
   {
-    id: "pos",
-    name: "Punto de Venta",
-    icon: "🛒",
-    permissions: [
-      { id: "pos_sales", name: "Realizar Ventas", description: "Procesar ventas en el POS" },
-      { id: "pos_discounts", name: "Aplicar Descuentos", description: "Autorizar descuentos especiales" },
-      { id: "pos_voids", name: "Anular Ventas", description: "Cancelar transacciones" },
-      { id: "pos_reports", name: "Reportes de Ventas", description: "Ver reportes del POS" },
-    ],
-  },
-  {
+    // qr-tracking page
     id: "events",
     name: "Eventos y PR",
     icon: "🎉",
@@ -353,6 +359,9 @@ export function RoleManagement() {
   const [itemToDelete, setItemToDelete] = useState<{ type: 'staff' | 'role', item: Staff | Role } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [currentStep, setCurrentStep] = useState(1)
+  const totalSteps = 3
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
 
   // Form state for role editing
   const [roleForm, setRoleForm] = useState({
@@ -404,6 +413,8 @@ export function RoleManagement() {
   const handleCloseRoleDialog = () => {
     setIsRoleDialogOpen(false)
     setSelectedRole(null)
+    setCurrentStep(1) // Reset to first step
+    setSelectedPermissions([]) // Reset permissions
     setRoleForm({
       name: '',
       description: '',
@@ -424,6 +435,52 @@ export function RoleManagement() {
     })
   }
 
+  const handleNextStep = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1)
+    }
+  }
+
+  const handlePreviousStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1)
+    }
+  }
+
+  const canProceedToNextStep = () => {
+    switch (currentStep) {
+      case 1:
+        return roleForm.name.trim() !== '' && roleForm.description.trim() !== ''
+      case 2:
+        return true // Permissions step - always allow to proceed
+      case 3:
+        return true // Review step
+      default:
+        return false
+    }
+  }
+
+  const handlePermissionChange = (permissionId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedPermissions(prev => [...prev, permissionId])
+    } else {
+      setSelectedPermissions(prev => prev.filter(id => id !== permissionId))
+    }
+  }
+
+  const getStepTitle = () => {
+    switch (currentStep) {
+      case 1:
+        return "Información Básica"
+      case 2:
+        return "Permisos y Accesos"
+      case 3:
+        return "Revisar y Crear"
+      default:
+        return ""
+    }
+  }
+
   const handleViewStaff = (staff: Staff) => {
     setSelectedStaff(staff)
     setIsStaffDialogOpen(true)
@@ -436,6 +493,8 @@ export function RoleManagement() {
 
   const handleCreateRole = () => {
     setSelectedRole(null)
+    setCurrentStep(1) // Start from first step
+    setSelectedPermissions([]) // Reset permissions for new role
     setRoleForm({
       name: '',
       description: '',
@@ -459,6 +518,8 @@ export function RoleManagement() {
 
   const handleEditRole = (role: Role) => {
     setSelectedRole(role)
+    setCurrentStep(1) // Start from first step
+    setSelectedPermissions(role.permissions || []) // Load existing permissions
     setRoleForm({
       name: role.name,
       description: role.description,
@@ -535,10 +596,10 @@ export function RoleManagement() {
       const roleData = {
         ...roleForm,
         id: selectedRole?.id || Date.now(), // Generate ID for new roles
-        permissions: selectedRole?.permissions || [],
-        color: selectedRole?.color || '#3B82F6',
-        workingHours: selectedRole?.workingHours || { start: '18:00', end: '04:00' },
-        allowedDays: selectedRole?.allowedDays || []
+        permissions: selectedPermissions, // Use selected permissions from wizard
+        color: selectedRole?.color || 'bg-blue-100 text-blue-800',
+        workingHours: roleForm.workingHours,
+        allowedDays: roleForm.allowedDays
       }
 
       // Here you would implement the actual save logic
@@ -571,10 +632,6 @@ export function RoleManagement() {
   const getRoleColor = (role: string) => {
     const roleObj = mockRoles.find((r) => r.name === role)
     return roleObj ? roleObj.color : "bg-gray-100 text-gray-800"
-  }
-
-  const isPermissionChecked = (permissionId: string, rolePermissions: string[]) => {
-    return rolePermissions?.includes(permissionId) || false
   }
 
   return (
@@ -1078,82 +1135,116 @@ export function RoleManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="basic">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="basic">Información Básica</TabsTrigger>
-              <TabsTrigger value="permissions">Permisos</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="basic" className="space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="role-name">Nombre del Rol</Label>
-                  <Input
-                    id="role-name"
-                    value={roleForm.name}
-                    onChange={(e) => setRoleForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Ej: Supervisor de Bar"
+          {/* Step Progress Indicator */}
+          <div className="flex items-center justify-between mb-6">
+            {[1, 2, 3].map((step) => (
+              <div key={step} className="flex items-center">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    step === currentStep
+                      ? "bg-blue-600 text-white"
+                      : step < currentStep
+                      ? "bg-green-600 text-white"
+                      : "bg-gray-200 text-gray-600"
+                  }`}
+                >
+                  {step < currentStep ? "✓" : step}
+                </div>
+                {step < 3 && (
+                  <div
+                    className={`w-16 h-1 mx-2 ${
+                      step < currentStep ? "bg-green-600" : "bg-gray-200"
+                    }`}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="access-level">Nivel de Acceso</Label>
-                  <Select
-                    value={roleForm.accessLevel}
-                    onValueChange={(value) => setRoleForm(prev => ({ ...prev, accessLevel: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Acceso Completo">Acceso Completo</SelectItem>
-                      <SelectItem value="Acceso Departamental">Acceso Departamental</SelectItem>
-                      <SelectItem value="Acceso Limitado">Acceso Limitado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                )}
               </div>
+            ))}
+          </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="role-description">Descripción</Label>
-                <Textarea
-                  id="role-description"
-                  value={roleForm.description}
-                  onChange={(e) => setRoleForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Describe las responsabilidades de este rol..."
-                  rows={3}
-                />
-              </div>
+          {/* Step Title */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold">{getStepTitle()}</h3>
+            <p className="text-sm text-muted-foreground">
+              Paso {currentStep} de {totalSteps}
+            </p>
+          </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="transaction-limit">Límite de Transacción ($)</Label>
-                  <Input
-                    id="transaction-limit"
-                    type="number"
-                    value={roleForm.maxTransactionAmount}
-                    onChange={(e) => setRoleForm(prev => ({ ...prev, maxTransactionAmount: Number(e.target.value) }))}
-                    placeholder="10000"
-                    min="0"
-                    step="100"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="can-cancel-transactions">Puede Anular Transacciones</Label>
-                  <div className="flex items-center space-x-2 pt-2">
-                    <Checkbox
-                      id="can-cancel-transactions"
-                      checked={roleForm.canOverride}
-                      onCheckedChange={(checked) => setRoleForm(prev => ({ ...prev, canOverride: checked as boolean }))}
+          {/* Step Content */}
+          <div className="min-h-[400px]">
+            {/* Step 1: Basic Information */}
+            {currentStep === 1 && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="role-name">Nombre del Rol</Label>
+                    <Input
+                      id="role-name"
+                      value={roleForm.name}
+                      onChange={(e) => setRoleForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Ej: Supervisor de Bar"
                     />
-                    <Label htmlFor="can-cancel-transactions" className="text-sm font-normal">
-                      Permitir anular/modificar transacciones
-                    </Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="access-level">Nivel de Acceso</Label>
+                    <Select
+                      value={roleForm.accessLevel}
+                      onValueChange={(value) => setRoleForm(prev => ({ ...prev, accessLevel: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Acceso Completo">Acceso Completo</SelectItem>
+                        <SelectItem value="Acceso Departamental">Acceso Departamental</SelectItem>
+                        <SelectItem value="Acceso Limitado">Acceso Limitado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="role-description">Descripción</Label>
+                  <Textarea
+                    id="role-description"
+                    value={roleForm.description}
+                    onChange={(e) => setRoleForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Describe las responsabilidades de este rol..."
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="transaction-limit">Límite de Transacción ($)</Label>
+                    <Input
+                      id="transaction-limit"
+                      type="number"
+                      value={roleForm.maxTransactionAmount}
+                      onChange={(e) => setRoleForm(prev => ({ ...prev, maxTransactionAmount: Number(e.target.value) }))}
+                      placeholder="10000"
+                      min="0"
+                      step="100"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="can-cancel-transactions">Puede Anular Transacciones</Label>
+                    <div className="flex items-center space-x-2 pt-2">
+                      <Checkbox
+                        id="can-cancel-transactions"
+                        checked={roleForm.canOverride}
+                        onCheckedChange={(checked) => setRoleForm(prev => ({ ...prev, canOverride: checked as boolean }))}
+                      />
+                      <Label htmlFor="can-cancel-transactions" className="text-sm font-normal">
+                        Permitir anular/modificar transacciones
+                      </Label>
+                    </div>
                   </div>
                 </div>
               </div>
-            </TabsContent>
+            )}
 
-            <TabsContent value="permissions" className="space-y-4 pt-4">
+            {/* Step 2: Permissions */}
+            {currentStep === 2 && (
               <div className="space-y-6">
                 {permissionModules.map((module) => (
                   <Card key={module.id}>
@@ -1169,9 +1260,8 @@ export function RoleManagement() {
                           <div key={permission.id} className="flex items-start space-x-3 p-3 border rounded-lg">
                             <Checkbox
                               id={permission.id}
-                              defaultChecked={
-                                selectedRole ? isPermissionChecked(permission.id, selectedRole.permissions) : false
-                              }
+                              checked={selectedPermissions.includes(permission.id)}
+                              onCheckedChange={(checked) => handlePermissionChange(permission.id, checked as boolean)}
                             />
                             <div className="flex-1">
                               <Label htmlFor={permission.id} className="font-medium cursor-pointer">
@@ -1186,16 +1276,96 @@ export function RoleManagement() {
                   </Card>
                 ))}
               </div>
-            </TabsContent>
-          </Tabs>
+            )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseRoleDialog} disabled={isLoading}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveRole} disabled={isLoading}>
-              {isLoading ? "Guardando..." : selectedRole ? "Guardar Cambios" : "Crear Rol"}
-            </Button>
+            {/* Step 3: Review and Create */}
+            {currentStep === 3 && (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Resumen del Rol</CardTitle>
+                    <CardDescription>Revisa la información antes de crear el rol</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Nombre del Rol</Label>
+                        <p className="text-sm font-medium">{roleForm.name}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Nivel de Acceso</Label>
+                        <p className="text-sm font-medium">{roleForm.accessLevel}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Descripción</Label>
+                      <p className="text-sm">{roleForm.description}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Límite de Transacción</Label>
+                        <p className="text-sm font-medium">${roleForm.maxTransactionAmount.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Puede Anular Transacciones</Label>
+                        <p className="text-sm font-medium">{roleForm.canOverride ? "Sí" : "No"}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Permisos Seleccionados</Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedPermissions.length > 0 ? (
+                          selectedPermissions.map((permissionId) => {
+                            const permission = permissionModules
+                              .flatMap(module => module.permissions)
+                              .find(p => p.id === permissionId)
+                            return (
+                              <Badge key={permissionId} variant="outline" className="text-xs">
+                                {permission?.name || permissionId}
+                              </Badge>
+                            )
+                          })
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No se han seleccionado permisos</p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex justify-between">
+            <div>
+              {currentStep > 1 && (
+                <Button variant="outline" onClick={handlePreviousStep} disabled={isLoading}>
+                  Anterior
+                </Button>
+              )}
+            </div>
+
+            <div className="flex space-x-2">
+              <Button variant="outline" onClick={handleCloseRoleDialog} disabled={isLoading}>
+                Cancelar
+              </Button>
+
+              {currentStep < totalSteps ? (
+                <Button
+                  onClick={handleNextStep}
+                  disabled={!canProceedToNextStep() || isLoading}
+                >
+                  Siguiente
+                </Button>
+              ) : (
+                <Button onClick={handleSaveRole} disabled={isLoading}>
+                  {isLoading ? "Creando..." : selectedRole ? "Guardar Cambios" : "Crear Rol"}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
