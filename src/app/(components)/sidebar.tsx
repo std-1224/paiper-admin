@@ -33,8 +33,14 @@ import { usePathname } from "next/navigation";
 import { ExitIcon } from "@radix-ui/react-icons";
 import { useAuth } from "@/context/AuthContext";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useVenue } from "@/context/VenueContext";
-import { toast } from "sonner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const mainNavItems = [
   { id: "dashboard", title: "Inicio", icon: HomeIcon, path: "/dashboard" },
@@ -91,6 +97,7 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
   const { user, signOut } = useAuth();
   const { userPermissions, isLoadingPermissions, hasPermission } =
     useUserPermissions();
+  const { userRole, isLoadingRole } = useUserRole();
   const { venue, isLoading: isLoadingVenue } = useVenue();
 
   // Filter mainNavItems based on user permissions
@@ -234,17 +241,48 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
         </SidebarGroup>
 
         {/* User Info */}
-        <div className="flex items-center gap-2 px-2 py-2 border-t">
-          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <User className="h-4 w-4 text-blue-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-800 truncate">
-              {user?.email}
-            </p>
-            <p className="text-xs text-gray-500">Admin</p>
-          </div>
-        </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 px-2 py-2 border-t cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                  <User className="h-4 w-4 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                    {user?.email}
+                  </p>
+                  {isLoadingRole ? (
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-16"></div>
+                  ) : (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {userRole?.name || 'Sin rol asignado'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </TooltipTrigger>
+            {userRole && (
+              <TooltipContent side="top" className="max-w-xs">
+                <div className="space-y-2">
+                  <div>
+                    <p className="font-semibold text-sm">{userRole.name}</p>
+                    {userRole.description && (
+                      <p className="text-xs text-muted-foreground">{userRole.description}</p>
+                    )}
+                  </div>
+                  <div className="text-xs space-y-1">
+                    <p><span className="font-medium">Nivel:</span> {
+                      userRole.level === 'full' ? 'Completo' :
+                      userRole.level === 'departmental' ? 'Departamental' : 'Limitado'
+                    }</p>
+                    <p><span className="font-medium">Límite de transacción:</span> ${userRole.transaction_limit?.toLocaleString() || '0'}</p>
+                  </div>
+                </div>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       </SidebarFooter>
     </Sidebar>
   );
