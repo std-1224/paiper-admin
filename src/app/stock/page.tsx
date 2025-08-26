@@ -38,6 +38,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -73,6 +79,7 @@ import {
   Info,
   Package,
   ChefHat,
+  MoreHorizontal,
 } from "lucide-react";
 import { ProductDetailModal } from "@/components/products/ProductDetailModal";
 import { useAppContext } from "@/context/AppContext";
@@ -1308,8 +1315,7 @@ const Stock = () => {
 
     // Show success message with all selected bars
     toast.success(
-      `${data.quantity} unidades de ${data.product} transferidas de ${
-        data.fromBar
+      `${data.quantity} unidades de ${data.product} transferidas de ${data.fromBar
       } a ${selectedBars.join(", ")}`
     );
     // Aquí iría la lógica para crear la transferencia
@@ -1983,8 +1989,8 @@ const Stock = () => {
                           <Badge variant="outline">
                             {isProduct
                               ? categoryList.find(
-                                  (c) => c.value === product.category
-                                )?.label || product.category
+                                (c) => c.value === product.category
+                              )?.label || product.category
                               : isRecipe
                                 ? "Receta"
                                 : isIngredient
@@ -1999,10 +2005,10 @@ const Stock = () => {
                             (isIngredient &&
                               product.type === "ingredient" &&
                               product.sale_price)) && (
-                            <span className="font-medium text-green-600">
-                              ${product.sale_price?.toFixed(2) || "0.00"}
-                            </span>
-                          )}
+                              <span className="font-medium text-green-600">
+                                ${product.sale_price?.toFixed(2) || "0.00"}
+                              </span>
+                            )}
                           {isRecipe &&
                             product.is_active &&
                             recipeProducts[product.id] && (
@@ -2030,10 +2036,10 @@ const Stock = () => {
                             (isIngredient &&
                               product.type === "ingredient" &&
                               product.purchase_price)) && (
-                            <span className="font-medium text-green-600">
-                              ${product.purchase_price?.toFixed(2) || "0.00"}
-                            </span>
-                          )}
+                              <span className="font-medium text-green-600">
+                                ${product.purchase_price?.toFixed(2) || "0.00"}
+                              </span>
+                            )}
                           {isIngredient && product.type !== "ingredient" && (
                             <span className="font-medium text-green-600">
                               $
@@ -2074,7 +2080,7 @@ const Stock = () => {
                         </TableCell>
                         <TableCell>
                           {isProduct ||
-                          (isIngredient && item.type === "ingredient") ? (
+                            (isIngredient && item.type === "ingredient") ? (
                             <Badge
                               variant="outline"
                               className={
@@ -2111,45 +2117,7 @@ const Stock = () => {
                       )} */}
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                // if (
-                                //   user?.role === "barman" ||
-                                //   user?.role === "client"
-                                // ) {
-                                //   toast.error(
-                                //     "No tienes permiso para ajustar stock"
-                                //   );
-                                //   return;
-                                // }
-                                handleAssignStock(product);
-                              }}
-                            >
-                              <ArrowRightLeft className="mr-2 h-4 w-4" />
-                              Asignar
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                              onClick={() => {
-                                // if (
-                                //   user?.role === "barman" ||
-                                //   user?.role === "client"
-                                // ) {
-                                //   toast.error(
-                                //     "No tienes permiso para ajustar stock"
-                                //   );
-                                //   return;
-                                // }
-                                handleAdjustStock(product);
-                              }}
-                            >
-                              <PackagePlus className="mr-2 h-4 w-4" />
-                              Ajustar
-                            </Button>
+
 
                             {/* Edit pencil icon for all item types */}
                             <Button
@@ -2253,7 +2221,7 @@ const Stock = () => {
                                                     customQuantityPerUnit:
                                                       ri.deduct_quantity +
                                                       ri.deduct_stock *
-                                                        ingredientData.quantity,
+                                                      ingredientData.quantity,
                                                     deduct_stock:
                                                       ri.deduct_stock,
                                                     deduct_quantity:
@@ -2261,7 +2229,7 @@ const Stock = () => {
                                                     totalQuantityNeeded:
                                                       ri.deduct_quantity +
                                                       ri.deduct_stock *
-                                                        ingredientData.quantity,
+                                                      ingredientData.quantity,
                                                     id: ri.ingredient_id,
                                                   });
                                                 }
@@ -2316,7 +2284,7 @@ const Stock = () => {
                                                         parseFloat(
                                                           ing.quantity
                                                         ) /
-                                                          ingredientData.quantity
+                                                        ingredientData.quantity
                                                       ),
                                                       deduct_quantity:
                                                         parseFloat(
@@ -2359,40 +2327,82 @@ const Stock = () => {
                               }}
                               title="Editar"
                             >
-                              <Pencil className="h-4 w-4" />
+                              <Edit className="h-4 w-4" />
                             </Button>
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                              onClick={() => {
-                                // if (
-                                //   user?.role === "barman" ||
-                                //   user?.role === "manager" ||
-                                //   user?.role === "client"
-                                // ) {
-                                //   toast.error(
-                                //     "No tienes permiso para eliminar productos"
-                                //   );
-                                //   return;
-                                // }
-                                handleDeleteClick(product);
-                              }}
-                              disabled={deletingProductId === item.id}
-                            >
-                              {deletingProductId === item.id ? (
-                                <>
-                                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                                  Eliminando...
-                                </>
-                              ) : (
-                                <>
-                                  <Trash className="mr-2 h-4 w-4" />
-                                  Eliminar
-                                </>
-                              )}
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    // if (
+                                    //   user?.role === "barman" ||
+                                    //   user?.role === "client"
+                                    // ) {
+                                    //   toast.error(
+                                    //     "No tienes permiso para ajustar stock"
+                                    //   );
+                                    //   return;
+                                    // }
+                                    handleAssignStock(product);
+                                  }}
+                                  className="text-purple-600"
+                                >
+                                  <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                  Asignar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    // if (
+                                    //   user?.role === "barman" ||
+                                    //   user?.role === "client"
+                                    // ) {
+                                    //   toast.error(
+                                    //     "No tienes permiso para ajustar stock"
+                                    //   );
+                                    //   return;
+                                    // }
+                                    handleAdjustStock(product);
+                                  }}
+                                  className="text-blue-600"
+                                >
+                                  <PackagePlus className="mr-2 h-4 w-4" />
+                                  Ajustar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    // if (
+                                    //   user?.role === "barman" ||
+                                    //   user?.role === "manager" ||
+                                    //   user?.role === "client"
+                                    // ) {
+                                    //   toast.error(
+                                    //     "No tienes permiso para eliminar productos"
+                                    //   );
+                                    //   return;
+                                    // }
+                                    handleDeleteClick(product);
+                                  }}
+                                  className="text-red-600"
+                                  disabled={deletingProductId === item.id}
+                                >
+                                  {deletingProductId === item.id ? (
+                                    <>
+                                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                                      Eliminando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Trash className="mr-2 h-4 w-4" />
+                                      Eliminar
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -3335,28 +3345,28 @@ const Stock = () => {
             {/* Compact Summary Section */}
             {(editAddedIngredientsList.length > 0 ||
               editAddedRecipesList.length > 0) && (
-              <div className="border rounded-lg p-3 bg-gray-50">
-                <div className="flex items-center gap-2 mb-2">
-                  <Info className="h-4 w-4 text-gray-600" />
-                  <h4 className="font-medium text-gray-900 text-sm">
-                    Resumen de Actualización
-                  </h4>
-                </div>
-                <div className="text-xs text-gray-600 space-y-2">
-                  <div className="flex gap-4">
-                    <span className="flex items-center gap-1">
-                      <Package className="h-3 w-3 text-emerald-600" />
-                      <strong>Ingredientes:</strong>{" "}
-                      {editAddedIngredientsList.length}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <ChefHat className="h-3 w-3 text-blue-600" />
-                      <strong>Recetas:</strong> {editAddedRecipesList.length}
-                    </span>
+                <div className="border rounded-lg p-3 bg-gray-50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info className="h-4 w-4 text-gray-600" />
+                    <h4 className="font-medium text-gray-900 text-sm">
+                      Resumen de Actualización
+                    </h4>
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-2">
+                    <div className="flex gap-4">
+                      <span className="flex items-center gap-1">
+                        <Package className="h-3 w-3 text-emerald-600" />
+                        <strong>Ingredientes:</strong>{" "}
+                        {editAddedIngredientsList.length}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <ChefHat className="h-3 w-3 text-blue-600" />
+                        <strong>Recetas:</strong> {editAddedRecipesList.length}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
 
           {/* Description Field */}
