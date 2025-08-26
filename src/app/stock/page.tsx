@@ -80,11 +80,14 @@ import {
   Package,
   ChefHat,
   MoreHorizontal,
+  EyeOff,
+  Eye,
 } from "lucide-react";
 import { ProductDetailModal } from "@/components/products/ProductDetailModal";
 import { useAppContext } from "@/context/AppContext";
 import { InventoryData, Product } from "@/types/types";
 import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
 import ImageUpload from "../(components)/image-upload";
 import { Textarea } from "@/components/ui/textarea";
 import { categoryList } from "@/lib/utils";
@@ -2079,34 +2082,61 @@ const Stock = () => {
                             .length > 2 && "..."}
                         </TableCell>
                         <TableCell>
-                          {isProduct ||
-                            (isIngredient && item.type === "ingredient") ? (
-                            <Badge
-                              variant="outline"
-                              className={
-                                item.stock > 5
-                                  ? "bg-green-50 text-green-700 border-green-200"
-                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                          {/* Show status based on item type and quantity */}
+                          {isIngredient || (isProduct && product.type === "ingredient") ? (
+                            (() => {
+                              // Get quantity for ingredients and ingredient-type products
+                              let currentQuantity = 0;
+                              let originalQuantity = 0;
+                              let unit = "ml";
+
+                              if (product.type === "ingredient") {
+                                // For ingredient-type products, get data from associated ingredient
+                                const ingredient = ingredientsData.find(
+                                  (ing) => ing.product_id === product.id
+                                );
+                                if (ingredient) {
+                                  currentQuantity = ingredient.quantity || 0;
+                                  originalQuantity = ingredient.original_quantity || ingredient.quantity || 0;
+                                  unit = ingredient.unit || "ml";
+                                }
+                              } else {
+                                // For regular ingredients
+                                currentQuantity = item.quantity || 0;
+                                originalQuantity = item.original_quantity || item.quantity || 0;
+                                unit = item.unit || "ml";
                               }
-                            >
-                              {item.stock > 5 ? "En Stock" : "Falta Stock"}
-                            </Badge>
-                          ) : isRecipe ? (
-                            <Badge
-                              variant="outline"
-                              className="bg-blue-50 text-blue-700 border-blue-200"
-                            >
-                              Receta
-                            </Badge>
-                          ) : isIngredient ? (
-                            <Badge
-                              variant="outline"
-                              className="bg-green-50 text-green-700 border-green-200"
-                            >
-                              {item.quantity || 0} {item.unit || "unidad"}
-                            </Badge>
+
+                              // Show "Open" if quantity < original_quantity, "Closed" if quantity = original_quantity
+                              return currentQuantity < originalQuantity ? (
+                                // Open state: show quantity info and progress bar
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2 text-blue-600">
+                                    <Eye className="h-4 w-4" />
+                                    <span className="text-sm font-medium">Open</span>
+                                  </div>
+                                  <div className="text-xs text-gray-600">
+                                    {currentQuantity} {unit} / {originalQuantity} {unit}
+                                  </div>
+                                  <Progress
+                                    value={originalQuantity ? (currentQuantity / originalQuantity) * 100 : 0}
+                                    className="h-1 w-16"
+                                  />
+                                </div>
+                              ) : (
+                                // Closed state: quantity equals original_quantity (full/unused)
+                                <div className="flex items-center gap-2 text-gray-500">
+                                  <EyeOff className="h-4 w-4" />
+                                  <span className="text-sm">Closed</span>
+                                </div>
+                              );
+                            })()
                           ) : (
-                            <Badge variant="outline">N/A</Badge>
+                            // For regular products and recipes: always show "Closed"
+                            <div className="flex items-center gap-2 text-gray-500">
+                              <EyeOff className="h-4 w-4" />
+                              <span className="text-sm">Closed</span>
+                            </div>
                           )}
                         </TableCell>
                         {showUnredeemed && "date" in item && (
