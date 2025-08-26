@@ -36,6 +36,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import React from "react"
+import { useAuth } from "@/context/AuthContext"
 
 // Type definitions
 interface Staff {
@@ -136,53 +137,26 @@ const permissionModules = [
   }
 ]
 
-// Añadamos los datos de ejemplo para el historial de cambios después de la constante mockRoles
-const mockAuditLog = [
-  {
-    id: 1,
-    user: "Carlos Mendoza",
-    userRole: "Administrador",
-    action: "update",
-    actionType: "role",
-    targetName: "Bar Manager",
-    details: "Modificó permisos: añadió 'payments_refund', eliminó 'inventory_suppliers'",
-    timestamp: "2024-01-15 14:30:22",
-    ipAddress: "192.168.1.45",
-    status: "success",
-    changes: {
-      before: {
-        permissions: [
-          "dashboard_view",
-          "inventory_view",
-          "inventory_edit",
-          "inventory_orders",
-          "inventory_suppliers",
-          "pos_sales",
-          "pos_discounts",
-          "pos_reports",
-          "payments_view",
-          "payments_process",
-        ],
-      },
-      after: {
-        permissions: [
-          "dashboard_view",
-          "inventory_view",
-          "inventory_edit",
-          "inventory_orders",
-          "pos_sales",
-          "pos_discounts",
-          "pos_reports",
-          "payments_view",
-          "payments_process",
-          "payments_refund",
-        ],
-      },
-    },
-  },
-]
+// Interface for audit log entries
+interface AuditLogEntry {
+  id: number;
+  user: string;
+  userRole: string;
+  action: string;
+  actionType: string;
+  targetName: string;
+  details: string;
+  timestamp: string;
+  ipAddress: string;
+  status: string;
+  changes?: {
+    before?: any;
+    after?: any;
+  };
+}
 
 export function RoleManagement() {
+  const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
   const [isStaffDialogOpen, setIsStaffDialogOpen] = useState(false)
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false)
@@ -201,6 +175,40 @@ export function RoleManagement() {
   const [expandedRolePermissions, setExpandedRolePermissions] = useState<Set<string | number>>(new Set())
   const [staff, setStaff] = useState<Staff[]>([]) // Initialize with empty array
   const [isLoadingStaff, setIsLoadingStaff] = useState(false)
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([])
+  const [isLoadingAuditLog, setIsLoadingAuditLog] = useState(false)
+
+  // Helper function to get role name from audit log entry
+  const getRoleNameFromAuditLog = (log: AuditLogEntry): string => {
+    // For role operations, use the target name (which is the role name)
+    if (log.actionType === "role") {
+      return log.targetName
+    }
+
+    // For staff role assignments, extract role name from changes
+    if (log.actionType === "staff_role_assignment" && log.changes) {
+      // For updates, prefer the new role name
+      if (log.changes.after?.role_name) {
+        return log.changes.after.role_name
+      }
+      // For deletions, use the old role name
+      if (log.changes.before?.role_name) {
+        return log.changes.before.role_name
+      }
+    }
+
+    // Fallback to generic category
+    return log.actionType === "staff_role_assignment" ? "Asignación Staff" : "Roles"
+  }
+
+  // Helper function to get descriptive target info
+  const getTargetDescription = (log: AuditLogEntry): string => {
+    if (log.actionType === "role") {
+      return `Rol: ${log.targetName}`
+    }
+
+    return log.targetName
+  }
 
   // Staff form state
   const [staffForm, setStaffForm] = useState({
@@ -250,10 +258,31 @@ export function RoleManagement() {
     }
   }
 
-  // Fetch roles and staff on component mount
+  // Fetch audit log from API
+  const fetchAuditLog = async () => {
+    setIsLoadingAuditLog(true)
+    try {
+      const response = await fetch('/api/audit-log?limit=50')
+      if (response.ok) {
+        const fetchedAuditLog = await response.json()
+        setAuditLog(fetchedAuditLog)
+      } else {
+        console.error('Failed to fetch audit log')
+        setAuditLog([]) // Set empty array if API fails
+      }
+    } catch (error) {
+      console.error('Error fetching audit log:', error)
+      setAuditLog([]) // Set empty array if API fails
+    } finally {
+      setIsLoadingAuditLog(false)
+    }
+  }
+
+  // Fetch roles, staff, and audit log on component mount
   useEffect(() => {
     fetchRoles()
     fetchStaff()
+    fetchAuditLog()
   }, [])
 
   // Form state for role editing
@@ -515,6 +544,12 @@ export function RoleManagement() {
         throw new Error('Email and role are required')
       }
 
+      // Prepare current user info for audit logging
+      const currentUserInfo = user ? {
+        current_user_id: user.id,
+        current_user_email: user.email
+      } : {}
+
       let response
       if (selectedStaff) {
         // Update existing staff using role_permissions API
@@ -526,7 +561,8 @@ export function RoleManagement() {
           body: JSON.stringify({
             user_id: selectedStaff.id,
             role_id: staffForm.role_id,
-            phone: staffForm.phone
+            phone: staffForm.phone,
+            ...currentUserInfo
           }),
         })
       } else {
@@ -539,7 +575,8 @@ export function RoleManagement() {
           body: JSON.stringify({
             email: staffForm.email,
             phone: staffForm.phone,
-            role_id: staffForm.role_id
+            role_id: staffForm.role_id,
+            ...currentUserInfo
           }),
         })
       }
@@ -562,8 +599,9 @@ export function RoleManagement() {
         status: 'active'
       })
 
-      // Refresh the staff list
+      // Refresh the staff list and audit log
       await fetchStaff()
+      await fetchAuditLog()
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(null), 3000)
@@ -579,6 +617,12 @@ export function RoleManagement() {
   const handleSaveRole = async () => {
     setIsLoading(true)
     try {
+      // Prepare current user info for audit logging
+      const currentUserInfo = user ? {
+        current_user_id: user.id,
+        current_user_email: user.email
+      } : {}
+
       // Create the role data from form
       const roleData = {
         name: roleForm.name,
@@ -586,6 +630,7 @@ export function RoleManagement() {
         accessLevel: roleForm.accessLevel,
         maxTransactionAmount: roleForm.maxTransactionAmount,
         permissions: selectedPermissions, // Use selected permissions from wizard
+        ...currentUserInfo
       }
 
       let response
@@ -623,8 +668,9 @@ export function RoleManagement() {
       setSuccessMessage(`${selectedRole ? 'Rol actualizado' : 'Rol creado'} exitosamente`)
       handleCloseRoleDialog()
 
-      // Refresh the roles list
+      // Refresh the roles list and audit log
       await fetchRoles()
+      await fetchAuditLog()
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(null), 3000)
@@ -985,7 +1031,29 @@ export function RoleManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockAuditLog.map((log) => (
+                  {isLoadingAuditLog ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <div className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-2"></div>
+                          <span className="text-muted-foreground">Cargando historial...</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : auditLog.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <div className="text-center">
+                          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-medium text-muted-foreground mb-2">No hay registros de auditoría</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Los cambios en roles y permisos aparecerán aquí.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    auditLog.map((log: AuditLogEntry) => (
                     <>
                       <TableRow key={log.id} className="hover:bg-muted/50">
                         <TableCell>
@@ -1005,7 +1073,7 @@ export function RoleManagement() {
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="font-medium">{log.user}</span>
-                            <span className="text-xs text-muted-foreground">{log.userRole}</span>
+                            <span className="text-xs text-muted-foreground">{getRoleNameFromAuditLog(log)}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1018,18 +1086,13 @@ export function RoleManagement() {
                             </Badge>
                             <Badge variant="outline" className="flex items-center space-x-1">
                               <Shield className="h-3 w-3" />
-                              <span className="capitalize hidden sm:inline ml-1">
-                                {log.actionType === "role" && "Roles"}
-                                {log.actionType === "user" && "Usuarios"}
-                                {log.actionType === "inventory" && "Inventario"}
-                                {log.actionType === "pos" && "Ventas"}
-                                {log.actionType === "event" && "Eventos"}
-                                {log.actionType === "settings" && "Config"}
+                              <span className="ml-1 text-xs sm:text-sm">
+                                {getRoleNameFromAuditLog(log)}
                               </span>
                             </Badge>
                           </div>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell font-medium">{log.targetName}</TableCell>
+                        <TableCell className="hidden md:table-cell font-medium">{getTargetDescription(log)}</TableCell>
                         <TableCell className="hidden md:table-cell text-sm">{log.details}</TableCell>
                         <TableCell className="hidden md:table-cell">
                           <div className="flex flex-col">
@@ -1090,22 +1153,43 @@ export function RoleManagement() {
                                   </h4>
                                   {log.changes && (
                                     <div className="space-y-4">
-                                      <div>
-                                        <h5 className="text-xs font-medium text-muted-foreground mb-2">Antes:</h5>
-                                        <div className="bg-background rounded p-3 text-xs font-mono">
-                                          <pre className="whitespace-pre-wrap">
-{JSON.stringify({ permissions: log.changes.before.permissions }, null, 2)}
-                                          </pre>
+                                      {/* Only show "Before" section if there's a before state */}
+                                      {log.changes.before && (
+                                        <div>
+                                          <h5 className="text-xs font-medium text-muted-foreground mb-2">Antes:</h5>
+                                          <div className="bg-background rounded p-3 text-xs font-mono">
+                                            <pre className="whitespace-pre-wrap">
+{JSON.stringify(log.changes.before, null, 2)}
+                                            </pre>
+                                          </div>
                                         </div>
-                                      </div>
-                                      <div>
-                                        <h5 className="text-xs font-medium text-muted-foreground mb-2">Después:</h5>
-                                        <div className="bg-background rounded p-3 text-xs font-mono">
-                                          <pre className="whitespace-pre-wrap">
-{JSON.stringify({ permissions: log.changes.after.permissions }, null, 2)}
-                                          </pre>
+                                      )}
+
+                                      {/* Always show "After" section for creates and updates */}
+                                      {log.changes.after && (
+                                        <div>
+                                          <h5 className="text-xs font-medium text-muted-foreground mb-2">
+                                            {log.changes.before ? 'Después:' : 'Estado Creado:'}
+                                          </h5>
+                                          <div className="bg-background rounded p-3 text-xs font-mono">
+                                            <pre className="whitespace-pre-wrap">
+{JSON.stringify(log.changes.after, null, 2)}
+                                            </pre>
+                                          </div>
                                         </div>
-                                      </div>
+                                      )}
+
+                                      {/* For deletions, only show the before state */}
+                                      {!log.changes.after && log.changes.before && (
+                                        <div>
+                                          <h5 className="text-xs font-medium text-muted-foreground mb-2">Estado Eliminado:</h5>
+                                          <div className="bg-background rounded p-3 text-xs font-mono">
+                                            <pre className="whitespace-pre-wrap">
+{JSON.stringify(log.changes.before, null, 2)}
+                                            </pre>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -1115,7 +1199,8 @@ export function RoleManagement() {
                         </TableRow>
                       )}
                     </>
-                  ))}
+                  ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

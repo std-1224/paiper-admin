@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase as supabaseServerClient } from "@/lib/supabaseClient";
+import { createAuditLog, getCurrentUserInfo, getUserInfoByEmail } from '@/lib/auditLogger';
 
 // GET - Fetch all roles with their permissions
 export async function GET() {
@@ -53,12 +54,14 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { 
-      name, 
-      description, 
-      accessLevel, 
-      maxTransactionAmount, 
-      permissions = [] 
+    const {
+      name,
+      description,
+      accessLevel,
+      maxTransactionAmount,
+      permissions = [],
+      current_user_id,
+      current_user_email
     } = body
 
     // Validate required fields
@@ -78,6 +81,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get current user info for audit logging
+    let userInfo = null
+    if (current_user_id) {
+      userInfo = await getCurrentUserInfo(current_user_id)
+    } else if (current_user_email) {
+      userInfo = await getUserInfoByEmail(current_user_email)
+    }
+
     // Create the role
     const { data: role, error: roleError } = await supabaseServerClient
       .from('roles')
@@ -92,6 +103,32 @@ export async function POST(request: NextRequest) {
 
     if (roleError) {
       console.error('Error creating role:', roleError)
+
+      // Log failed attempt
+      if (userInfo) {
+        await createAuditLog({
+          user_id: userInfo.user_id,
+          user_name: userInfo.user_name,
+          user_email: userInfo.user_email,
+          user_role: userInfo.user_role,
+          action: 'create',
+          action_type: 'role',
+          target_type: 'role',
+          target_id: '00000000-0000-0000-0000-000000000000', // Placeholder since creation failed
+          target_name: name.trim(),
+          description: `Failed to create role: ${name.trim()}`,
+          changes_after: {
+            name: name.trim(),
+            description: description?.trim() || '',
+            level: accessLevel,
+            transaction_limit: parseFloat(maxTransactionAmount) || 0,
+            permissions: permissions
+          },
+          status: 'failed',
+          error_message: roleError.message
+        })
+      }
+
       if (roleError.code === '23505') { // Unique constraint violation
         return NextResponse.json(
           { error: 'A role with this name already exists' },
@@ -126,6 +163,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Log successful role creation (no "before" state for new roles)
+    if (userInfo) {
+      await createAuditLog({
+        user_id: userInfo.user_id,
+        user_name: userInfo.user_name,
+        user_email: userInfo.user_email,
+        user_role: userInfo.user_role,
+        action: 'create',
+        action_type: 'role',
+        target_type: 'role',
+        target_id: role.id,
+        target_name: role.name,
+        description: `Created new role: ${role.name}`,
+        changes_before: null, // No previous state for new role
+        changes_after: {
+          name: role.name,
+          description: role.description,
+          level: role.level,
+          transaction_limit: parseFloat(role.transaction_limit),
+          permissions: permissions
+        },
+        status: 'success'
+      })
+    }
+
     // Return the created role with permissions
     const createdRole = {
       id: role.id,
@@ -156,13 +218,15 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { 
+    const {
       id,
-      name, 
-      description, 
-      accessLevel, 
-      maxTransactionAmount, 
-      permissions = [] 
+      name,
+      description,
+      accessLevel,
+      maxTransactionAmount,
+      permissions = [],
+      current_user_id,
+      current_user_email
     } = body
 
     // Validate required fields
@@ -179,6 +243,35 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Get current user info for audit logging
+    let userInfo = null
+    if (current_user_id) {
+      userInfo = await getCurrentUserInfo(current_user_id)
+    } else if (current_user_email) {
+      userInfo = await getUserInfoByEmail(current_user_email)
+    }
+
+    // Get the current role data before updating for audit log
+    const { data: currentRole, error: currentRoleError } = await supabaseServerClient
+      .from('roles')
+      .select(`
+        *,
+        permissions (
+          module
+        )
+      `)
+      .eq('id', id)
+      .single()
+
+    if (currentRoleError || !currentRole) {
+      return NextResponse.json(
+        { error: 'Role not found' },
+        { status: 404 }
+      )
+    }
+
+    const currentPermissions = currentRole.permissions?.map((p: any) => p.module) || []
 
     // Update the role
     const { data: role, error: roleError } = await supabaseServerClient
@@ -241,6 +334,37 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Log successful role update
+    if (userInfo) {
+      await createAuditLog({
+        user_id: userInfo.user_id,
+        user_name: userInfo.user_name,
+        user_email: userInfo.user_email,
+        user_role: userInfo.user_role,
+        action: 'update',
+        action_type: 'role',
+        target_type: 'role',
+        target_id: role.id,
+        target_name: role.name,
+        description: `Updated role: ${role.name}`,
+        changes_before: {
+          name: currentRole.name,
+          description: currentRole.description,
+          level: currentRole.level,
+          transaction_limit: parseFloat(currentRole.transaction_limit),
+          permissions: currentPermissions
+        },
+        changes_after: {
+          name: role.name,
+          description: role.description,
+          level: role.level,
+          transaction_limit: parseFloat(role.transaction_limit),
+          permissions: permissions
+        },
+        status: 'success'
+      })
+    }
+
     // Return the updated role with permissions
     const updatedRole = {
       id: role.id,
@@ -279,6 +403,30 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Get current user info for audit logging
+    const userInfo = await getCurrentUserInfo()
+
+    // Get the role data before deletion for audit log
+    const { data: roleToDelete, error: getRoleError } = await supabaseServerClient
+      .from('roles')
+      .select(`
+        *,
+        permissions (
+          module
+        )
+      `)
+      .eq('id', id)
+      .single()
+
+    if (getRoleError || !roleToDelete) {
+      return NextResponse.json(
+        { error: 'Role not found' },
+        { status: 404 }
+      )
+    }
+
+    const rolePermissionsData = roleToDelete.permissions?.map((p: any) => p.module) || []
 
     // Step 1: Get all users with this role_id from role_permissions
     const { data: rolePermissions, error: getRolePermissionsError } = await supabaseServerClient
@@ -355,6 +503,31 @@ export async function DELETE(request: NextRequest) {
         { error: 'Failed to delete role' },
         { status: 500 }
       )
+    }
+
+    // Log successful role deletion
+    if (userInfo) {
+      await createAuditLog({
+        user_id: userInfo.user_id,
+        user_name: userInfo.user_name,
+        user_email: userInfo.user_email,
+        user_role: userInfo.user_role,
+        action: 'delete',
+        action_type: 'role',
+        target_type: 'role',
+        target_id: roleToDelete.id,
+        target_name: roleToDelete.name,
+        description: `Deleted role: ${roleToDelete.name} (affected ${rolePermissions?.length || 0} users)`,
+        changes_before: {
+          name: roleToDelete.name,
+          description: roleToDelete.description,
+          level: roleToDelete.level,
+          transaction_limit: parseFloat(roleToDelete.transaction_limit),
+          permissions: rolePermissionsData,
+          affected_users: rolePermissions?.length || 0
+        },
+        status: 'success'
+      })
     }
 
     return NextResponse.json({

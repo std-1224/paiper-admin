@@ -133,12 +133,19 @@ export default function Dashboard() {
         (order) => new Date(order.created_at) >= last24Hours
       );
 
-      // Calculate sales totals
-      const todayTotalSales = todayOrders.reduce(
+      // Calculate sales totals - only count delivered orders (approved sales)
+      const todayDeliveredOrders = todayOrders.filter(
+        (order) => order.status === "delivered"
+      );
+      const yesterdayDeliveredOrders = yesterdayOrders.filter(
+        (order) => order.status === "delivered"
+      );
+
+      const todayTotalSales = todayDeliveredOrders.reduce(
         (sum, order) => sum + (order.total_amount || 0),
         0
       );
-      const yesterdayTotalSales = yesterdayOrders.reduce(
+      const yesterdayTotalSales = yesterdayDeliveredOrders.reduce(
         (sum, order) => sum + (order.total_amount || 0),
         0
       );

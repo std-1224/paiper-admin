@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ApprovalStatus } from "@/types/types";
 import { supabase as supabaseServerClient } from "@/lib/supabaseClient";
+import { createAuditLog, getCurrentUserInfo, getUserInfoByEmail } from '@/lib/auditLogger';
 
 // GET - Fetch role permissions for a user OR all staff members
 export async function GET(request: NextRequest) {
@@ -277,7 +278,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, phone, role_id } = body;
+    const { email, phone, role_id, current_user_id, current_user_email } = body;
 
     // Validate required fields
     if (!email || !role_id) {
@@ -287,10 +288,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get current user info for audit logging
+    let userInfo = null
+    if (current_user_id) {
+      userInfo = await getCurrentUserInfo(current_user_id)
+    } else if (current_user_email) {
+      userInfo = await getUserInfoByEmail(current_user_email)
+    }
+
     // Step 1: Find profile by email
     const { data: profile, error: profileError } = await supabaseServerClient
       .from("profiles")
-      .select("id, email, role")
+      .select("id, email, role, name")
       .eq("email", email.toLowerCase().trim())
       .single();
 
@@ -301,16 +310,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Get role information
+    // Step 2: Get role information with permissions
     const { data: role, error: roleError } = await supabaseServerClient
       .from("roles")
-      .select("id, name")
+      .select(`
+        id,
+        name,
+        permissions (
+          module
+        )
+      `)
       .eq("id", role_id)
       .single();
 
     if (roleError || !role) {
       return NextResponse.json({ error: "Role not found" }, { status: 404 });
     }
+
+    const rolePermissionsData = role.permissions?.map((p: any) => p.module) || []
 
     // Step 3: Update profile with role and phone
     const updateData: any = {
@@ -362,6 +379,31 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Log successful staff role assignment (creation - no "before" state)
+    if (userInfo) {
+      await createAuditLog({
+        user_id: userInfo.user_id,
+        user_name: userInfo.user_name,
+        user_email: userInfo.user_email,
+        user_role: userInfo.user_role,
+        action: 'create',
+        action_type: 'staff_role_assignment',
+        target_type: 'user',
+        target_id: profile.id,
+        target_name: profile.name || profile.email.split('@')[0],
+        description: `Assigned role "${role.name}" to user: ${profile.name || profile.email}`,
+        changes_before: null, // No previous state for new staff assignment
+        changes_after: {
+          role_name: role.name,
+          permissions: rolePermissionsData,
+          phone: phone?.trim() || null,
+          approval_status: 'approved'
+        },
+        status: 'success'
+      })
+    }
+
     // Return the created staff member information
     const staffMember = {
       id: profile.id,
@@ -386,7 +428,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { user_id, role_id } = body;
+    const { user_id, role_id, current_user_id, current_user_email } = body;
 
     // Validate required fields
     if (!user_id || !role_id) {
@@ -395,7 +437,63 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       );
     }
-    // Insert new role permissions
+
+    // Get current user info for audit logging
+    let userInfo = null
+    if (current_user_id) {
+      userInfo = await getCurrentUserInfo(current_user_id)
+    } else if (current_user_email) {
+      userInfo = await getUserInfoByEmail(current_user_email)
+    }
+
+    // Get current role assignment for audit log
+    const { data: currentRolePermission } = await supabaseServerClient
+      .from("role_permissions")
+      .select(`
+        role_id,
+        roles (
+          id,
+          name,
+          permissions (
+            module
+          )
+        )
+      `)
+      .eq("user_id", user_id)
+      .single()
+
+    // Get target user info
+    const { data: targetUser, error: targetUserError } = await supabaseServerClient
+      .from("profiles")
+      .select("id, name, email")
+      .eq("id", user_id)
+      .single()
+
+    // Get new role info
+    const { data: newRole, error: newRoleError } = await supabaseServerClient
+      .from("roles")
+      .select(`
+        id,
+        name,
+        permissions (
+          module
+        )
+      `)
+      .eq("id", role_id)
+      .single()
+
+    if (targetUserError || !targetUser || newRoleError || !newRole) {
+      return NextResponse.json(
+        { error: "User or role not found" },
+        { status: 404 }
+      );
+    }
+
+    const oldRoleData = currentRolePermission?.roles as any
+    const oldPermissions = oldRoleData?.permissions?.map((p: any) => p.module) || []
+    const newPermissions = newRole.permissions?.map((p: any) => p.module) || []
+
+    // Update role permissions
     const { error: insertError } = await supabaseServerClient
       .from("role_permissions")
       .update({ role_id })
@@ -407,6 +505,31 @@ export async function PUT(request: NextRequest) {
         { error: "Failed to update role permissions" },
         { status: 500 }
       );
+    }
+
+    // Log successful staff role update
+    if (userInfo) {
+      await createAuditLog({
+        user_id: userInfo.user_id,
+        user_name: userInfo.user_name,
+        user_email: userInfo.user_email,
+        user_role: userInfo.user_role,
+        action: 'update',
+        action_type: 'staff_role_assignment',
+        target_type: 'user',
+        target_id: targetUser.id,
+        target_name: targetUser.name || targetUser.email.split('@')[0],
+        description: `Changed role for user "${targetUser.name || targetUser.email}" from "${oldRoleData?.name || 'Unknown'}" to "${newRole.name}"`,
+        changes_before: {
+          role_name: oldRoleData?.name || 'Unknown',
+          permissions: oldPermissions
+        },
+        changes_after: {
+          role_name: newRole.name,
+          permissions: newPermissions
+        },
+        status: 'success'
+      })
     }
 
     return NextResponse.json({
@@ -435,13 +558,17 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Get current user info for audit logging
+    const userInfo = await getCurrentUserInfo()
+
     let profileId = userId;
+    let targetUser = null;
 
     // If email provided, find the profile
     if (!userId && email) {
       const { data: profile, error: profileError } = await supabaseServerClient
         .from("profiles")
-        .select("id")
+        .select("id, name, email")
         .eq("email", email.toLowerCase().trim())
         .single();
 
@@ -453,6 +580,23 @@ export async function DELETE(request: NextRequest) {
       }
 
       profileId = profile.id;
+      targetUser = profile;
+    } else if (userId) {
+      // Get user info by ID
+      const { data: profile, error: profileError } = await supabaseServerClient
+        .from("profiles")
+        .select("id, name, email")
+        .eq("id", userId)
+        .single();
+
+      if (profileError || !profile) {
+        return NextResponse.json(
+          { error: "Profile not found" },
+          { status: 404 }
+        );
+      }
+
+      targetUser = profile;
     }
 
     // Step 1: Find profile using user_id (already done above)
@@ -474,10 +618,19 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Step 3: Get the user's current role_permissions to find role_id
+    // Step 3: Get the user's current role_permissions to find role_id with role details
     const { data: currentRolePermissions, error: getRolePermissionsError } = await supabaseServerClient
       .from("role_permissions")
-      .select("role_id")
+      .select(`
+        role_id,
+        roles (
+          id,
+          name,
+          permissions (
+            module
+          )
+        )
+      `)
       .eq("user_id", profileId)
       .limit(1);
 
@@ -520,6 +673,31 @@ export async function DELETE(request: NextRequest) {
           { status: 500 }
         );
       }
+    }
+
+    // Log successful staff role removal
+    if (userInfo && targetUser && currentRolePermissions && currentRolePermissions.length > 0) {
+      const roleData = currentRolePermissions[0].roles as any
+      const permissions = roleData?.permissions?.map((p: any) => p.module) || []
+
+      await createAuditLog({
+        user_id: userInfo.user_id,
+        user_name: userInfo.user_name,
+        user_email: userInfo.user_email,
+        user_role: userInfo.user_role,
+        action: 'delete',
+        action_type: 'staff_role_assignment',
+        target_type: 'user',
+        target_id: targetUser.id,
+        target_name: targetUser.name || targetUser.email.split('@')[0],
+        description: `Removed role "${roleData?.name || 'Unknown'}" from user: ${targetUser.name || targetUser.email}`,
+        changes_before: {
+          role_name: roleData?.name || 'Unknown',
+          permissions: permissions,
+          approval_status: 'approved'
+        },
+        status: 'success'
+      })
     }
 
     return NextResponse.json({
