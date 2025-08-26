@@ -866,6 +866,7 @@ export function RoleManagement() {
                       <Button variant="ghost" size="icon" onClick={() => handleEditRole(role)}>
                         <Edit className="h-4 w-4" />
                       </Button>
+                      {role.name ! == "Owner" && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -875,6 +876,7 @@ export function RoleManagement() {
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                      )}
                     </div>
                   </div>
                   <CardDescription>{role.description}</CardDescription>
