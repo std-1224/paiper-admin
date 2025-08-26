@@ -173,10 +173,10 @@ export function BarVisualization({ className }: BarVisualizationProps) {
                   className="hover:text-red-600 absolute top-[2px] right-[2px] padding-0"
                   size="icon"
                   onClick={(e) => {
-                    if(user?.role === "client" || user?.role === "manager") {
-                      toast.error("No tienes permiso para eliminar barras");
-                      return;
-                    }
+                    // if(user?.role === "client" || user?.role === "manager") {
+                    //   toast.error("No tienes permiso para eliminar barras");
+                    //   return;
+                    // }
                     e.stopPropagation();
                     e.preventDefault();
                     handleDeleteOrder(bar?.id);
@@ -214,10 +214,10 @@ export function BarVisualization({ className }: BarVisualizationProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if(user?.role === "client" || user?.role === "manager") {
-                      toast.error("No tienes permiso para ver detalles de barras");
-                      return;
-                    }
+                    // if(user?.role === "client" || user?.role === "manager") {
+                    //   toast.error("No tienes permiso para ver detalles de barras");
+                    //   return;
+                    // }
                     handleViewBarDetail(bar?.id || "1")
                   }}
                 >
