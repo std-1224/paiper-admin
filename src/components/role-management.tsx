@@ -714,7 +714,7 @@ export function RoleManagement() {
         <TabsList>
           <TabsTrigger value="staff">Personal</TabsTrigger>
           <TabsTrigger value="roles">Roles y Permisos</TabsTrigger>
-          {/* <TabsTrigger value="history">Historial de Cambios</TabsTrigger> */}
+          <TabsTrigger value="history">Historial de Cambios</TabsTrigger>
         </TabsList>
 
         <TabsContent value="staff" className="space-y-4">
@@ -947,7 +947,7 @@ export function RoleManagement() {
           )}
         </TabsContent>
 
-        {/* <TabsContent value="history" className="space-y-4">
+        <TabsContent value="history" className="space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1120,7 +1120,7 @@ export function RoleManagement() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent> */}
+        </TabsContent>
       </Tabs>
 
       {/* Staff Dialog */}
