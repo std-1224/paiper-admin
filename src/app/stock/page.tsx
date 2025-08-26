@@ -44,6 +44,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -82,6 +89,10 @@ import {
   MoreHorizontal,
   EyeOff,
   Eye,
+  QrCode,
+  Users,
+  Clock,
+  Edit2Icon,
 } from "lucide-react";
 import { ProductDetailModal } from "@/components/products/ProductDetailModal";
 import { useAppContext } from "@/context/AppContext";
@@ -285,6 +296,10 @@ const Stock = () => {
     null
   );
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // Bar sidebar states
+  const [barSidebarOpen, setBarSidebarOpen] = useState(false);
+  const [selectedBarForSidebar, setSelectedBarForSidebar] = useState<any>(null);
 
   // Recipe and Ingredient edit modal states
   const [recipeDetailOpen, setRecipeDetailOpen] = useState(false);
@@ -557,6 +572,13 @@ const Stock = () => {
       // For regular products, use the existing product detail modal
       viewProductDetail(product);
     }
+  };
+
+  // Handle opening bar sidebar
+  const handleBarClick = (barId: string, barName: string) => {
+    const bar = barsData.find(b => b.id?.toString() === barId);
+    setSelectedBarForSidebar(bar || { id: barId, name: barName });
+    setBarSidebarOpen(true);
   };
 
   // Helper function to extract quantity and unit from description (matching stock-management)
@@ -2071,7 +2093,7 @@ const Stock = () => {
                                   variant="link"
                                   className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800"
                                   onClick={() =>
-                                    router.push(`/bars/${s.barId}`)
+                                    handleBarClick(s.barId?.toString() || '', s.barName || '')
                                   }
                                 >
                                   {`${s.barName} (${s.quantity})`}
@@ -3437,6 +3459,158 @@ const Stock = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bar Details Sidebar */}
+      <Sheet open={barSidebarOpen} onOpenChange={setBarSidebarOpen}>
+        <SheetContent className="sm:min-w-[800px] w-full overflow-y-auto" side="right">
+          <SheetHeader className="pb-4">
+            <SheetTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              {selectedBarForSidebar?.name || 'Bar Details'}
+            </SheetTitle>
+            <SheetDescription>
+              Información detallada y estadísticas de la barra
+            </SheetDescription>
+          </SheetHeader>
+
+          {selectedBarForSidebar && (
+            <div className="space-y-6">
+              {/* Bar Stats Cards */}
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold">$82,350</div>
+                    <p className="text-xs text-muted-foreground">Ventas del mes</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold">875</div>
+                    <p className="text-xs text-muted-foreground">Pedidos</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold">42</div>
+                    <p className="text-xs text-muted-foreground">Productos</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold">5</div>
+                    <p className="text-xs text-muted-foreground">Staff</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Performance Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Rendimiento Reciente</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-medium mb-2">Categorías más vendidas</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Bebidas alcohólicas</span>
+                          <span className="font-medium">64%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Bebidas sin alcohol</span>
+                          <span className="font-medium">21%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Energizantes</span>
+                          <span className="font-medium">15%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium mb-2">Productos top</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Gin Tonic</span>
+                          <span className="font-medium">145</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Cerveza</span>
+                          <span className="font-medium">132</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Fernet con Coca</span>
+                          <span className="font-medium">98</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Bar Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Información de la Barra</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-medium mb-2">Códigos QR</h4>
+                      <div className="flex items-center">
+                        <QrCode className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <span className="text-sm">3 códigos activos</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium mb-2">Personal</h4>
+                      <div className="flex items-center">
+                        <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <span className="text-sm">5 empleados activos</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium mb-2">Horas de Operación</h4>
+                      <div className="flex items-center">
+                        <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <span className="text-sm">Jueves a Domingo: 21:00 - 05:00</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setBarSidebarOpen(false);
+                    // Navigate to full bar page
+                    window.location.href = `/bars/${selectedBarForSidebar.id}`;
+                  }}
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  Ver Detalles Completos
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setBarSidebarOpen(false);
+                  }}
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  View Product Modal
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 };
