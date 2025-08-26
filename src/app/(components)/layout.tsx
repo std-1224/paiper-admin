@@ -21,6 +21,7 @@ import BalanceRechargeForm from "./balance-recharge-form";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "./ProtectedRoute";
 import { RouteProtection } from "@/components/RouteProtection";
+import { VenueProvider } from "@/context/VenueContext";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import Loading from "./loading";
@@ -203,18 +204,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <RouteProtection>
       <ProtectedRoute allowedRoles={["admin"]}>
-        <AppSidebar
-          toggleTheme={toggleTheme}
-          isDarkMode={isDarkMode}
-        />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <Header
-            setIsNotificationsOpen={setIsNotificationsOpen}
+        <VenueProvider>
+          <AppSidebar
+            toggleTheme={toggleTheme}
+            isDarkMode={isDarkMode}
           />
-          <main className="overflow-y-auto dark:bg-gray-950 flex-1 p-4 md:p-8 overflow-auto">
-            {children}
-          </main>
-        </div>
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <Header
+              setIsNotificationsOpen={setIsNotificationsOpen}
+            />
+            <main className="overflow-y-auto dark:bg-gray-950 flex-1 p-4 md:p-8 overflow-auto">
+              {children}
+            </main>
+          </div>
+        </VenueProvider>
 
       {/* Notifications Sidebar Modal */}
       <Sheet open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>

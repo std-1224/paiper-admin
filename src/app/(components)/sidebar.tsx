@@ -33,6 +33,7 @@ import { usePathname } from "next/navigation";
 import { ExitIcon } from "@radix-ui/react-icons";
 import { useAuth } from "@/context/AuthContext";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { useVenue } from "@/context/VenueContext";
 import { toast } from "sonner";
 
 const mainNavItems = [
@@ -88,10 +89,12 @@ interface AppSidebarProps {
 export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
-  const { userPermissions, isLoadingPermissions, hasPermission } = useUserPermissions();
+  const { userPermissions, isLoadingPermissions, hasPermission } =
+    useUserPermissions();
+  const { venue, isLoading: isLoadingVenue } = useVenue();
 
   // Filter mainNavItems based on user permissions
-  const filteredNavItems = mainNavItems.filter(item => {
+  const filteredNavItems = mainNavItems.filter((item) => {
     // If still loading permissions, show all items
     if (isLoadingPermissions) {
       return true;
@@ -99,7 +102,7 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
 
     // If no permissions, only show dashboard
     if (userPermissions.length === 0) {
-      return item.id === 'dashboard';
+      return item.id === "dashboard";
     }
 
     // Check if user has permission for this module
@@ -164,6 +167,24 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
       <SidebarFooter className="p-4 border-t">
         <SidebarGroup>
           <SidebarGroupContent>
+            {/* Venue Name Display */}
+            <div className="flex flex-col">
+              {isLoadingVenue ? (
+                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              ) : venue ? (
+                <>
+                  <h1 className="text-xl font-bold text-blue-800 dark:text-blue-200 tracking-wide">
+                    {venue.name}
+                  </h1>
+                  {venue.description && (
+                    <p className="text-xs text-blue-600 dark:text-blue-300 mt-1 opacity-80">
+                      {venue.description}
+                    </p>
+                  )}
+                </>
+              ) : null}
+            </div>
+
             <SidebarMenu>
               {/* Configuration - only show if user has configuration permission */}
               {(isLoadingPermissions || hasPermission("configuration")) && (

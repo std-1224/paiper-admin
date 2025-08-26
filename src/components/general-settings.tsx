@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Settings } from "lucide-react";
+import { Bell, Shield, Palette } from "lucide-react";
+import { VenueSettings } from "@/components/VenueSettings";
 
 export function GeneralSettings() {
   return (
@@ -25,48 +27,9 @@ export function GeneralSettings() {
           Configuraciones básicas del sistema
         </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Settings className="mr-2 h-5 w-5" />
-            Información del Venue
-          </CardTitle>
-          <CardDescription>Datos básicos del establecimiento</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="venue-name">Nombre del Venue</Label>
-            <Input id="venue-name" defaultValue="Club Paradise" />
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="venue-description">Descripción</Label>
-            <Textarea
-              id="venue-description"
-              defaultValue="El mejor club nocturno de la ciudad"
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="opening-time">Hora de Apertura</Label>
-              <Input id="opening-time" type="time" defaultValue="18:00" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="closing-time">Hora de Cierre</Label>
-              <Input id="closing-time" type="time" defaultValue="04:00" />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="max-capacity">Capacidad Máxima</Label>
-            <Input id="max-capacity" type="number" defaultValue="500" />
-          </div>
-
-          <Button className="w-full">Guardar Información</Button>
-        </CardContent>
-      </Card>
+      {/* Venue Settings */}
+      <VenueSettings />
 
       <Card>
         <CardHeader>
