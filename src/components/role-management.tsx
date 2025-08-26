@@ -866,7 +866,7 @@ export function RoleManagement() {
                       <Button variant="ghost" size="icon" onClick={() => handleEditRole(role)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      {role.name ! == "Owner" && (
+                      {role.name === "Owner" && (
                       <Button
                         variant="ghost"
                         size="icon"
