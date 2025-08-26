@@ -49,6 +49,25 @@ interface Staff {
   avatar: string
   joinDate: string
   department: string
+  roleDetails: {
+    id: number
+    name: string
+    description: string
+    level: string
+    transaction_limit: number
+  }
+  permissions: {
+    id: number
+    module: string
+    role_id: number
+  }[]
+  rolePermissions: {
+    id: number
+    user_id: number
+    role_id: number
+    created_at: string
+    updated_at: string
+  }[]
 }
 
 interface Role {
@@ -64,68 +83,7 @@ interface Role {
   allowedDays: string[]
 }
 
-const mockStaff: Staff[] = [
-  {
-    id: 1,
-    name: "Carlos Mendoza",
-    email: "carlos@clubparadise.com",
-    phone: "+52 555 123 4567",
-    role: "Administrador",
-    status: "active",
-    lastLogin: "2024-01-15 14:30",
-    avatar: "/placeholder.svg?height=40&width=40",
-    joinDate: "2023-06-15",
-    department: "Administración",
-  },
-  {
-    id: 2,
-    name: "Ana García",
-    email: "ana.garcia@clubparadise.com",
-    phone: "+52 555 234 5678",
-    role: "Bar Manager",
-    status: "active",
-    lastLogin: "2024-01-15 12:15",
-    avatar: "/placeholder.svg?height=40&width=40",
-    joinDate: "2023-08-20",
-    department: "Bar",
-  },
-  {
-    id: 3,
-    name: "Miguel Torres",
-    email: "miguel.torres@clubparadise.com",
-    phone: "+52 555 345 6789",
-    role: "Barman",
-    status: "active",
-    lastLogin: "2024-01-15 10:45",
-    avatar: "/placeholder.svg?height=40&width=40",
-    joinDate: "2023-09-10",
-    department: "Bar",
-  },
-  {
-    id: 4,
-    name: "Sofia Ruiz",
-    email: "sofia.ruiz@clubparadise.com",
-    phone: "+52 555 456 7890",
-    role: "PR Manager",
-    status: "active",
-    lastLogin: "2024-01-15 16:20",
-    avatar: "/placeholder.svg?height=40&width=40",
-    joinDate: "2023-07-05",
-    department: "Marketing",
-  },
-  {
-    id: 5,
-    name: "Diego López",
-    email: "diego.lopez@clubparadise.com",
-    phone: "+52 555 567 8901",
-    role: "Barman",
-    status: "inactive",
-    lastLogin: "2024-01-10 22:30",
-    avatar: "/placeholder.svg?height=40&width=40",
-    joinDate: "2023-11-12",
-    department: "Bar",
-  },
-]
+
 
 const permissionModules = [
   {
@@ -167,6 +125,12 @@ const permissionModules = [
   {
     id: "finances",
     name: "Finances",
+    icon: "💰",
+    description: "Gestión financiera y reportes"
+  },
+  {
+    id: "configuration",
+    name: "Configuration",
     icon: "💰",
     description: "Gestión financiera y reportes"
   }
@@ -235,6 +199,16 @@ export function RoleManagement() {
   const [roles, setRoles] = useState<Role[]>([]) // Initialize with empty array
   const [isLoadingRoles, setIsLoadingRoles] = useState(false)
   const [expandedRolePermissions, setExpandedRolePermissions] = useState<Set<string | number>>(new Set())
+  const [staff, setStaff] = useState<Staff[]>([]) // Initialize with empty array
+  const [isLoadingStaff, setIsLoadingStaff] = useState(false)
+
+  // Staff form state
+  const [staffForm, setStaffForm] = useState({
+    email: '',
+    phone: '',
+    role_id: '',
+    status: 'active'
+  })
 
   // Fetch roles from API
   const fetchRoles = async () => {
@@ -256,9 +230,30 @@ export function RoleManagement() {
     }
   }
 
-  // Fetch roles on component mount
+  // Fetch staff from API
+  const fetchStaff = async () => {
+    setIsLoadingStaff(true)
+    try {
+      const response = await fetch('/api/role_permissions?all_staff=true')
+      if (response.ok) {
+        const fetchedStaff = await response.json()
+        setStaff(fetchedStaff)
+      } else {
+        console.error('Failed to fetch staff')
+        setStaff([]) // Set empty array if API fails
+      }
+    } catch (error) {
+      console.error('Error fetching staff:', error)
+      setStaff([]) // Set empty array if API fails
+    } finally {
+      setIsLoadingStaff(false)
+    }
+  }
+
+  // Fetch roles and staff on component mount
   useEffect(() => {
     fetchRoles()
+    fetchStaff()
   }, [])
 
   // Form state for role editing
@@ -382,11 +377,28 @@ export function RoleManagement() {
   const handleViewStaff = (staff: Staff) => {
     setSelectedStaff(staff)
     setIsStaffDialogOpen(true)
+    // Find the role ID from the role name
+    const selectedRole = roles.find(role => role.name === staff.role)
+    // Populate form with existing staff data
+    setStaffForm({
+      email: staff.email,
+      phone: staff.phone,
+      role_id: selectedRole?.id?.toString() || '',
+      status: staff.status
+    })
   }
+
+
 
   const handleNewStaff = () => {
     setSelectedStaff(null)
     setIsStaffDialogOpen(true)
+    setStaffForm({
+      email: '',
+      phone: '',
+      role_id: '',
+      status: 'active'
+    })
   }
 
   const handleCreateRole = () => {
@@ -445,13 +457,41 @@ export function RoleManagement() {
     if (itemToDelete) {
       setIsLoading(true)
       try {
-        // Here you would implement the actual delete logic
-        console.log(`Deleting ${itemToDelete.type}:`, itemToDelete.item)
+        if (itemToDelete.type === 'staff') {
+          // Delete staff member using role_permissions API
+          const staff = itemToDelete.item as Staff
+          const response = await fetch(`/api/role_permissions?user_id=${staff.id}`, {
+            method: 'DELETE',
+          })
 
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000))
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.error || 'Failed to delete staff member')
+          }
 
-        setSuccessMessage(`${itemToDelete.type === 'staff' ? 'Miembro del staff' : 'Rol'} eliminado exitosamente`)
+          setSuccessMessage('Miembro del staff eliminado exitosamente')
+
+          // Refresh the staff list
+          await fetchStaff()
+        } else if (itemToDelete.type === 'role') {
+          // Delete role using roles API
+          const role = itemToDelete.item as Role
+          const response = await fetch(`/api/roles?id=${role.id}`, {
+            method: 'DELETE',
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.error || 'Failed to delete role')
+          }
+
+          setSuccessMessage('Rol eliminado exitosamente')
+
+          // Refresh the roles list
+          await fetchRoles()
+          await fetchStaff()
+        }
+
         setIsDeleteDialogOpen(false)
         setItemToDelete(null)
 
@@ -459,6 +499,8 @@ export function RoleManagement() {
         setTimeout(() => setSuccessMessage(null), 3000)
       } catch (error) {
         console.error('Error deleting item:', error)
+        setSuccessMessage(`Error: ${error instanceof Error ? error.message : 'Failed to delete item'}`)
+        setTimeout(() => setSuccessMessage(null), 5000)
       } finally {
         setIsLoading(false)
       }
@@ -468,20 +510,67 @@ export function RoleManagement() {
   const handleSaveStaff = async () => {
     setIsLoading(true)
     try {
-      // Here you would implement the actual save logic
-      console.log('Saving staff:', selectedStaff)
+      // Validate required fields
+      if (!staffForm.email || !staffForm.role_id) {
+        throw new Error('Email and role are required')
+      }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      let response
+      if (selectedStaff) {
+        // Update existing staff using role_permissions API
+        response = await fetch('/api/role_permissions', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: selectedStaff.id,
+            role_id: staffForm.role_id,
+            phone: staffForm.phone
+          }),
+        })
+      } else {
+        // Create new staff using role_permissions API
+        response = await fetch('/api/role_permissions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: staffForm.email,
+            phone: staffForm.phone,
+            role_id: staffForm.role_id
+          }),
+        })
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save staff member')
+      }
+
+      const result = await response.json()
+      console.log('Staff saved successfully:', result)
 
       setSuccessMessage(`${selectedStaff ? 'Staff actualizado' : 'Staff creado'} exitosamente`)
       setIsStaffDialogOpen(false)
       setSelectedStaff(null)
+      setStaffForm({
+        email: '',
+        phone: '',
+        role_id: '',
+        status: 'active'
+      })
+
+      // Refresh the staff list
+      await fetchStaff()
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (error) {
       console.error('Error saving staff:', error)
+      setSuccessMessage(`Error: ${error instanceof Error ? error.message : 'Failed to save staff member'}`)
+      setTimeout(() => setSuccessMessage(null), 5000)
     } finally {
       setIsLoading(false)
     }
@@ -586,12 +675,12 @@ export function RoleManagement() {
     }
   }
 
-  const filteredStaff = mockStaff.filter((staff) => {
+  const filteredStaff = staff.filter((staffMember) => {
     const search = searchTerm.toLowerCase()
     return (
-      staff.name.toLowerCase().includes(search) ||
-      staff.email.toLowerCase().includes(search) ||
-      staff.role.toLowerCase().includes(search)
+      staffMember.name.toLowerCase().includes(search) ||
+      staffMember.email.toLowerCase().includes(search) ||
+      staffMember.role.toLowerCase().includes(search)
     )
   })
 
@@ -625,7 +714,7 @@ export function RoleManagement() {
         <TabsList>
           <TabsTrigger value="staff">Personal</TabsTrigger>
           <TabsTrigger value="roles">Roles y Permisos</TabsTrigger>
-          <TabsTrigger value="history">Historial de Cambios</TabsTrigger>
+          {/* <TabsTrigger value="history">Historial de Cambios</TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="staff" className="space-y-4">
@@ -643,19 +732,43 @@ export function RoleManagement() {
 
           <Card>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Personal</TableHead>
-                    <TableHead>Contacto</TableHead>
-                    <TableHead>Rol</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Último Acceso</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredStaff.map((staff) => (
+              {isLoadingStaff ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-muted-foreground">Cargando personal...</p>
+                  </div>
+                </div>
+              ) : filteredStaff.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-muted-foreground mb-2">No hay personal disponible</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {searchTerm ? 'No se encontraron resultados para tu búsqueda.' : 'Aún no se han agregado miembros del personal.'}
+                    </p>
+                    {!searchTerm && (
+                      <Button onClick={handleNewStaff} className="flex items-center space-x-2">
+                        <Plus className="h-4 w-4" />
+                        <span>Agregar Primer Staff</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Personal</TableHead>
+                      <TableHead>Contacto</TableHead>
+                      <TableHead>Rol</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Último Acceso</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredStaff.map((staff) => (
                     <TableRow key={staff.id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
@@ -694,7 +807,7 @@ export function RoleManagement() {
                           {staff.status === "active" ? "Activo" : "Inactivo"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{staff.lastLogin}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{staff.roleDetails.level}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end space-x-2">
                           <Button variant="ghost" size="icon" onClick={() => handleViewStaff(staff)}>
@@ -714,6 +827,7 @@ export function RoleManagement() {
                   ))}
                 </TableBody>
               </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -757,7 +871,7 @@ export function RoleManagement() {
                         size="icon"
                         onClick={() => handleDeleteConfirmation('role', role)}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        disabled={mockStaff.filter((s) => s.role === role.name).length > 0}
+                        // disabled={staff.filter((s) => s.role === role.name).length > 0}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -831,7 +945,7 @@ export function RoleManagement() {
           )}
         </TabsContent>
 
-        <TabsContent value="history" className="space-y-4">
+        {/* <TabsContent value="history" className="space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1004,7 +1118,7 @@ export function RoleManagement() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
       </Tabs>
 
       {/* Staff Dialog */}
@@ -1039,26 +1153,57 @@ export function RoleManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" defaultValue={selectedStaff?.email || ""} placeholder="correo@ejemplo.com" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={staffForm.email}
+                  onChange={(e) => setStaffForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="correo@ejemplo.com"
+                  disabled={!!selectedStaff}
+                  className={selectedStaff ? "bg-muted" : ""}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Teléfono</Label>
-                <Input id="phone" defaultValue={selectedStaff?.phone || ""} placeholder="+52 555 123 4567" />
+                <Input
+                  id="phone"
+                  value={staffForm.phone}
+                  onChange={(e) => setStaffForm(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="+52 555 123 4567"
+                  disabled={!!selectedStaff}
+                  className={selectedStaff ? "bg-muted" : ""}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="role-select">Rol</Label>
-                <Select defaultValue={selectedStaff?.role || ""}>
+                <Select
+                  value={staffForm.role_id}
+                  onValueChange={(value) => setStaffForm(prev => ({ ...prev, role_id: value }))}
+                  disabled={isLoadingRoles}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un rol" />
+                    <SelectValue placeholder={
+                      isLoadingRoles
+                        ? "Cargando roles..."
+                        : roles.length === 0
+                          ? "No hay roles disponibles"
+                          : "Selecciona un rol"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    {roles.length > 0 ? (
+                    {isLoadingRoles ? (
+                      <SelectItem value="" disabled>
+                        Cargando roles...
+                      </SelectItem>
+                    ) : roles.length > 0 ? (
                       roles.map((role) => (
-                        <SelectItem key={role.id} value={role.name}>
-                          {role.name}
+                        <SelectItem key={role.id} value={role.id.toString()}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{role.name}</span>
+                          </div>
                         </SelectItem>
                       ))
                     ) : (
@@ -1072,8 +1217,12 @@ export function RoleManagement() {
               {selectedStaff && (
                 <div className="space-y-2">
                   <Label htmlFor="status">Estado</Label>
-                  <Select defaultValue={selectedStaff.status}>
-                    <SelectTrigger>
+                  <Select
+                    value={staffForm.status}
+                    onValueChange={(value) => setStaffForm(prev => ({ ...prev, status: value }))}
+                    disabled={true}
+                  >
+                    <SelectTrigger className="bg-muted">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1093,16 +1242,27 @@ export function RoleManagement() {
                   <Input
                     id="join-date"
                     type="date"
-                    defaultValue={selectedStaff.joinDate || ""}
-                    className="w-full"
+                    defaultValue={selectedStaff.joinDate ? (() => {
+                      // Convert DD/MM/YYYY or D/M/YYYY to YYYY-MM-DD format
+                      const parts = selectedStaff.joinDate.split('/');
+                      if (parts.length === 3) {
+                        const day = parts[0].padStart(2, '0');
+                        const month = parts[1].padStart(2, '0');
+                        const year = parts[2];
+                        return `${year}-${month}-${day}`;
+                      }
+                      return selectedStaff.joinDate;
+                    })() : ""}
+                    className="w-full bg-muted"
+                    disabled
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="last-access">Último Acceso</Label>
                   <Input
                     id="last-access"
-                    defaultValue={selectedStaff.lastLogin || ""}
-                    placeholder="2024-01-15 14:30"
+                    defaultValue={selectedStaff.roleDetails?.level || ""}
+                    placeholder="Nivel de acceso"
                     disabled
                     className="bg-muted"
                   />

@@ -12,6 +12,7 @@ import {
   SunIcon,
   MoonIcon,
   Settings2,
+  Loader2,
 } from "lucide-react";
 
 import Link from "next/link";
@@ -31,6 +32,7 @@ import { usePathname } from "next/navigation";
 
 import { ExitIcon } from "@radix-ui/react-icons";
 import { useAuth } from "@/context/AuthContext";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { toast } from "sonner";
 
 const mainNavItems = [
@@ -86,6 +88,24 @@ interface AppSidebarProps {
 export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const { userPermissions, isLoadingPermissions, hasPermission } = useUserPermissions();
+
+  // Filter mainNavItems based on user permissions
+  const filteredNavItems = mainNavItems.filter(item => {
+    // If still loading permissions, show all items
+    if (isLoadingPermissions) {
+      return true;
+    }
+
+    // If no permissions, only show dashboard
+    if (userPermissions.length === 0) {
+      return item.id === 'dashboard';
+    }
+
+    // Check if user has permission for this module
+    return hasPermission(item.id);
+  });
+
   return (
     <Sidebar>
       <SidebarHeader className="p-4 border-b">
@@ -107,19 +127,35 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
           </SidebarGroupLabel> */}
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNavItems.map((item) => (
-                <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton asChild isActive={pathname === item.path}>
-                    <Link
-                      href={item.path}
-                      className="w-full justify-start text-left"
+              {isLoadingPermissions ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="animate-spin h-4 w-4 ml-2" />
+                </div>
+              ) : filteredNavItems.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground dark:text-gray-400">
+                    No tienes permisos para acceder a ninguna sección
+                  </p>
+                </div>
+              ) : (
+                // Show filtered items based on permissions
+                filteredNavItems.map((item) => (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.path}
                     >
-                      <item.icon className="h-3 w-3" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                      <Link
+                        href={item.path}
+                        className="w-full justify-start text-left"
+                      >
+                        <item.icon className="h-3 w-3" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -129,18 +165,23 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {/* Configuration */}
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === "/configuration"}>
-                  <Link
-                    href="/configuration"
-                    className="w-full justify-start text-left"
+              {/* Configuration - only show if user has configuration permission */}
+              {(isLoadingPermissions || hasPermission("configuration")) && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === "/configuration"}
                   >
-                    <Settings2 className="h-3 w-3" />
-                    <span>Configuración</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+                    <Link
+                      href="/configuration"
+                      className={`w-full justify-start text-left ${isLoadingPermissions ? "opacity-50" : ""}`}
+                    >
+                      <Settings2 className="h-3 w-3" />
+                      <span>Configuración</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
 
               {/* Theme Toggle */}
               <SidebarMenuItem>
@@ -167,9 +208,6 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
                   <span>Logout</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-
-
-
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

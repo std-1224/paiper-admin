@@ -44,9 +44,6 @@ export default function AuthCallback() {
           router.push("/login?status=pending");
           return;
         }
-
-        // If user is approved, redirect to dashboard
-        router.push("/dashboard");
       } catch (error) {
         console.error("Auth callback error:", error);
         router.push("/login");

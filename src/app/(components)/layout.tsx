@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import BalanceRechargeForm from "./balance-recharge-form";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "./ProtectedRoute";
+import { RouteProtection } from "@/components/RouteProtection";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import Loading from "./loading";
@@ -181,7 +182,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   if (pathname === "/new-order") {
     return (
-      <>
+      <RouteProtection>
         {children}
         <Dialog open={isBalanceFormOpen} onOpenChange={setIsBalanceFormOpen}>
           <DialogContent className="sm:max-w-md dark:bg-gray-900 dark:border-gray-800">
@@ -195,24 +196,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 					<PlusCircleIcon className='h-6 w-6 mr-2' />
 					Cargar Saldo
 				</Button> */}
-      </>
+      </RouteProtection>
     );
   }
 
   return (
-    <ProtectedRoute allowedRoles={["admin"]}>
-      <AppSidebar
-        toggleTheme={toggleTheme}
-        isDarkMode={isDarkMode}
-      />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Header
-          setIsNotificationsOpen={setIsNotificationsOpen}
+    <RouteProtection>
+      <ProtectedRoute allowedRoles={["admin"]}>
+        <AppSidebar
+          toggleTheme={toggleTheme}
+          isDarkMode={isDarkMode}
         />
-        <main className="overflow-y-auto dark:bg-gray-950 flex-1 p-4 md:p-8 overflow-auto">
-          {children}
-        </main>
-      </div>
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Header
+            setIsNotificationsOpen={setIsNotificationsOpen}
+          />
+          <main className="overflow-y-auto dark:bg-gray-950 flex-1 p-4 md:p-8 overflow-auto">
+            {children}
+          </main>
+        </div>
 
       {/* Notifications Sidebar Modal */}
       <Sheet open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
@@ -410,5 +412,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </Button>
       </div>
     </ProtectedRoute>
+    </RouteProtection>
   );
 }

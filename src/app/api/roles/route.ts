@@ -280,21 +280,87 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Delete the role (permissions will be deleted automatically due to CASCADE)
-    const { error } = await supabaseServerClient
+    // Step 1: Get all users with this role_id from role_permissions
+    const { data: rolePermissions, error: getRolePermissionsError } = await supabaseServerClient
+      .from('role_permissions')
+      .select('user_id')
+      .eq('role_id', id)
+
+    if (getRolePermissionsError) {
+      console.error('Error fetching role permissions:', getRolePermissionsError)
+      return NextResponse.json(
+        { error: 'Failed to fetch role permissions' },
+        { status: 500 }
+      )
+    }
+
+    // Step 2: Update approval_status to pending for all users with this role
+    if (rolePermissions && rolePermissions.length > 0) {
+      const userIds = rolePermissions.map(rp => rp.user_id)
+
+      const { error: updateProfilesError } = await supabaseServerClient
+        .from('profiles')
+        .update({
+          approval_status: 'pending',
+          updated_at: new Date().toISOString()
+        })
+        .in('id', userIds)
+
+      if (updateProfilesError) {
+        console.error('Error updating profiles approval status:', updateProfilesError)
+        return NextResponse.json(
+          { error: 'Failed to update user approval status' },
+          { status: 500 }
+        )
+      }
+    }
+
+    // Step 3: Remove all data from role_permissions that has this role_id
+    const { error: deleteRolePermissionsError } = await supabaseServerClient
+      .from('role_permissions')
+      .delete()
+      .eq('role_id', id)
+
+    if (deleteRolePermissionsError) {
+      console.error('Error deleting role permissions:', deleteRolePermissionsError)
+      return NextResponse.json(
+        { error: 'Failed to delete role permissions' },
+        { status: 500 }
+      )
+    }
+
+    // Step 4: Remove all data from permissions that has this role_id
+    const { error: deletePermissionsError } = await supabaseServerClient
+      .from('permissions')
+      .delete()
+      .eq('role_id', id)
+
+    if (deletePermissionsError) {
+      console.error('Error deleting permissions:', deletePermissionsError)
+      return NextResponse.json(
+        { error: 'Failed to delete permissions' },
+        { status: 500 }
+      )
+    }
+
+    // Step 5: Remove data from roles
+    const { error: deleteRoleError } = await supabaseServerClient
       .from('roles')
       .delete()
       .eq('id', id)
 
-    if (error) {
-      console.error('Error deleting role:', error)
+    if (deleteRoleError) {
+      console.error('Error deleting role:', deleteRoleError)
       return NextResponse.json(
         { error: 'Failed to delete role' },
         { status: 500 }
       )
     }
 
-    return NextResponse.json({ message: 'Role deleted successfully' })
+    return NextResponse.json({
+      message: 'Role deleted successfully',
+      affectedUsers: rolePermissions?.length || 0
+    })
   } catch (error) {
     console.error('Error in DELETE /api/roles:', error)
     return NextResponse.json(
