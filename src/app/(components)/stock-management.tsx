@@ -618,10 +618,10 @@ export default function StockManagement() {
 
   // Clear transfer logs function
   const handleClearTransferLogs = () => {
-    if (user?.role === "barman" || user?.role === "client") {
-      toast.error("No tienes permiso para limpiar registros");
-      return;
-    }
+    // if (user?.role === "barman" || user?.role === "client") {
+    //   toast.error("No tienes permiso para limpiar registros");
+    //   return;
+    // }
     setShowClearRecordsModal(true);
   };
 
@@ -2470,10 +2470,10 @@ export default function StockManagement() {
 
   const handleUpdateProduct = async () => {
     if (!editingProduct) return;
-    if (user?.role === "barman" || user?.role === "client") {
-      toast.error("No tienes permiso para editar productos");
-      return;
-    }
+    // if (user?.role === "barman" || user?.role === "client") {
+    //   toast.error("No tienes permiso para editar productos");
+    //   return;
+    // }
     try {
       setIsLoading(true);
       let uploadedUrl = editingProduct.image_url;
@@ -3056,10 +3056,10 @@ export default function StockManagement() {
           </Button>
           <Button
             onClick={() => {
-              if (user?.role === "barman" || user?.role === "client") {
-                toast.error("No tienes permiso para crear pedidos");
-                return;
-              }
+              // if (user?.role === "barman" || user?.role === "client") {
+              //   toast.error("No tienes permiso para crear pedidos");
+              //   return;
+              // }
               setShowAddProductModal(true);
             }}
           >
@@ -3079,10 +3079,10 @@ export default function StockManagement() {
             <Button
               variant="outline"
               onClick={() => {
-                if (user?.role === "barman" || user?.role === "client") {
-                  toast.error("No tienes permiso para ajustar stock");
-                  return;
-                }
+                // if (user?.role === "barman" || user?.role === "client") {
+                //   toast.error("No tienes permiso para ajustar stock");
+                //   return;
+                // }
                 // Initialize quantities for selected products
                 const initialQuantities: { [key: string]: number } = {};
                 selectedProducts.forEach((productId) => {
@@ -3101,10 +3101,10 @@ export default function StockManagement() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  if (user?.role === "barman" || user?.role === "client") {
-                    toast.error("No tienes permiso para ajustar stock");
-                    return;
-                  }
+                  // if (user?.role === "barman" || user?.role === "client") {
+                  //   toast.error("No tienes permiso para ajustar stock");
+                  //   return;
+                  // }
                   // Initialize quantities for selected products
                   const initialQuantities: { [key: string]: number } = {};
                   selectedProducts.forEach((productId) => {
@@ -3120,10 +3120,10 @@ export default function StockManagement() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  if (user?.role === "barman" || user?.role === "client") {
-                    toast.error("No tienes permiso para ajustar stock");
-                    return;
-                  }
+                  // if (user?.role === "barman" || user?.role === "client") {
+                  //   toast.error("No tienes permiso para ajustar stock");
+                  //   return;
+                  // }
                   // Initialize quantities for selected products
                   const initialQuantities: { [key: string]: number } = {};
                   selectedProducts.forEach((productId) => {

@@ -132,16 +132,16 @@ export default function RoleManagement() {
   };
 
   const handleEditUser = (user: User) => {
-    if(currentUser?.role === "admin" || currentUser?.role === "master") {
+    // if(currentUser?.role === "admin" || currentUser?.role === "master") {
       setSelectedUser(user);
       setTransfers([]);
       setIsEditDialogOpen(true);
-    } else {
-      toast({
-        title: "No tienes permiso para editar usuarios",
-        description: "Solo los administradores pueden editar usuarios",
-      })
-    }
+    // } else {
+    //   toast({
+    //     title: "No tienes permiso para editar usuarios",
+    //     description: "Solo los administradores pueden editar usuarios",
+    //   })
+    // }
   };
 
   const handleSendGift = (user: User) => {

@@ -362,10 +362,10 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
             size="sm"
             className="flex items-center gap-2"
             onClick={() => {
-              if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
-                toast.error("No tienes permiso para transferir stock");
-                return;
-              }
+              // if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+              //   toast.error("No tienes permiso para transferir stock");
+              //   return;
+              // }
               handleSelectAll();
             }}
           >
@@ -498,10 +498,10 @@ export const StockTransfers = ({ selectedBar }: { selectedBar: number }) => {
                       checked={selectedItems[Number(item.id)] || false}
                       onCheckedChange={() =>
                         {
-                          if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
-                            toast.error("No tienes permiso para transferir stock");
-                            return;
-                          }
+                          // if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+                          //   toast.error("No tienes permiso para transferir stock");
+                          //   return;
+                          // }
                           handleSelectItem(Number(item.id), item.barId)
                         }
                       }

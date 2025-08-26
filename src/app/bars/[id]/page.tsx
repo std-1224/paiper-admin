@@ -246,10 +246,10 @@ const BarDetail = () => {
           </Link>
         </Button>
         <Button className="mr-2" onClick={() =>{ 
-          if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
-            toast.error("No tienes permiso para ajustar stock");
-            return;
-          }
+          // if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+          //   toast.error("No tienes permiso para ajustar stock");
+          //   return;
+          // }
           handleAdjustStock()}}>
           <PackagePlus className="mr-2 h-4 w-4" />
           Ajustar Stock
@@ -558,10 +558,10 @@ const BarDetail = () => {
                                 variant="destructive"
                                 size="sm"
                                 onClick={() => {
-                                  if (user?.role === "client" || user?.role === "manager") {
-                                    toast.error("No tienes permiso para eliminar códigos QR");
-                                    return;
-                                  }
+                                  // if (user?.role === "client" || user?.role === "manager") {
+                                  //   toast.error("No tienes permiso para eliminar códigos QR");
+                                  //   return;
+                                  // }
                                   handleDeleteQr(qr.id)
                                 }}
                               >
@@ -590,10 +590,10 @@ const BarDetail = () => {
                   size="sm"
                   className="ml-auto"
                   onClick={() => {
-                    if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
-                      toast.error("No tienes permiso para ajustar stock");
-                      return;
-                    }
+                    // if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+                    //   toast.error("No tienes permiso para ajustar stock");
+                    //   return;
+                    // }
                     handleAdjustStock()}}
                 >
                   <PackagePlus className="mr-2 h-4 w-4" />

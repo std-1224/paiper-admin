@@ -300,10 +300,10 @@ export function OrderCard({
     return (
       <Button
         onClick={() => {
-          if(user?.role === "barman" || user?.role === "client") {
-            toast.error("No tienes permiso para editar pedidos");
-            return;
-          }
+          // if(user?.role === "barman" || user?.role === "client") {
+          //   toast.error("No tienes permiso para editar pedidos");
+          //   return;
+          // }
           handleUpdateStatus()
         }}
         className={`${config.className} w-[50%]`}
@@ -343,10 +343,10 @@ export function OrderCard({
               variant="ghost"
               size="icon"
               onClick={(e) => {
-                if(user?.role === "barman" || user?.role === "client") {
-                  toast.error("No tienes permiso para editar pedidos");
-                  return;
-                }
+                // if(user?.role === "barman" || user?.role === "client") {
+                //   toast.error("No tienes permiso para editar pedidos");
+                //   return;
+                // }
                 e.stopPropagation();
                 e.preventDefault();
                 setIsEditOpen(true);
@@ -359,10 +359,10 @@ export function OrderCard({
               className="hover:bg-red-600 hover:text-white"
               size="icon"
               onClick={(e) => {
-                if(user?.role === "barman" || user?.role === "client") {
-                  toast.error("No tienes permiso para editar pedidos");
-                  return;
-                }
+                // if(user?.role === "barman" || user?.role === "client") {
+                //   toast.error("No tienes permiso para editar pedidos");
+                //   return;
+                // }
                 e.stopPropagation();
                 e.preventDefault();
                 handleDeleteOrder(order.id);

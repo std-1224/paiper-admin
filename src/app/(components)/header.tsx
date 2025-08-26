@@ -70,10 +70,10 @@ export default function Header({
         <Button
           className="bg-black flex items-center"
           onClick={() => {
-            if (user?.role === "barman" || user?.role === "client") {
-              toast.error("No tienes permiso para crear pedidos");
-              return;
-            }
+            // if (user?.role === "barman" || user?.role === "client") {
+            //   toast.error("No tienes permiso para crear pedidos");
+            //   return;
+            // }
             router.push("/new-order");
           }}
         >

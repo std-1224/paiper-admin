@@ -146,10 +146,10 @@ export default function RecipeConfiguration() {
             variant="outline"
             className="gap-2"
             onClick={() => {
-              if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
-                toast.error("No tienes permiso para agregar ingredientes");
-                return;
-              }
+              // if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+              //   toast.error("No tienes permiso para agregar ingredientes");
+              //   return;
+              // }
               setShowAddIngredientModal(true)
             }}
           >
@@ -157,10 +157,10 @@ export default function RecipeConfiguration() {
             Agregar Ingrediente
           </Button>
           <Button className="gap-2" onClick={() => {
-            if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
-              toast.error("No tienes permiso para agregar ingredientes");
-              return;
-            }
+            // if (user?.role === "barman" || user?.role === "client" || user?.role === "manager") {
+            //   toast.error("No tienes permiso para agregar ingredientes");
+            //   return;
+            // }
             setShowAddRecipeModal(true)
           }}>
             <Cocktail size={16} />
