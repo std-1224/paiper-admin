@@ -7,7 +7,6 @@ import Layout from "@/app/(components)/layout";
 import Head from "next/head";
 import { AuthProvider } from "@/context/AuthContext";
 import { usePathname } from "next/navigation";
-import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppProvider } from "@/context/AppContext";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -38,7 +37,7 @@ export default function App({ children }: { children: React.ReactNode }) {
         <Sonner />
           <AuthProvider>
             <AppProvider>
-              <SidebarProvider>{getLayout()}</SidebarProvider>
+              {getLayout()}
             </AppProvider>
           </AuthProvider>
       </body>

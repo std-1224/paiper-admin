@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useAppContext } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 interface HeaderProps {
   setIsNotificationsOpen: (value: boolean) => void;
@@ -54,15 +55,18 @@ export default function Header({
 
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b dark:border-gray-800">
-      <div className="flex items-center">
-        <h1 className="text-xl font-semibold dark:text-white">
-          {getPageTitle()}
-        </h1>
-        <div className="ml-4 flex items-center">
-          <span className="h-2 w-2 rounded-full bg-green-500 mr-2"></span>
-          <span className="text-sm text-muted-foreground dark:text-gray-400">
-            En línea
-          </span>
+      <div className="flex items-center gap-4">
+        <SidebarTrigger className="md:hidden" />
+        <div className="flex items-center">
+          <h1 className="text-xl font-semibold dark:text-white">
+            {getPageTitle()}
+          </h1>
+          <div className="ml-4 flex items-center">
+            <span className="h-2 w-2 rounded-full bg-green-500 mr-2"></span>
+            <span className="text-sm text-muted-foreground dark:text-gray-400">
+              En línea
+            </span>
+          </div>
         </div>
       </div>
 

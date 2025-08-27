@@ -27,6 +27,7 @@ import { usePathname } from "next/navigation";
 import Loading from "./loading";
 import Header from "./header";
 import { useAppContext } from "@/context/AppContext";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { format } from "date-fns";
 import { Notification } from "@/types/types";
 import { supabase } from "@/lib/supabaseClient";
@@ -205,18 +206,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <RouteProtection>
       <ProtectedRoute allowedRoles={["admin"]}>
         <VenueProvider>
-          <AppSidebar
-            toggleTheme={toggleTheme}
-            isDarkMode={isDarkMode}
-          />
-          <div className="flex flex-col flex-1 overflow-hidden">
-            <Header
-              setIsNotificationsOpen={setIsNotificationsOpen}
+          <SidebarProvider>
+            <AppSidebar
+              toggleTheme={toggleTheme}
+              isDarkMode={isDarkMode}
             />
-            <main className="overflow-y-auto dark:bg-gray-950 flex-1 p-4 md:p-8 overflow-auto">
-              {children}
-            </main>
-          </div>
+            <SidebarInset>
+              <Header
+                setIsNotificationsOpen={setIsNotificationsOpen}
+              />
+              <main className="overflow-y-auto dark:bg-gray-950 flex-1 p-4 md:p-8 overflow-auto">
+                {children}
+              </main>
+            </SidebarInset>
+          </SidebarProvider>
         </VenueProvider>
 
       {/* Notifications Sidebar Modal */}
