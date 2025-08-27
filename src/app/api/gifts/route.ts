@@ -5,7 +5,36 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
     const giftId = searchParams.get("giftId");
+    const id = searchParams.get("id");
 
+    // Handle both giftId and id parameters for compatibility
+    const queryId = giftId || id;
+
+    if (!queryId) {
+      // If no ID provided, return all gifts
+      const { data, error } = await supabaseServerClient
+        .from("gifts")
+        .select(
+          `*, products (
+                          id,
+                          name,
+                          image_url,
+                          sale_price
+                      ),  sender:profiles!sender_id (
+            id,
+            email,
+            name
+          )`
+        )
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+      return NextResponse.json(data, { status: 200 });
+    }
+
+    // Get single gift by ID
     const { data, error } = await supabaseServerClient
       .from("gifts")
       .select(
@@ -20,15 +49,15 @@ export async function GET(req: NextRequest) {
           name
         )`
       )
-      .eq("id", giftId)
+      .eq("id", queryId)
       .single();
 
     if (error) {
       throw error;
     }
-    return NextResponse.json({ data: data, status: 200 });
+    return NextResponse.json(data, { status: 200 });
   } catch (error: any) {
-    console.error("Error creating user:", error.message);
+    console.error("Error fetching gift:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
