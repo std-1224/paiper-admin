@@ -638,9 +638,12 @@ async function deductRecipeIngredients(
   return deductInventory(productId, orderQuantity, barId);
 }
 
-export const GET = async () => {
+export const GET = async (req: Request) => {
   try {
-    const { data, error } = await supabaseServerClient
+    const { searchParams } = new URL(req.url);
+    const orderId = searchParams.get('id');
+
+    const baseQuery = supabaseServerClient
       .from("orders")
       .select(
         `
@@ -655,20 +658,35 @@ export const GET = async () => {
                         image_url,
                         stock
                     )
-                ), 
+                ),
                 qr_codes (
                     id,
                     bar_id, name
-                    
+
                 ),
                 user:profiles!user_id (
                     id,
                     email,
+                    name,
                     sector_id
                 )
             `
-      )
-      .order("created_at", { ascending: false });
+      );
+
+    let data, error;
+
+    // If orderId is provided, fetch single order
+    if (orderId) {
+      const result = await baseQuery.eq('id', orderId).single();
+      data = result.data;
+      error = result.error;
+    } else {
+      // Otherwise fetch all orders
+      const result = await baseQuery.order("created_at", { ascending: false });
+      data = result.data;
+      error = result.error;
+    }
+
     if (error) {
       throw error;
     }
