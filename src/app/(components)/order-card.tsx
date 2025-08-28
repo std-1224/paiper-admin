@@ -13,6 +13,7 @@ import {
   SaveIcon,
   EyeIcon,
   Loader2Icon,
+  GiftIcon,
 } from "lucide-react";
 import {
   Sheet,
@@ -57,6 +58,8 @@ export const PAYMENT_BADGE_CLASSES = {
     "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400",
   mercadopago:
     "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400",
+  courtesy:
+    "bg-pink-100 text-pink-800 dark:bg-pink-900/20 dark:text-pink-400",
 };
 
 const NOTE_CLASSES = {
@@ -234,7 +237,9 @@ export function OrderCard({
             ? "Saldo"
             : order.payment_method === "cashless"
               ? "Cashless"
-              : "Mercado Pago"}
+              : order.payment_method === "courtesy"
+                ? "Cortesía"
+                : "Mercado Pago"}
       </span>
     ),
     [order.payment_method]
@@ -330,7 +335,14 @@ export function OrderCard({
       >
         <div className="flex justify-between items-center p-4 border-b">
           <div className="flex items-center space-x-3">
-            <div className="font-bold">{order.id}</div>
+            <div className="flex items-center space-x-2">
+              <div className="font-bold">{order.id}</div>
+              {order.payment_method === "courtesy" && (
+                <div title="Courtesy Gift Order">
+                  <GiftIcon className="h-5 w-5 text-pink-500" />
+                </div>
+              )}
+            </div>
             {order.table_number && (
               <div className="text-sm text-muted-foreground">
                 Mesa {order.table}
@@ -504,6 +516,7 @@ export function OrderCard({
                   <SelectItem value="cash">Efectivo</SelectItem>
                   <SelectItem value="balance">Tarjeta</SelectItem>
                   <SelectItem value="mercadopago">Mercado Pago</SelectItem>
+                  <SelectItem value="courtesy">Cortesía</SelectItem>
                 </SelectContent>
               </Select>
             </div>
