@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { useAppContext } from "@/context/AppContext";
 import ImageUpload from "./image-upload";
+import { useAuth } from "@/context/AuthContext";
 
 interface RecipeDetailsModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export default function RecipeDetailsModal({
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const { uploadImageToSupabase, ingredientsData } = useAppContext();
+  const { user } = useAuth();
 
   // Form state for editing
   const [editForm, setEditForm] = useState({
@@ -393,6 +395,56 @@ export default function RecipeDetailsModal({
             }
           } catch (error) {
             console.error('Error refetching product data:', error);
+          }
+
+          // Create audit log for recipe update
+          if (user && recipe) {
+            try {
+              const changes = [];
+              if (recipe.name !== editForm.name) changes.push(`Nombre: "${recipe.name}" → "${editForm.name}"`);
+              if (recipe.description !== editForm.description) changes.push(`Descripción actualizada`);
+              if (recipe.purchase_price !== parseFloat(editForm.purchase_price)) changes.push(`Precio compra: ${recipe.purchase_price} → ${parseFloat(editForm.purchase_price)}`);
+              if (recipe.sale_price !== parseFloat(editForm.sale_price)) changes.push(`Precio venta: ${recipe.sale_price} → ${parseFloat(editForm.sale_price)}`);
+              if (recipe.is_active !== editForm.is_active) changes.push(`Estado: ${recipe.is_active ? 'Activo' : 'Inactivo'} → ${editForm.is_active ? 'Activo' : 'Inactivo'}`);
+
+              if (changes.length > 0) {
+                await fetch("/api/audit-log", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    user_id: user.id,
+                    user_name: user.email?.split('@')[0] || 'Unknown',
+                    user_email: user.email || '',
+                    user_role: user.role || 'user',
+                    action: "update",
+                    action_type: "recipe_update",
+                    target_type: "recipe",
+                    target_id: recipeId,
+                    target_name: editForm.name,
+                    description: `Receta actualizada: ${changes.join(', ')}`,
+                    changes_before: {
+                      name: recipe.name,
+                      description: recipe.description,
+                      purchase_price: recipe.purchase_price,
+                      sale_price: recipe.sale_price,
+                      is_active: recipe.is_active
+                    },
+                    changes_after: {
+                      name: editForm.name,
+                      description: editForm.description,
+                      purchase_price: parseFloat(editForm.purchase_price),
+                      sale_price: parseFloat(editForm.sale_price),
+                      is_active: editForm.is_active
+                    },
+                    status: "success"
+                  }),
+                });
+              }
+            } catch (auditError) {
+              console.error("Error creating audit log:", auditError);
+            }
           }
 
           setIsEditing(false);

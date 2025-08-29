@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Initialize Supabase client
 import { supabase as supabaseServerClient } from '@/lib/supabaseClient';
+import { getCurrentUserInfo } from '@/lib/auditLogger';
 
 // GET - Fetch all ingredients
 export async function GET() {
@@ -146,6 +147,20 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Get current ingredient data for audit logging
+    const { data: currentIngredient, error: fetchError } = await supabaseServerClient
+      .from('ingredients')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !currentIngredient) {
+      return NextResponse.json(
+        { error: 'Ingredient not found' },
+        { status: 404 }
+      );
+    }
+
     // Build update object with only provided fields
     const updateData: {
       product_id?: string | null;
@@ -189,6 +204,62 @@ export async function PUT(request: NextRequest) {
         { error: 'Ingredient not found' },
         { status: 404 }
       );
+    }
+
+    // Create audit log for ingredient update
+    try {
+      const userInfo = await getCurrentUserInfo();
+      if (userInfo) {
+        // Create description of changes
+        const changes = [];
+        if (name !== undefined && name !== currentIngredient.name) {
+          changes.push(`Nombre: "${currentIngredient.name}" → "${name}"`);
+        }
+        if (stock !== undefined && parseFloat(stock) !== currentIngredient.stock) {
+          changes.push(`Stock: ${currentIngredient.stock} → ${parseFloat(stock)}`);
+        }
+        if (quantity !== undefined && parseFloat(quantity) !== currentIngredient.quantity) {
+          changes.push(`Cantidad: ${currentIngredient.quantity} → ${parseFloat(quantity)}`);
+        }
+        if (original_quantity !== undefined && parseFloat(original_quantity) !== currentIngredient.original_quantity) {
+          changes.push(`Cantidad Original: ${currentIngredient.original_quantity} → ${parseFloat(original_quantity)}`);
+        }
+        if (unit !== undefined && unit !== currentIngredient.unit) {
+          changes.push(`Unidad: "${currentIngredient.unit}" → "${unit}"`);
+        }
+        if (purchase_price !== undefined && parseFloat(purchase_price) !== currentIngredient.purchase_price) {
+          changes.push(`Precio: ${currentIngredient.purchase_price} → ${parseFloat(purchase_price)}`);
+        }
+
+        const changeDescription = changes.length > 0
+          ? `Ingrediente actualizado: ${changes.join(', ')}`
+          : 'Ingrediente actualizado sin cambios detectados';
+
+        await fetch(`${process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000'}/api/audit-log`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: userInfo.user_id,
+            user_name: userInfo.user_name,
+            user_email: userInfo.user_email,
+            user_role: userInfo.user_role,
+            action: 'update',
+            action_type: 'ingredient_update',
+            target_type: 'ingredient',
+            target_id: ingredient.id,
+            target_name: ingredient.name,
+            description: changeDescription,
+            changes_before: currentIngredient,
+            changes_after: ingredient,
+            status: 'success'
+          }),
+        });
+      }
+    } catch (auditError) {
+      console.error('Error creating audit log:', auditError);
+      // Don't fail the request if audit logging fails
     }
 
     return NextResponse.json(ingredient);

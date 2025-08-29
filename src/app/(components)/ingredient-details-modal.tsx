@@ -16,6 +16,7 @@ import { Edit, X, Clock, Package, Beaker, Droplets, Save, Upload, DollarSign } f
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAppContext } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 import ImageUpload from "./image-upload";
 
 interface IngredientDetailsModalProps {
@@ -36,6 +37,7 @@ export default function IngredientDetailsModal({
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const { uploadImageToSupabase, fetchIngredients } = useAppContext();
+  const { user } = useAuth();
 
   // Form state for editing
   const [editForm, setEditForm] = useState({
@@ -171,6 +173,59 @@ export default function IngredientDetailsModal({
       }
 
       const updatedIngredient = await ingredientResponse.json();
+
+      // Create audit log for ingredient update
+      if (user) {
+        try {
+          const changes = [];
+          if (ingredient.name !== editForm.name) changes.push(`Nombre: "${ingredient.name}" → "${editForm.name}"`);
+          if (ingredient.stock !== parseFloat(editForm.stock)) changes.push(`Stock: ${ingredient.stock} → ${parseFloat(editForm.stock)}`);
+          if (ingredient.quantity !== parseFloat(editForm.quantity)) changes.push(`Cantidad: ${ingredient.quantity} → ${parseFloat(editForm.quantity)}`);
+          if (ingredient.purchase_price !== parseFloat(editForm.purchase_price)) changes.push(`Precio: ${ingredient.purchase_price} → ${parseFloat(editForm.purchase_price)}`);
+          if (ingredient.unit !== editForm.unit) changes.push(`Unidad: "${ingredient.unit}" → "${editForm.unit}"`);
+          if (ingredient.is_active !== editForm.is_active) changes.push(`Estado: ${ingredient.is_active ? 'Activo' : 'Inactivo'} → ${editForm.is_active ? 'Activo' : 'Inactivo'}`);
+
+          if (changes.length > 0) {
+            await fetch("/api/audit-log", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                user_id: user.id,
+                user_name: user.email?.split('@')[0] || 'Unknown',
+                user_email: user.email || '',
+                user_role: user.role || 'user',
+                action: "update",
+                action_type: "ingredient_update",
+                target_type: "ingredient",
+                target_id: updatedIngredient.id,
+                target_name: updatedIngredient.name,
+                description: `Ingrediente actualizado: ${changes.join(', ')}`,
+                changes_before: {
+                  name: ingredient.name,
+                  stock: ingredient.stock,
+                  quantity: ingredient.quantity,
+                  purchase_price: ingredient.purchase_price,
+                  unit: ingredient.unit,
+                  is_active: ingredient.is_active
+                },
+                changes_after: {
+                  name: editForm.name,
+                  stock: parseFloat(editForm.stock),
+                  quantity: parseFloat(editForm.quantity),
+                  purchase_price: parseFloat(editForm.purchase_price),
+                  unit: editForm.unit,
+                  is_active: editForm.is_active
+                },
+                status: "success"
+              }),
+            });
+          }
+        } catch (auditError) {
+          console.error("Error creating audit log:", auditError);
+        }
+      }
 
       // Handle image upload
       let imageUrl = editForm.image_url;

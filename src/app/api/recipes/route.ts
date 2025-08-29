@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Initialize Supabase client
 import { supabase as supabaseServerClient } from '@/lib/supabaseClient';
+import { getCurrentUserInfo } from '@/lib/auditLogger';
 
 // Interface for recipe ingredients
 interface RecipeIngredientRequest {
@@ -293,6 +294,20 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Get current recipe data for audit logging
+    const { data: currentRecipe, error: currentFetchError } = await supabaseServerClient
+      .from('recipes')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (currentFetchError || !currentRecipe) {
+      return NextResponse.json(
+        { error: 'Recipe not found' },
+        { status: 404 }
+      );
+    }
+
     // Build update object with only provided fields (excluding ingredients)
     const updateData: {
       name?: string;
@@ -391,6 +406,56 @@ export async function PUT(request: NextRequest) {
     if (fetchError) {
       console.error('Error fetching complete recipe:', fetchError);
       return NextResponse.json(recipe);
+    }
+
+    // Create audit log for recipe update
+    try {
+      const userInfo = await getCurrentUserInfo();
+      if (userInfo) {
+        // Create description of changes
+        const changes = [];
+        if (name !== undefined && name !== currentRecipe.name) {
+          changes.push(`Nombre: "${currentRecipe.name}" → "${name}"`);
+        }
+        if (type !== undefined && type !== currentRecipe.type) {
+          changes.push(`Tipo: "${currentRecipe.type}" → "${type}"`);
+        }
+        if (is_active !== undefined && is_active !== currentRecipe.is_active) {
+          changes.push(`Estado: ${currentRecipe.is_active ? 'Activo' : 'Inactivo'} → ${is_active ? 'Activo' : 'Inactivo'}`);
+        }
+        if (ingredients !== undefined) {
+          changes.push('Ingredientes actualizados');
+        }
+
+        const changeDescription = changes.length > 0
+          ? `Receta actualizada: ${changes.join(', ')}`
+          : 'Receta actualizada sin cambios detectados';
+
+        await fetch(`${process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000'}/api/audit-log`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: userInfo.user_id,
+            user_name: userInfo.user_name,
+            user_email: userInfo.user_email,
+            user_role: userInfo.user_role,
+            action: 'update',
+            action_type: 'recipe_update',
+            target_type: 'recipe',
+            target_id: completeRecipe.id,
+            target_name: completeRecipe.name,
+            description: changeDescription,
+            changes_before: currentRecipe,
+            changes_after: completeRecipe,
+            status: 'success'
+          }),
+        });
+      }
+    } catch (auditError) {
+      console.error('Error creating audit log:', auditError);
+      // Don't fail the request if audit logging fails
     }
 
     return NextResponse.json(completeRecipe);

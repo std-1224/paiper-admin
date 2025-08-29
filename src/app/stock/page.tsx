@@ -715,6 +715,9 @@ const Stock = () => {
     // }
     try {
       setIsLoading(true);
+
+      // Get original product data for audit logging
+      const originalProduct = productsData.find(p => p.id === editingProduct.id);
       let uploadedUrl = editingProduct.image_url;
       if (imageFile) {
         const fileName = `image-${Date.now()}.${imageFile.name.split(".").pop()}`;
@@ -835,6 +838,56 @@ const Stock = () => {
         }
       } else {
         toast.success("Producto actualizado exitosamente");
+      }
+
+      // Create audit log for product update
+      if (user && originalProduct) {
+        try {
+          const changes = [];
+          if (originalProduct.name !== editingProduct.name) changes.push(`Nombre: "${originalProduct.name}" → "${editingProduct.name}"`);
+          if (originalProduct.description !== editingProduct.description) changes.push(`Descripción: "${originalProduct.description}" → "${editingProduct.description}"`);
+          if (originalProduct.stock !== editingProduct.stock) changes.push(`Stock: ${originalProduct.stock} → ${editingProduct.stock}`);
+          if (originalProduct.sale_price !== editingProduct.sale_price) changes.push(`Precio: $${originalProduct.sale_price} → $${editingProduct.sale_price}`);
+          if (originalProduct.purchase_price !== editingProduct.purchase_price) changes.push(`Precio compra: $${originalProduct.purchase_price} → $${editingProduct.purchase_price}`);
+
+          if (changes.length > 0) {
+            await fetch("/api/audit-log", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                user_id: user.id,
+                user_name: user.email?.split('@')[0] || 'Unknown',
+                user_email: user.email || '',
+                user_role: user.role || 'user',
+                action: "update",
+                action_type: "stock_update",
+                target_type: "product",
+                target_id: editingProduct.id,
+                target_name: editingProduct.name,
+                description: `Producto actualizado: ${changes.join(', ')}`,
+                changes_before: {
+                  name: originalProduct.name,
+                  description: originalProduct.description,
+                  stock: originalProduct.stock,
+                  sale_price: originalProduct.sale_price,
+                  purchase_price: originalProduct.purchase_price
+                },
+                changes_after: {
+                  name: editingProduct.name,
+                  description: editingProduct.description,
+                  stock: editingProduct.stock,
+                  sale_price: editingProduct.sale_price,
+                  purchase_price: editingProduct.purchase_price
+                },
+                status: "success"
+              }),
+            });
+          }
+        } catch (auditError) {
+          console.error("Error creating audit log:", auditError);
+        }
       }
 
       // Reset edit modal states (enhanced version)

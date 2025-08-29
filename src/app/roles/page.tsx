@@ -167,6 +167,10 @@ export default function RoleManagement() {
     if (!selectedUser) return;
 
     try {
+      // Get the original user data to track changes
+      const originalUser = users.find(u => u.id === selectedUser.id);
+      const balanceChanged = originalUser && originalUser.balance !== selectedUser.balance;
+
       const response = await fetch("/api/users", {
         method: "PUT",
         headers: {
@@ -183,6 +187,35 @@ export default function RoleManagement() {
 
       const data = await response.json();
       console.log("User updated successfully:", data);
+
+      // Log balance change if it occurred
+      if (balanceChanged && currentUser) {
+        try {
+          await fetch("/api/audit-log", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              user_id: currentUser.id,
+              user_name: currentUser.email?.split('@')[0] || 'Unknown',
+              user_email: currentUser.email || '',
+              user_role: currentUser.role || 'user',
+              action: "update",
+              action_type: "balance_update",
+              target_type: "user",
+              target_id: selectedUser.id,
+              target_name: selectedUser.name || selectedUser.email,
+              description: `Balance actualizado de ${originalUser?.balance || 0} a ${selectedUser.balance}`,
+              changes_before: { balance: originalUser?.balance || 0 },
+              changes_after: { balance: selectedUser.balance },
+              status: "success"
+            }),
+          });
+        } catch (auditError) {
+          console.error("Error creating audit log:", auditError);
+        }
+      }
 
       // Optionally, refresh the user list or close the dialog
       fetchUsers();

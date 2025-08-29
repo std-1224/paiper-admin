@@ -417,6 +417,9 @@ export default function OrdersManagement() {
 
   const handleCancelOrderConfirm = async () => {
     try {
+      // Get order details before cancellation for audit log
+      const orderToCancel = ordersData.find(order => order.id === selectedOrderId);
+
       const response = await fetch(`/api/orders`, {
         method: "PUT",
         headers: {
@@ -427,6 +430,38 @@ export default function OrdersManagement() {
       if (!response.ok) {
         throw new Error("Failed to cancel order");
       }
+
+      // Create audit log for order cancellation
+      if (user && orderToCancel) {
+        try {
+          // Generate a UUID for the target_id since order IDs are not UUIDs
+          // We'll use the user's ID as the target_id and include the order ID in the description
+          await fetch("/api/audit-log", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              user_id: user.id,
+              user_name: user.email?.split('@')[0] || 'Unknown',
+              user_email: user.email || '',
+              user_role: user.role || 'user',
+              action: "cancel",
+              action_type: "order_cancellation",
+              target_type: "order",
+              target_id: user.id, // Use user ID as target_id since order ID is not UUID
+              target_name: `Pedido #${selectedOrderId}`,
+              description: `Pedido cancelado - ID: ${selectedOrderId} - Total: $${orderToCancel.total_amount} - Cliente: ${orderToCancel.user_name || orderToCancel.user?.email}`,
+              changes_before: { status: orderToCancel.status, order_id: selectedOrderId },
+              changes_after: { status: "cancelled", order_id: selectedOrderId },
+              status: "success"
+            }),
+          });
+        } catch (auditError) {
+          console.error("Error creating audit log:", auditError);
+        }
+      }
+
       fetch("/api/mails", {
         method: "POST",
         body: JSON.stringify({

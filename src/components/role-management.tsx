@@ -34,6 +34,9 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronRight,
+  DollarSign,
+  X,
+  Package,
 } from "lucide-react"
 import React from "react"
 import { useAuth } from "@/context/AuthContext"
@@ -205,6 +208,15 @@ export function RoleManagement() {
   const getTargetDescription = (log: AuditLogEntry): string => {
     if (log.actionType === "role") {
       return `Rol: ${log.targetName}`
+    }
+    if (log.actionType === "balance_update") {
+      return `Usuario: ${log.targetName}`
+    }
+    if (log.actionType === "order_cancellation") {
+      return `Pedido: ${log.targetName}`
+    }
+    if (log.actionType === "stock_update") {
+      return `Producto: ${log.targetName}`
     }
 
     return log.targetName
@@ -1047,7 +1059,7 @@ export function RoleManagement() {
                           <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                           <h3 className="text-lg font-medium text-muted-foreground mb-2">No hay registros de auditoría</h3>
                           <p className="text-sm text-muted-foreground">
-                            Los cambios en roles y permisos aparecerán aquí.
+                            Los cambios en roles, balances, pedidos cancelados y actualizaciones de stock aparecerán aquí.
                           </p>
                         </div>
                       </TableCell>
@@ -1078,16 +1090,42 @@ export function RoleManagement() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            <Badge className="bg-blue-100 text-blue-800">
+                            <Badge className={`${
+                              log.action === "create" ? "bg-green-100 text-green-800" :
+                              log.action === "update" ? "bg-blue-100 text-blue-800" :
+                              log.action === "delete" ? "bg-red-100 text-red-800" :
+                              log.action === "cancel" ? "bg-orange-100 text-orange-800" :
+                              "bg-gray-100 text-gray-800"
+                            }`}>
                               {log.action === "create" && "Creación"}
                               {log.action === "update" && "Modificación"}
                               {log.action === "delete" && "Eliminación"}
+                              {log.action === "cancel" && "Cancelación"}
                               {log.action === "failed" && "Fallido"}
                             </Badge>
                             <Badge variant="outline" className="flex items-center space-x-1">
-                              <Shield className="h-3 w-3" />
+                              {log.actionType === "role" || log.actionType === "staff_role_assignment" || log.actionType === "permission" ? (
+                                <Shield className="h-3 w-3" />
+                              ) : log.actionType === "balance_update" ? (
+                                <DollarSign className="h-3 w-3 text-green-600" />
+                              ) : log.actionType === "order_cancellation" ? (
+                                <X className="h-3 w-3 text-red-600" />
+                              ) : log.actionType === "stock_update" ? (
+                                <Package className="h-3 w-3 text-blue-600" />
+                              ) : log.actionType === "recipe_update" ? (
+                                <Package className="h-3 w-3 text-purple-600" />
+                              ) : log.actionType === "ingredient_update" ? (
+                                <Package className="h-3 w-3 text-orange-600" />
+                              ) : (
+                                <Shield className="h-3 w-3" />
+                              )}
                               <span className="ml-1 text-xs sm:text-sm">
-                                {getRoleNameFromAuditLog(log)}
+                                {log.actionType === "balance_update" && "💰 Balance"}
+                                {log.actionType === "order_cancellation" && "❌ Pedido"}
+                                {log.actionType === "stock_update" && "📦 Stock"}
+                                {log.actionType === "recipe_update" && "🍽️ Receta"}
+                                {log.actionType === "ingredient_update" && "🥄 Ingrediente"}
+                                {(log.actionType === "role" || log.actionType === "staff_role_assignment" || log.actionType === "permission") && getRoleNameFromAuditLog(log)}
                               </span>
                             </Badge>
                           </div>
@@ -1123,11 +1161,33 @@ export function RoleManagement() {
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-sm font-medium">Acción:</span>
-                                      <span className="text-sm">{log.action === "update" ? "Update - Role" : log.action}</span>
+                                      <span className="text-sm">
+                                        {log.action === "create" && "Creación"}
+                                        {log.action === "update" && "Modificación"}
+                                        {log.action === "delete" && "Eliminación"}
+                                        {log.action === "cancel" && "Cancelación"}
+                                        {" - "}
+                                        {log.actionType === "role" && "Rol"}
+                                        {log.actionType === "staff_role_assignment" && "Asignación de Rol"}
+                                        {log.actionType === "permission" && "Permiso"}
+                                        {log.actionType === "balance_update" && "Actualización de Balance"}
+                                        {log.actionType === "order_cancellation" && "Cancelación de Pedido"}
+                                        {log.actionType === "stock_update" && "Actualización de Stock"}
+                                        {log.actionType === "recipe_update" && "Actualización de Receta"}
+                                        {log.actionType === "ingredient_update" && "Actualización de Ingrediente"}
+                                      </span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-sm font-medium">Objetivo:</span>
-                                      <span className="text-sm">{log.targetName}</span>
+                                      <span className="text-sm">
+                                        {log.actionType === "balance_update" && "Usuario: "}
+                                        {log.actionType === "order_cancellation" && "Pedido: "}
+                                        {log.actionType === "stock_update" && "Producto: "}
+                                        {log.actionType === "recipe_update" && "Receta: "}
+                                        {log.actionType === "ingredient_update" && "Ingrediente: "}
+                                        {(log.actionType === "role" || log.actionType === "staff_role_assignment" || log.actionType === "permission") && "Rol: "}
+                                        {log.targetName}
+                                      </span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-sm font-medium">Fecha:</span>

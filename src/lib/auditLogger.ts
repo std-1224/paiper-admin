@@ -7,9 +7,9 @@ export interface AuditLogEntry {
   user_name: string;
   user_email: string;
   user_role: string;
-  action: 'create' | 'update' | 'delete';
-  action_type: 'role' | 'staff_role_assignment' | 'permission';
-  target_type: 'role' | 'user' | 'permission';
+  action: 'create' | 'update' | 'delete' | 'cancel';
+  action_type: 'role' | 'staff_role_assignment' | 'permission' | 'balance_update' | 'order_cancellation' | 'stock_update';
+  target_type: 'role' | 'user' | 'permission' | 'order' | 'product' | 'ingredient' | 'recipe';
   target_id: string;
   target_name: string;
   description: string;

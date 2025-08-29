@@ -129,9 +129,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate enum values
-    const validActions = ['create', 'update', 'delete']
-    const validActionTypes = ['role', 'staff_role_assignment', 'permission']
-    const validTargetTypes = ['role', 'user', 'permission']
+    const validActions = ['create', 'update', 'delete', 'cancel']
+    const validActionTypes = ['role', 'staff_role_assignment', 'permission', 'balance_update', 'order_cancellation', 'stock_update', 'recipe_update', 'ingredient_update']
+    const validTargetTypes = ['role', 'user', 'permission', 'order', 'product', 'ingredient', 'recipe']
     const validStatuses = ['success', 'failed', 'pending']
 
     if (!validActions.includes(action)) {

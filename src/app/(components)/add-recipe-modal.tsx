@@ -25,6 +25,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAppContext } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 
 // Define the recipe ingredient type interface
 interface RecipeIngredientType {
@@ -62,6 +63,7 @@ export default function AddRecipeModal({
   const [loadingIngredients, setLoadingIngredients] = useState(false);
 
   const { fetchRecipes, recipesData } = useAppContext();
+  const { user } = useAuth();
 
   // Calculate total purchase price based on ingredients
   const calculatePurchasePrice = () => {
@@ -254,6 +256,19 @@ export default function AddRecipeModal({
 
     setLoading(true);
     try {
+      // Get current recipe data for audit logging
+      let currentRecipe = null;
+      if (user) {
+        try {
+          const currentResponse = await fetch(`/api/recipes/${selectedRecipe}`);
+          if (currentResponse.ok) {
+            currentRecipe = await currentResponse.json();
+          }
+        } catch (error) {
+          console.error("Error fetching current recipe:", error);
+        }
+      }
+
       const response = await fetch("/api/recipes", {
         method: "PUT",
         headers: {
@@ -273,6 +288,50 @@ export default function AddRecipeModal({
       }
 
       toast.success("Receta actualizada exitosamente");
+
+      // Create audit log for recipe update
+      if (user && currentRecipe) {
+        try {
+          const changes = [];
+          if (currentRecipe.name !== recipeName.trim()) changes.push(`Nombre: "${currentRecipe.name}" → "${recipeName.trim()}"`);
+          if (currentRecipe.type !== type) changes.push(`Tipo: "${currentRecipe.type}" → "${type}"`);
+          if (JSON.stringify(currentRecipe.ingredients) !== JSON.stringify(recipeIngredients)) changes.push('Ingredientes actualizados');
+
+          if (changes.length > 0) {
+            await fetch("/api/audit-log", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                user_id: user.id,
+                user_name: user.email?.split('@')[0] || 'Unknown',
+                user_email: user.email || '',
+                user_role: user.role || 'user',
+                action: "update",
+                action_type: "recipe_update",
+                target_type: "recipe",
+                target_id: selectedRecipe,
+                target_name: recipeName.trim(),
+                description: `Receta actualizada: ${changes.join(', ')}`,
+                changes_before: {
+                  name: currentRecipe.name,
+                  type: currentRecipe.type,
+                  ingredients: currentRecipe.ingredients
+                },
+                changes_after: {
+                  name: recipeName.trim(),
+                  type: type,
+                  ingredients: recipeIngredients
+                },
+                status: "success"
+              }),
+            });
+          }
+        } catch (auditError) {
+          console.error("Error creating audit log:", auditError);
+        }
+      }
 
       // Reset form and close modal
       handleClose();

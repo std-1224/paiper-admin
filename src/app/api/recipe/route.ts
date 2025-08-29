@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase as supabaseServerClient } from '@/lib/supabaseClient';
+import { getCurrentUserInfo } from '@/lib/auditLogger';
 
 
 export const GET = async () => {
@@ -119,6 +120,55 @@ export const PUT = async (req: Request) => {
 
         if (error) {
             throw error;
+        }
+
+        // Create audit log for recipe update
+        try {
+            const userInfo = await getCurrentUserInfo();
+            if (userInfo && data && data[0]) {
+                const updatedRecipe = data[0];
+
+                // Create description of changes
+                const changes = [];
+                if (name && name !== currentRecipe.name) {
+                    changes.push(`Nombre: "${currentRecipe.name}" → "${name}"`);
+                }
+                if (category && category !== currentRecipe.category) {
+                    changes.push(`Categoría: "${currentRecipe.category}" → "${category}"`);
+                }
+                if (ingredients) {
+                    changes.push('Ingredientes actualizados');
+                }
+
+                const changeDescription = changes.length > 0
+                    ? `Receta actualizada: ${changes.join(', ')}`
+                    : 'Receta actualizada sin cambios detectados';
+
+                await fetch(`${process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000'}/api/audit-log`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userInfo.user_id,
+                        user_name: userInfo.user_name,
+                        user_email: userInfo.user_email,
+                        user_role: userInfo.user_role,
+                        action: 'update',
+                        action_type: 'recipe_update',
+                        target_type: 'recipe',
+                        target_id: updatedRecipe.id,
+                        target_name: updatedRecipe.name,
+                        description: changeDescription,
+                        changes_before: currentRecipe,
+                        changes_after: updatedRecipe,
+                        status: 'success'
+                    }),
+                });
+            }
+        } catch (auditError) {
+            console.error('Error creating audit log:', auditError);
+            // Don't fail the request if audit logging fails
         }
 
         // Note: Stock changes are handled by the recipe system, not individual product linking
