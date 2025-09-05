@@ -39,6 +39,19 @@ export const PUT = async (req: Request) => {
         if (!body.id) {
             return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
         }
+
+        // Get the original user data to check for balance changes
+        const { data: originalUser, error: fetchError } = await supabaseServerClient
+            .from('profiles')
+            .select('balance')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) {
+            throw fetchError;
+        }
+
+        // Update the user
         const { data, error } = await supabaseServerClient
             .from('profiles')
             .update({
@@ -55,6 +68,35 @@ export const PUT = async (req: Request) => {
 
         if (error) {
             throw error;
+        }
+
+        // Check if balance was updated and create transaction record
+        const originalBalance = parseFloat(originalUser?.balance || '0');
+        const newBalance = parseFloat(updateData.balance || '0');
+
+        if (originalBalance !== newBalance) {
+            const balanceChange = newBalance - originalBalance;
+
+            try {
+                await supabaseServerClient
+                    .from('transactions')
+                    .insert([
+                        {
+                            user_id: id,
+                            amount: balanceChange, // Store the actual change (positive or negative)
+                            type: 'cash',
+                            status: 'approved',
+                            payment_url: null,
+                            preference_id: null,
+                            order_id: null,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        }
+                    ]);
+            } catch (transactionError) {
+                console.error('Error creating transaction record:', transactionError);
+                // Don't fail the user update if transaction creation fails
+            }
         }
 
         return NextResponse.json(data, { status: 200 }); // Return the updated user

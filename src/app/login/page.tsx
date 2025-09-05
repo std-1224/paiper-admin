@@ -58,7 +58,7 @@ const Login = () => {
 
           <Auth
             supabaseClient={supabase}
-            providers={["google", "apple" ]}
+            providers={["google"]}
             redirectTo={`${redirectDomain}/auth/callback`}
             appearance={{ theme: ThemeSupa }}
             socialLayout="horizontal"
