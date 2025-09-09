@@ -3179,7 +3179,7 @@ export default function StockManagement() {
                       </td>
                     </tr>
                   ))
-                : filteredProducts.map((item) => {
+                : filteredProducts.filter(item => item.is_active === true).map((item) => {
                   const product = item as any; // Cast to access all properties
                   // Check if item is from normalized recipes data
                   const isRecipe = normalizedRecipesData.some(recipe => recipe.id === item.id) || item.type === "recipe";
