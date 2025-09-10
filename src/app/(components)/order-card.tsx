@@ -260,9 +260,7 @@ export function OrderCard({
       }
 
       newStatus =
-        order.status === "paying" && order.payment_method === "cash"
-          ? "pending"
-          : order.status === "pending" || order.status === "delayed"
+        order.status === "pending" || order.status === "delayed"
             ? "preparing"
             : order.status === "preparing" || order.status === "delayed"
               ? "ready"
