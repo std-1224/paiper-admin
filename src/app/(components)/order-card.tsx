@@ -225,11 +225,10 @@ export function OrderCard({
   const PaymentStatusBadge = useMemo(
     () => (
       <span
-        className={`px-2 py-1 text-xs font-medium rounded-full ${
-          PAYMENT_BADGE_CLASSES[
-            order.payment_method as keyof typeof PAYMENT_BADGE_CLASSES
-          ]
-        }`}
+        className={`px-2 py-1 text-xs font-medium rounded-full ${PAYMENT_BADGE_CLASSES[
+          order.payment_method as keyof typeof PAYMENT_BADGE_CLASSES
+        ]
+          }`}
       >
         {order.payment_method === "cash"
           ? "Efectivo"
@@ -249,22 +248,12 @@ export function OrderCard({
     setIsButtonDisabled(true);
 
     try {
-      let newStatus = "";
-
-      if (order.status === "pending" && (order.payment_method === "mercadopago" || order.payment_method === "cash")) {
-        newStatus = "preparing";
-      } else if (order.status === "preparing" || order.status === "delayed") {
-        newStatus = "ready";
-      } else if (order.status === "ready") {
-        newStatus = "delivered";
-      }
-
-      newStatus =
+      const newStatus =
         order.status === "pending" || order.status === "delayed"
-            ? "preparing"
-            : order.status === "preparing" || order.status === "delayed"
-              ? "ready"
-              : "delivered";
+          ? "preparing"
+          : order.status === "preparing" || order.status === "delayed"
+            ? "ready"
+            : "delivered";
 
       const response = await fetch(`/api/orders`, {
         method: "PUT",
@@ -324,7 +313,7 @@ export function OrderCard({
           isButtonDisabled ||
           order.status === "cancelled" ||
           order.status === "delivered"
-           ||
+          ||
           (order.status == "paying" && order.payment_method == "mercadopago")
         }
       >

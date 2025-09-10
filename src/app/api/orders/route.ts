@@ -682,7 +682,7 @@ export const GET = async (req: Request) => {
       error = result.error;
     } else {
       // Otherwise fetch all orders
-      const result = await baseQuery.order("created_at", { ascending: false });
+      const result = await baseQuery.neq("status", "paying").order("created_at", { ascending: false });
       data = result.data;
       error = result.error;
     }
