@@ -70,7 +70,7 @@ const NOTE_CLASSES = {
 
 export const ACTION_BUTTONS = {
   paying: {
-    text: "Marcar como pagado",
+    text: "Esperando pago",
     className: "bg-green-600 hover:bg-green-700 text-white",
   },
   pending: {
@@ -249,7 +249,17 @@ export function OrderCard({
     setIsButtonDisabled(true);
 
     try {
-      const newStatus =
+      let newStatus = "";
+
+      if (order.status === "pending" && (order.payment_method === "mercadopago" || order.payment_method === "cash")) {
+        newStatus = "preparing";
+      } else if (order.status === "preparing" || order.status === "delayed") {
+        newStatus = "ready";
+      } else if (order.status === "ready") {
+        newStatus = "delivered";
+      }
+
+      newStatus =
         order.status === "paying" && order.payment_method === "cash"
           ? "pending"
           : order.status === "pending" || order.status === "delayed"
@@ -315,7 +325,8 @@ export function OrderCard({
         disabled={
           isButtonDisabled ||
           order.status === "cancelled" ||
-          order.status === "delivered" ||
+          order.status === "delivered"
+           ||
           (order.status == "paying" && order.payment_method == "mercadopago")
         }
       >
