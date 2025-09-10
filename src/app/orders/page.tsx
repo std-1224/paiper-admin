@@ -552,22 +552,22 @@ export default function OrdersManagement() {
                 <Badge
                   className={`bg-${STATUS_CONFIG[
                       selectedOrder.status as keyof typeof STATUS_CONFIG
-                    ].color
+                    ]?.color
                     }-100 text-${STATUS_CONFIG[
                       selectedOrder.status as keyof typeof STATUS_CONFIG
-                    ].color
+                    ]?.color
                     }-800 dark:bg-${STATUS_CONFIG[
                       selectedOrder.status as keyof typeof STATUS_CONFIG
-                    ].color
+                    ]?.color
                     }-900/20 dark:text-${STATUS_CONFIG[
                       selectedOrder.status as keyof typeof STATUS_CONFIG
-                    ].color
+                    ]?.color
                     }-400`}
                 >
                   {
                     STATUS_CONFIG[
                       selectedOrder.status as keyof typeof STATUS_CONFIG
-                    ].label
+                    ]?.label
                   }
                 </Badge>
               </DialogTitle>
