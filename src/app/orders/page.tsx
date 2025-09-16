@@ -157,16 +157,16 @@ export default function OrdersManagement() {
         });
         return;
       }
-      const response = await fetch(`/api/orders`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: order?.id,
-          status: "delivered",
-        }),
-      });
+      // const response = await fetch(`/api/orders`, {
+      //   method: "PUT",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //   },
+      //   body: JSON.stringify({
+      //     id: order?.id,
+      //     status: "delivered",
+      //   }),
+      // });
     }
     fetchOrders();
   };
