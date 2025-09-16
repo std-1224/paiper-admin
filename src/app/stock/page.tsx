@@ -1993,7 +1993,28 @@ const Stock = () => {
                         }
                       });
 
-                    return allItems;
+                    // Filter items based on search term
+                    const filteredItems = allItems.filter((item) => {
+                      if (!searchTerm) return true;
+
+                      const searchLower = searchTerm.toLowerCase();
+
+                      // Search by name
+                      const matchesName = item.name?.toLowerCase().includes(searchLower);
+
+                      // Search by category
+                      const matchesCategory = item.category?.toLowerCase().includes(searchLower);
+
+                      // Search by type
+                      const matchesType = item.type?.toLowerCase().includes(searchLower);
+
+                      // Search by description
+                      const matchesDescription = item.description?.toLowerCase().includes(searchLower);
+
+                      return matchesName || matchesCategory || matchesType || matchesDescription;
+                    });
+
+                    return filteredItems;
                   })().map((item) => {
                     const isProduct = item.type === "product";
                     const isRecipe = item.type === "recipe";
