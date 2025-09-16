@@ -550,55 +550,49 @@ async function deductDirectRecipeSale(
       if (!ingredient) continue;
 
       // Calculate total consumption needed for this ingredient
-      const quantityPerRecipe = ri.deduct_quantity; // e.g., 60ml per cocktail
-      const totalConsumption = quantityPerRecipe * orderQuantity; // e.g., 60ml × 1 = 60ml
+      const deductQuantity = ri.deduct_quantity; // Amount needed per recipe
+      const totalNeeded = deductQuantity * orderQuantity; // Total amount needed
 
-      console.log(`Deducting ${ingredient.name}: need ${totalConsumption}${ingredient.unit}, current: stock=${ingredient.stock}, quantity=${ingredient.quantity}, original_quantity=${ingredient.original_quantity}`);
+      console.log(`Deducting ${ingredient.name}: need ${totalNeeded}${ingredient.unit}, current: stock=${ingredient.stock}, quantity=${ingredient.quantity}, original_quantity=${ingredient.original_quantity}`);
+
+      // Calculate available quantity: current + (stock × original_quantity)
+      const availableNow = ingredient.quantity + (ingredient.stock * ingredient.original_quantity);
+
+      // Check if we have enough total available
+      if (totalNeeded > availableNow) {
+        throw new Error(
+          `Insufficient total stock for ${ingredient.name}: Available: ${availableNow}${ingredient.unit}, Required: ${totalNeeded}${ingredient.unit}`
+        );
+      }
 
       let newStock = ingredient.stock;
       let newQuantity = ingredient.quantity;
 
-      // Check if current opened quantity is sufficient
-      if (totalConsumption <= ingredient.quantity) {
-        // We have enough in the current opened unit - just deduct from current quantity
-        newQuantity = ingredient.quantity - totalConsumption;
-        // Stock remains the same since we didn't open a new unit
+      // If current quantity is sufficient
+      if (totalNeeded <= ingredient.quantity) {
+        newQuantity = ingredient.quantity - totalNeeded;
         console.log(`Using current opened unit: newStock=${newStock}, newQuantity=${newQuantity}`);
       } else {
-        // We need to open new stock units
-        // First, consume what's left in the current opened unit
-        let remainingNeeded = totalConsumption - ingredient.quantity;
+        // Need to consume from stock units
+        let remainingNeeded = totalNeeded - ingredient.quantity;
 
-        // Validate we have enough stock to open new units
-        if (ingredient.stock < 1) {
-          throw new Error(
-            `Insufficient stock for ${ingredient.name}: Available: ${ingredient.stock}, Required: at least 1 unit for ${totalConsumption}${ingredient.unit || 'units'}`
-          );
-        }
+        // Current unit is fully consumed
+        newQuantity = 0;
 
-        // Open one new unit (reduce stock by 1)
-        newStock = ingredient.stock - 1;
+        // Calculate how many full units we need to consume
+        const fullUnitsNeeded = Math.floor(remainingNeeded / ingredient.original_quantity);
+        const partialUnitConsumption = remainingNeeded % ingredient.original_quantity;
 
-        // The new opened unit starts with original_quantity, then we consume remainingNeeded
-        newQuantity = ingredient.original_quantity - remainingNeeded;
+        // Consume full units
+        newStock = ingredient.stock - fullUnitsNeeded;
 
-        console.log(`Opening new unit: consumed ${ingredient.quantity} from current + ${remainingNeeded} from new unit. newStock=${newStock}, newQuantity=${newQuantity}`);
-
-        // Handle case where we need multiple new units (for very large consumption)
-        while (remainingNeeded > ingredient.original_quantity && newStock > 0) {
-          const additionalConsumption = remainingNeeded - ingredient.original_quantity;
+        // If there's partial consumption, consume one more unit partially
+        if (partialUnitConsumption > 0) {
           newStock = newStock - 1;
-
-          if (additionalConsumption >= ingredient.original_quantity) {
-            // Need to consume entire additional unit and possibly more
-            newQuantity = ingredient.original_quantity;
-            remainingNeeded = additionalConsumption - ingredient.original_quantity;
-          } else {
-            // Partial consumption of the additional unit
-            newQuantity = ingredient.original_quantity - additionalConsumption;
-            break;
-          }
+          newQuantity = ingredient.original_quantity - partialUnitConsumption;
         }
+
+        console.log(`Consumed ${ingredient.quantity} from current + ${fullUnitsNeeded} full units + ${partialUnitConsumption} from partial unit. newStock=${newStock}, newQuantity=${newQuantity}`);
       }
 
       // Ensure values don't go negative
