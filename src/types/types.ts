@@ -1,3 +1,35 @@
+export enum TableStatus {
+	// free, occupied, waiting_order, producing, delivered, bill_requested, paid
+	Free = 'free',
+	Occupied = 'occupied',
+	WaitingOrder = 'waiting_order',
+	Producing = 'producing',
+	Delivered = 'delivered',
+	BillRequested = 'bill_requested',
+	Paid = 'paid',
+}
+
+export interface TableType {
+    // id: 'ad0116fd-adf9-4ff8-b623-6992aa0951b4',
+    // venue_id: null,
+    // table_number: 5,
+    // capacity: 8,
+    // current_guests: 0,
+    // status: 'producing',
+    // assigned_waiter_id: null,
+    // created_at: '2025-09-18T19:47:45.591925+00:00',
+    // updated_at: '2025-09-18T20:17:54.363189+00:00',
+	id: string
+	venue_id: string
+	table_number: number
+	capacity: number
+	current_guests: number
+	status: TableStatus
+	assigned_waiter_id: string
+	created_at: string
+	updated_at: string
+}
+
 export enum UserType {
 	Client = 'client',
 	Master = 'master',
@@ -79,7 +111,7 @@ export interface User {
 	created_at: string;
 	transactions?: UserTransaction[];
 	sector_id?: number;
-
+	table_id?: string;
 }
 
 export interface QrUser extends User {

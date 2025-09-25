@@ -46,6 +46,7 @@ import { GiftService } from "(components)/gift-service";
 import {
   ActiveStatus,
   ApprovalStatus,
+  TableType,
   Transaction,
   User,
   UserTransaction,
@@ -57,16 +58,10 @@ import { MixerHorizontalIcon, Cross2Icon } from "@radix-ui/react-icons";
 import { QrScanner } from "(components)/qr-scanner";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useAppContext } from "@/context/AppContext";
 
 type TabType = "clientes" | "equipoPublicas" | "clientesVIP" | "equipo";
 type SortDirection = "asc" | "desc";
-const sectors = [
-  { id: 1, name: "SECTOR 1" },
-  { id: 2, name: "SECTOR 2" },
-  { id: 3, name: "SECTOR 3" },
-  { id: 4, name: "SECTOR 4" },
-  { id: 5, name: "SECTOR 5" },
-];
 
 export default function RoleManagement() {
   const [activeTab, setActiveTab] = useState<TabType>("clientes");
@@ -83,8 +78,9 @@ export default function RoleManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const { user : currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const { tablesData } = useAppContext();
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
@@ -133,9 +129,9 @@ export default function RoleManagement() {
 
   const handleEditUser = (user: User) => {
     // if(currentUser?.role === "admin" || currentUser?.role === "master") {
-      setSelectedUser(user);
-      setTransfers([]);
-      setIsEditDialogOpen(true);
+    setSelectedUser(user);
+    setTransfers([]);
+    setIsEditDialogOpen(true);
     // } else {
     //   toast({
     //     title: "No tienes permiso para editar usuarios",
@@ -271,8 +267,10 @@ export default function RoleManagement() {
       }
 
       toast(
-        {title: "QR Code Scanned",
-        description: `El regalo se ha canjeado exitosamente`,}
+        {
+          title: "QR Code Scanned",
+          description: `El regalo se ha canjeado exitosamente`,
+        }
       );
     } else {
       toast({
@@ -366,41 +364,37 @@ export default function RoleManagement() {
         <div className="border-b">
           <div className="flex overflow-x-auto">
             <button
-              className={`px-6 py-3 text-sm font-medium ${
-                activeTab === "clientes"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-muted-foreground"
-              }`}
+              className={`px-6 py-3 text-sm font-medium ${activeTab === "clientes"
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground"
+                }`}
               onClick={() => setActiveTab("clientes")}
             >
               Clientes
             </button>
             <button
-              className={`px-6 py-3 text-sm font-medium ${
-                activeTab === "equipoPublicas"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-muted-foreground"
-              }`}
+              className={`px-6 py-3 text-sm font-medium ${activeTab === "equipoPublicas"
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground"
+                }`}
               onClick={() => setActiveTab("equipoPublicas")}
             >
               Equipo Publicas
             </button>
             <button
-              className={`px-6 py-3 text-sm font-medium ${
-                activeTab === "clientesVIP"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-muted-foreground"
-              }`}
+              className={`px-6 py-3 text-sm font-medium ${activeTab === "clientesVIP"
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground"
+                }`}
               onClick={() => setActiveTab("clientesVIP")}
             >
               Clientes VIP
             </button>
             <button
-              className={`px-6 py-3 text-sm font-medium ${
-                activeTab === "equipo"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-muted-foreground"
-              }`}
+              className={`px-6 py-3 text-sm font-medium ${activeTab === "equipo"
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground"
+                }`}
               onClick={() => setActiveTab("equipo")}
             >
               Equipo
@@ -490,11 +484,10 @@ export default function RoleManagement() {
                       id={`status-container-${user.id}`}
                     >
                       <div
-                        className={`h-2 w-2 rounded-full ${
-                          user.status === "active"
-                            ? "bg-green-500"
-                            : "bg-red-500"
-                        } mr-2`}
+                        className={`h-2 w-2 rounded-full ${user.status === "active"
+                          ? "bg-green-500"
+                          : "bg-red-500"
+                          } mr-2`}
                         id={`status-indicator-${user.id}`}
                       ></div>
                       <span className="text-sm" id={`status-text-${user.id}`}>
@@ -512,11 +505,10 @@ export default function RoleManagement() {
                     <div className="flex items-center">
                       <Badge
                         variant={user.approval_status === ApprovalStatus.Approved ? "default" : "secondary"}
-                        className={`${
-                          user.approval_status === ApprovalStatus.Approved
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                            : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                        }`}
+                        className={`${user.approval_status === ApprovalStatus.Approved
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                          }`}
                       >
                         {user.approval_status === ApprovalStatus.Approved ? "Aprobado" : "Pendiente"}
                       </Badge>
@@ -839,25 +831,28 @@ export default function RoleManagement() {
                         Seleccionar Mesa
                       </Label>
                       <Select
-                        value={selectedUser?.sector_id?.toString()}
-                        onValueChange={(value) =>
+                        value={selectedUser?.table_id?.toString()} // bind to table_id
+                        onValueChange={(value) => {
+                          const selectedTable = tablesData.find((s) => s.id.toString() === value);
                           setSelectedUser({
                             ...selectedUser,
-                            sector_id: Number(value),
-                          })
-                        }
+                            table_id: value, // store the table id
+                            sector_id: selectedTable?.table_number, // store the table number
+                          });
+                        }}
                       >
                         <SelectTrigger className="max-w-xs">
-                          <SelectValue placeholder="Seleccionar Sector" />
+                          <SelectValue placeholder="Seleccionar Mesa" />
                         </SelectTrigger>
                         <SelectContent>
-                          {sectors.map((s) => (
+                          {tablesData.map((s: TableType) => (
                             <SelectItem key={s.id} value={s.id.toString()}>
-                              {s.name}
+                              Mesa {s.table_number} {/* show table number in dropdown */}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+
                     </div>
                   </div>
 

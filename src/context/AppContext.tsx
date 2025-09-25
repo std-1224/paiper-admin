@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { BarData, Product, InventoryData, Notification } from "@/types/types";
+import { BarData, Product, InventoryData, Notification, TableType } from "@/types/types";
 import { QRCodeData } from "@/types/types";
 import { User, Staff } from "@/types/types";
 import { Recipe } from "@/types/types";
@@ -35,6 +35,8 @@ interface AppContextProps {
     fileName: string
   ) => Promise<string | null>;
   fetchNotifications: () => Promise<void>;
+  fetchTables: () => Promise<void>;
+  tablesData: TableType[];
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -54,6 +56,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [notificationsData, setNotificationsData] = useState<Notification[]>(
     []
   );
+  const [tablesData, setTablesData] = useState<TableType[]>([]);
   const [ingredientsData, setIngredientsData] = useState<Ingredient[]>([]);
   const [normalizedRecipesData, setNormalizedRecipesData] = useState<NormalizedRecipe[]>([]);
 
@@ -283,6 +286,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const fetchTables = useCallback(async () => {
+    try {
+      const response = await fetch("/api/tables", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch tables");
+      }
+
+      const data = await response.json();
+      setTablesData(data);
+    } catch (error: any) {
+      console.error("Error fetching tables:", error.message);
+    }
+  }, []);
+
   const fetchStocksOfBar = useCallback(async (barId?: number) => {
     try {
       const response = await fetch(`/api/inventory/${barId ?? ""}`, {
@@ -412,6 +436,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   useEffect(() => {
+    fetchTables();
     fetchOrders();
     // fetchBars();
     // fetchQRCodes();
@@ -444,6 +469,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         fetchUsers,
         uploadImageToSupabase,
         fetchNotifications,
+        fetchTables,
+        tablesData,
       }}
     >
       {children}

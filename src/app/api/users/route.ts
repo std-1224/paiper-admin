@@ -62,7 +62,8 @@ export const PUT = async (req: Request) => {
                 status: updateData.status,
                 approval_status: updateData.approval_status,
                 sector_id: updateData.sector_id,
-                balance: updateData.balance
+                balance: updateData.balance,
+                table_id: updateData.table_id
             })
             .eq('id', id);
 
