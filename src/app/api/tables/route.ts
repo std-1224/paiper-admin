@@ -17,12 +17,6 @@ export const GET = async () => {
       throw error
     }
 
-    if (!data) {
-      return []
-    }
-
-    console.log('Tables data:', data)
-
     return NextResponse.json(data, { status: 200 });
   } catch (error) {
     console.error('Failed to fetch tables:', error)
