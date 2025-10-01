@@ -343,7 +343,7 @@ export function OrderCard({
             </div>
             {order.table_number && (
               <div className="text-sm text-muted-foreground">
-                Mesa {order.table}
+                Mesa {order.table_number}
               </div>
             )}
           </div>
