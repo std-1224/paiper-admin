@@ -31,6 +31,78 @@ export const GET = async (req: NextRequest) => {
     }
 };
 
+// Helper function to increment table guest count
+const incrementTableGuestCount = async (tableId: string | null) => {
+    if (!tableId) return;
+
+    try {
+        // Get current guest count and increment by 1
+        const { data: tableData, error: fetchError } = await supabaseServerClient
+            .from('tables')
+            .select('current_guests')
+            .eq('id', tableId)
+            .single();
+
+        if (fetchError) {
+            console.error('Error fetching table data:', fetchError);
+            return;
+        }
+
+        const currentGuests = tableData?.current_guests || 0;
+
+        // Update the table's current_guests field
+        const { error: updateError } = await supabaseServerClient
+            .from('tables')
+            .update({
+                current_guests: currentGuests + 1,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', tableId);
+
+        if (updateError) {
+            console.error('Error incrementing table guest count:', updateError);
+        }
+    } catch (error) {
+        console.error('Error in incrementTableGuestCount:', error);
+    }
+};
+
+// Helper function to decrement table guest count
+const decrementTableGuestCount = async (tableId: string | null) => {
+    if (!tableId) return;
+
+    try {
+        // Get current guest count and decrement by 1
+        const { data: tableData, error: fetchError } = await supabaseServerClient
+            .from('tables')
+            .select('current_guests')
+            .eq('id', tableId)
+            .single();
+
+        if (fetchError) {
+            console.error('Error fetching table data:', fetchError);
+            return;
+        }
+
+        const currentGuests = tableData?.current_guests || 0;
+
+        // Update the table's current_guests field (ensure it doesn't go below 0)
+        const { error: updateError } = await supabaseServerClient
+            .from('tables')
+            .update({
+                current_guests: Math.max(0, currentGuests - 1),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', tableId);
+
+        if (updateError) {
+            console.error('Error decrementing table guest count:', updateError);
+        }
+    } catch (error) {
+        console.error('Error in decrementTableGuestCount:', error);
+    }
+};
+
 export const PUT = async (req: Request) => {
     try {
         // Parse the request body
@@ -40,10 +112,10 @@ export const PUT = async (req: Request) => {
             return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
         }
 
-        // Get the original user data to check for balance changes
+        // Get the original user data to check for balance and table changes
         const { data: originalUser, error: fetchError } = await supabaseServerClient
             .from('profiles')
-            .select('balance')
+            .select('balance, table_id')
             .eq('id', id)
             .single();
 
@@ -69,6 +141,22 @@ export const PUT = async (req: Request) => {
 
         if (error) {
             throw error;
+        }
+
+        // Check if table assignment changed and update guest counts
+        const originalTableId = originalUser?.table_id;
+        const newTableId = updateData.table_id;
+
+        if (originalTableId !== newTableId) {
+            // Decrease guest count for the old table (if user was previously assigned)
+            if (originalTableId) {
+                await decrementTableGuestCount(originalTableId);
+            }
+
+            // Increase guest count for the new table (if user is now assigned)
+            if (newTableId) {
+                await incrementTableGuestCount(newTableId);
+            }
         }
 
         // Check if balance was updated and create transaction record
