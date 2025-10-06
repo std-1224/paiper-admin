@@ -249,18 +249,12 @@ export function OrderCard({
     setIsButtonDisabled(true);
 
     try {
-      const newStatus =
-        order.status === "pending" || order.status === "delayed"
-          ? "preparing"
-          : order.status === "preparing" || order.status === "delayed"
-            ? "ready"
-            : "delivered";
 
       if (order.table_number) {
 
         let status: DatabaseTableStatus;
 
-        if (order.status === "pending" && order.payment_method === "balance") {
+        if ((order.status === "pending" || order.status === "delayed") && order.payment_method === "balance") {
           status = "paid"
           await updateTableStatus(order.table_number, status as DatabaseTableStatus);
         }
@@ -275,6 +269,12 @@ export function OrderCard({
           await updateTableStatus(order.table_number, status as DatabaseTableStatus);
         }
       }
+      const newStatus =
+        order.status === "pending" || order.status === "delayed"
+          ? "preparing"
+          : order.status === "preparing" || order.status === "delayed"
+            ? "ready"
+            : "delivered";
       const response = await fetch(`/api/orders`, {
         method: "PUT",
         headers: {
@@ -322,6 +322,7 @@ export function OrderCard({
     return (
       <Button
         onClick={() => {
+          console.log("order: ", order.status)
           // if(user?.role === "barman" || user?.role === "client") {
           //   toast.error("No tienes permiso para editar pedidos");
           //   return;
