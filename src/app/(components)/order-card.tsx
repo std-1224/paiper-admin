@@ -42,6 +42,7 @@ import Loading from "./loading";
 import { ProductSearchField } from "@/components/products/ProductSearchField";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { DatabaseTableStatus, updateTableStatus } from "../api/tables/route";
 
 const STATUS_BADGE_CLASSES = {
   pending: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
@@ -255,6 +256,25 @@ export function OrderCard({
             ? "ready"
             : "delivered";
 
+      if (order.table_number) {
+
+        let updateStatus: DatabaseTableStatus;
+
+        if (order.status === "pending" && order.payment_method === "balance") {
+          updateStatus = "paid"
+          await updateTableStatus(order.table_number, updateStatus as DatabaseTableStatus);
+        }
+        if (order.status === "preparing") {
+          updateStatus = "waiting_order";
+          await updateTableStatus(order.table_number, updateStatus as DatabaseTableStatus);
+        } if (order.status === "ready") {
+          updateStatus = "producing";
+          await updateTableStatus(order.table_number, updateStatus as DatabaseTableStatus);
+        } if (order.status === "delivered") {
+          updateStatus = "delivered";
+          await updateTableStatus(order.table_number, updateStatus as DatabaseTableStatus);
+        }
+      }
       const response = await fetch(`/api/orders`, {
         method: "PUT",
         headers: {
