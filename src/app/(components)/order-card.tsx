@@ -258,21 +258,21 @@ export function OrderCard({
 
       if (order.table_number) {
 
-        let updateStatus: DatabaseTableStatus;
+        let status: DatabaseTableStatus;
 
         if (order.status === "pending" && order.payment_method === "balance") {
-          updateStatus = "paid"
-          await updateTableStatus(order.table_number, updateStatus as DatabaseTableStatus);
+          status = "paid"
+          await updateTableStatus(order.table_number, status as DatabaseTableStatus);
         }
         if (order.status === "preparing") {
-          updateStatus = "waiting_order";
-          await updateTableStatus(order.table_number, updateStatus as DatabaseTableStatus);
+          status = "waiting_order";
+          await updateTableStatus(order.table_number, status as DatabaseTableStatus);
         } if (order.status === "ready") {
-          updateStatus = "producing";
-          await updateTableStatus(order.table_number, updateStatus as DatabaseTableStatus);
+          status = "producing";
+          await updateTableStatus(order.table_number, status as DatabaseTableStatus);
         } if (order.status === "delivered") {
-          updateStatus = "delivered";
-          await updateTableStatus(order.table_number, updateStatus as DatabaseTableStatus);
+          status = "delivered";
+          await updateTableStatus(order.table_number, status as DatabaseTableStatus);
         }
       }
       const response = await fetch(`/api/orders`, {
