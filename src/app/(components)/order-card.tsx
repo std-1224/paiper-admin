@@ -42,7 +42,7 @@ import Loading from "./loading";
 import { ProductSearchField } from "@/components/products/ProductSearchField";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { DatabaseTableStatus, updateTableStatus } from "../api/tables/route";
+import { DatabaseTableStatus, updateTableStatus } from "@/lib/tableUtils";
 
 const STATUS_BADGE_CLASSES = {
   pending: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
