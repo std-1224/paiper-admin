@@ -41,50 +41,57 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAppContext } from "@/context/AppContext";
 
 const mainNavItems = [
-  { id: "dashboard", title: "Inicio", icon: HomeIcon, path: "/dashboard" },
+  {
+    id: "dashboard",
+    title: "Inicio",
+    icon: HomeIcon,
+    path: "/dashboard",
+    moduleKey: "stockqr" as const, // Core module - always required
+  },
   {
     id: "orders",
     title: "Gestión de Pedidos",
     icon: ShoppingCartIcon,
     path: "/orders",
+    moduleKey: "stockqr_orders" as const,
   },
   {
     id: "finances",
     title: "Panel de Finanzas",
     icon: DollarSignIcon,
     path: "/finances",
+    moduleKey: "stockqr_finances" as const,
   },
   {
     id: "roles",
     title: "Administración de Roles",
     icon: UsersIcon,
     path: "/roles",
+    moduleKey: "stockqr_roles" as const,
   },
   {
     id: "menu",
     title: "Gestión de Carta",
     icon: FileTextIcon,
     path: "/menu",
+    moduleKey: "stockqr_menu" as const,
   },
-  // {
-  //   id: "bars",
-  //   title: "Barras & QRs",
-  //   icon: QrCodeIcon,
-  //   path: "/bars",
-  // },
   {
     id: "qr-tracking",
     title: "Barras & QRs",
     icon: QrCodeIcon,
     path: "/qr-tracking",
+    moduleKey: "stockqr_qr_tracking" as const,
   },
   {
     id: "stock",
     title: "Stock & Reasignaciones",
     icon: Database,
     path: "/stock",
+    moduleKey: "stockqr_stock" as const,
   },
 ];
 interface AppSidebarProps {
@@ -99,11 +106,12 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
     useUserPermissions();
   const { userRole, isLoadingRole } = useUserRole();
   const { venue, isLoading: isLoadingVenue } = useVenue();
+  const { isModuleEnabled, tenantModulesLoading } = useAppContext();
 
-  // Filter mainNavItems based on user permissions
+  // Filter mainNavItems based on user permissions (but keep disabled modules visible)
   const filteredNavItems = mainNavItems.filter((item) => {
-    // If still loading permissions, show all items
-    if (isLoadingPermissions) {
+    // If still loading permissions or modules, show all items
+    if (isLoadingPermissions || tenantModulesLoading) {
       return true;
     }
 
@@ -113,7 +121,10 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
     }
 
     // Check if user has permission for this module
-    return hasPermission(item.id);
+    const hasUserPermission = hasPermission(item.id);
+
+    // Show item if user has permission (regardless of module enablement)
+    return hasUserPermission;
   });
 
   return (
@@ -137,7 +148,7 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
           </SidebarGroupLabel> */}
           <SidebarGroupContent>
             <SidebarMenu>
-              {isLoadingPermissions ? (
+              {isLoadingPermissions || tenantModulesLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="animate-spin h-4 w-4 ml-2" />
                 </div>
@@ -148,23 +159,48 @@ export function AppSidebar({ toggleTheme, isDarkMode }: AppSidebarProps) {
                   </p>
                 </div>
               ) : (
-                // Show filtered items based on permissions
-                filteredNavItems.map((item) => (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.path}
-                    >
-                      <Link
-                        href={item.path}
-                        className="w-full justify-start text-left"
-                      >
-                        <item.icon className="h-3 w-3" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))
+                // Show items - enabled ones are clickable, disabled ones are grayed out
+                filteredNavItems.map((item) => {
+                  const moduleEnabled = isModuleEnabled(item.moduleKey);
+                  const isDisabled = !moduleEnabled;
+
+                  return (
+                    <SidebarMenuItem key={item.path}>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <SidebarMenuButton
+                              asChild={!isDisabled}
+                              isActive={pathname === item.path && !isDisabled}
+                              disabled={isDisabled}
+                              className={isDisabled ? "opacity-50 cursor-not-allowed" : ""}
+                            >
+                              {isDisabled ? (
+                                <div className="w-full justify-start text-left flex items-center gap-2">
+                                  <item.icon className="h-3 w-3" />
+                                  <span>{item.title}</span>
+                                </div>
+                              ) : (
+                                <Link
+                                  href={item.path}
+                                  className="w-full justify-start text-left"
+                                >
+                                  <item.icon className="h-3 w-3" />
+                                  <span>{item.title}</span>
+                                </Link>
+                              )}
+                            </SidebarMenuButton>
+                          </TooltipTrigger>
+                          {isDisabled && (
+                            <TooltipContent side="right">
+                              <p className="text-xs">Módulo no habilitado para tu organización</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
+                    </SidebarMenuItem>
+                  );
+                })
               )}
             </SidebarMenu>
           </SidebarGroupContent>

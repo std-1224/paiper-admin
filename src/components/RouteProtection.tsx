@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useAuth } from '@/context/AuthContext';
+import { useAppContext, ModuleKey } from '@/context/AppContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ShieldX, ArrowLeft, Home } from 'lucide-react';
@@ -18,6 +19,17 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/qr-tracking': ['qr-tracking'],
   '/stock': ['stock'],
   '/configuration': ['configuration'],
+};
+
+// Define route to module mapping
+const ROUTE_MODULES: Record<string, ModuleKey> = {
+  '/dashboard': 'stockqr',
+  '/orders': 'stockqr_orders',
+  '/finances': 'stockqr_finances',
+  '/roles': 'stockqr_roles',
+  '/menu': 'stockqr_menu',
+  '/qr-tracking': 'stockqr_qr_tracking',
+  '/stock': 'stockqr_stock',
 };
 
 // Routes that don't require specific permissions (always accessible)
@@ -36,14 +48,14 @@ const AUTH_ONLY_ROUTES = [
 
 // Navigation items in order of priority for redirect
 const NAVIGATION_PRIORITY = [
-  { id: "dashboard", path: "/dashboard" },
-  { id: "orders", path: "/orders" },
-  { id: "finances", path: "/finances" },
-  { id: "roles", path: "/roles" },
-  { id: "menu", path: "/menu" },
-  { id: "qr-tracking", path: "/qr-tracking" },
-  { id: "stock", path: "/stock" },
-  { id: "configuration", path: "/configuration" },
+  { id: "dashboard", path: "/dashboard", moduleKey: "stockqr" as ModuleKey },
+  { id: "orders", path: "/orders", moduleKey: "stockqr_orders" as ModuleKey },
+  { id: "finances", path: "/finances", moduleKey: "stockqr_finances" as ModuleKey },
+  { id: "roles", path: "/roles", moduleKey: "stockqr_roles" as ModuleKey },
+  { id: "menu", path: "/menu", moduleKey: "stockqr_menu" as ModuleKey },
+  { id: "qr-tracking", path: "/qr-tracking", moduleKey: "stockqr_qr_tracking" as ModuleKey },
+  { id: "stock", path: "/stock", moduleKey: "stockqr_stock" as ModuleKey },
+  { id: "configuration", path: "/configuration", moduleKey: "stockqr" as ModuleKey },
 ];
 
 interface RouteProtectionProps {
@@ -55,9 +67,10 @@ export function RouteProtection({ children }: RouteProtectionProps) {
   const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
   const { userPermissions, isLoadingPermissions, hasAnyPermission } = useUserPermissions();
+  const { isModuleEnabled, tenantModulesLoading } = useAppContext();
 
-  // Don't render anything while auth is loading
-  if (authLoading) {
+  // Don't render anything while auth or modules are loading
+  if (authLoading || tenantModulesLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -79,7 +92,7 @@ export function RouteProtection({ children }: RouteProtectionProps) {
 
   // Handle root path "/" - redirect to first allowed page
   if (user && pathname === '/') {
-    if (isLoadingPermissions) {
+    if (isLoadingPermissions || tenantModulesLoading) {
       return (
         <div className="flex items-center justify-center min-h-screen">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -87,9 +100,9 @@ export function RouteProtection({ children }: RouteProtectionProps) {
       );
     }
 
-    // Find first allowed page based on user permissions
+    // Find first allowed page based on user permissions AND module enablement
     const firstAllowedPage = NAVIGATION_PRIORITY.find(nav =>
-      userPermissions.includes(nav.id)
+      userPermissions.includes(nav.id) && isModuleEnabled(nav.moduleKey)
     );
 
     if (firstAllowedPage) {
@@ -103,29 +116,30 @@ export function RouteProtection({ children }: RouteProtectionProps) {
 
   // Check if route requires specific permissions
   const requiredPermissions = ROUTE_PERMISSIONS[pathname];
-  
+  const requiredModule = ROUTE_MODULES[pathname];
+
   // If route doesn't require specific permissions, allow access
   if (!requiredPermissions) {
     // Check if it's an auth-only route
     if (AUTH_ONLY_ROUTES.includes(pathname)) {
       return user ? <>{children}</> : null;
     }
-    
+
     // For public routes or unspecified routes, allow access
     if (PUBLIC_ROUTES.includes(pathname)) {
       return <>{children}</>;
     }
-    
+
     // For authenticated users on unspecified routes, allow access
     if (user) {
       return <>{children}</>;
     }
-    
+
     return null;
   }
 
-  // Still loading permissions, show loading state
-  if (isLoadingPermissions) {
+  // Still loading permissions or modules, show loading state
+  if (isLoadingPermissions || tenantModulesLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -134,7 +148,13 @@ export function RouteProtection({ children }: RouteProtectionProps) {
   }
 
   // Check if user has required permissions
-  const hasAccess = hasAnyPermission(requiredPermissions);
+  const hasPermissionAccess = hasAnyPermission(requiredPermissions);
+
+  // Check if module is enabled (if route requires a module)
+  const hasModuleAccess = requiredModule ? isModuleEnabled(requiredModule) : true;
+
+  // User needs both permission AND module enabled
+  const hasAccess = hasPermissionAccess && hasModuleAccess;
 
   if (!hasAccess) {
     return (
@@ -148,22 +168,31 @@ export function RouteProtection({ children }: RouteProtectionProps) {
               Acceso Denegado
             </CardTitle>
             <CardDescription className="text-gray-600">
-              No tienes permisos para acceder a esta página.
+              {!hasPermissionAccess
+                ? "No tienes permisos para acceder a esta página."
+                : "Este módulo no está habilitado para tu organización."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-sm text-gray-500 text-center">
               <p>Página solicitada: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{pathname}</span></p>
-              <p className="mt-2">Permisos requeridos: <span className="font-semibold">{requiredPermissions.join(', ')}</span></p>
-              <p className="mt-2">Tus permisos: <span className="font-semibold">{userPermissions.length > 0 ? userPermissions.join(', ') : 'Ninguno'}</span></p>
+              {!hasPermissionAccess && (
+                <>
+                  <p className="mt-2">Permisos requeridos: <span className="font-semibold">{requiredPermissions.join(', ')}</span></p>
+                  <p className="mt-2">Tus permisos: <span className="font-semibold">{userPermissions.length > 0 ? userPermissions.join(', ') : 'Ninguno'}</span></p>
+                </>
+              )}
+              {!hasModuleAccess && requiredModule && (
+                <p className="mt-2">Módulo requerido: <span className="font-semibold">{requiredModule}</span> (no habilitado)</p>
+              )}
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button
                 variant="outline"
                 onClick={() => {
-                  // Find first allowed page based on user permissions
+                  // Find first allowed page based on user permissions AND module enablement
                   const firstAllowedPage = NAVIGATION_PRIORITY.find(nav =>
-                    userPermissions.includes(nav.id)
+                    userPermissions.includes(nav.id) && isModuleEnabled(nav.moduleKey)
                   );
 
                   if (firstAllowedPage) {
