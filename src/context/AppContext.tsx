@@ -7,6 +7,39 @@ import { Order } from "@/types/types";
 import { supabase, supabaseServerClient } from "@/lib/supabaseClient";
 import { Ingredient, Recipe as NormalizedRecipe } from "@/types/database";
 
+// Tenant Module Types
+export interface AppRegistry {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  is_core: boolean;
+  created_at: string;
+}
+
+export interface TenantModule {
+  id: string;
+  tenant_id: string;
+  app_id: string;
+  enabled: boolean;
+  config: any | null;
+  activated_at: string | null;
+  deactivated_at: string | null;
+  created_by: string | null;
+  updated_at: string | null;
+  apps_registry?: AppRegistry;
+}
+
+export type ModuleKey =
+  | 'stockqr'
+  | 'qrmenu'
+  | 'stockqr_orders'
+  | 'stockqr_finances'
+  | 'stockqr_roles'
+  | 'stockqr_menu'
+  | 'stockqr_qr_tracking'
+  | 'stockqr_stock';
+
 interface AppContextProps {
   barsData: BarData[];
   qrCodesData: QRCodeData[];
@@ -20,6 +53,12 @@ interface AppContextProps {
   ingredientsData: Ingredient[];
   normalizedRecipesData: NormalizedRecipe[];
   recipesLoading: boolean;
+  // Tenant Module Management
+  tenantModules: TenantModule[];
+  tenantModulesLoading: boolean;
+  isModuleEnabled: (moduleKey: ModuleKey) => boolean;
+  fetchTenantModules: () => Promise<void>;
+  // Existing functions
   fetchOrders: () => Promise<void>;
   fetchBars: () => Promise<void>;
   fetchQRCodes: () => Promise<void>;
@@ -44,6 +83,9 @@ const AppContext = createContext<AppContextProps | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  // Hardcoded tenant ID for paiper-admin
+  const TENANT_ID = "070ebdd4-3228-4ee3-a754-be69ce67bd9b";
+
   const [barsData, setBarsData] = useState<BarData[]>([]);
   const [qrCodesData, setQRCodesData] = useState<QRCodeData[]>([]);
   const [productsData, setProductsData] = useState<Product[]>([]);
@@ -59,6 +101,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [tablesData, setTablesData] = useState<TableType[]>([]);
   const [ingredientsData, setIngredientsData] = useState<Ingredient[]>([]);
   const [normalizedRecipesData, setNormalizedRecipesData] = useState<NormalizedRecipe[]>([]);
+
+  // Tenant Module State
+  const [tenantModules, setTenantModules] = useState<TenantModule[]>([]);
+  const [tenantModulesLoading, setTenantModulesLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const channel = supabase
@@ -157,6 +203,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       supabase.removeChannel(notificationChannel);
     };
   }, []);
+
+  // ============================================
+  // TENANT MODULE MANAGEMENT
+  // ============================================
+
+  /**
+   * Fetch all tenant modules for the current tenant
+   * Includes the apps_registry data for each module
+   */
+  const fetchTenantModules = useCallback(async () => {
+    try {
+      setTenantModulesLoading(true);
+
+      // First, fetch tenant_modules
+      const { data: modulesData, error: modulesError } = await supabase
+        .from("tenant_modules")
+        .select("*")
+        .eq("tenant_id", TENANT_ID)
+        .order("created_by", { ascending: true });
+
+      if (modulesError) {
+        console.error("Error fetching tenant modules:", modulesError);
+        throw modulesError;
+      }
+
+      // Then, fetch the corresponding apps_registry data for each module
+      if (modulesData && modulesData.length > 0) {
+        const appIds = modulesData.map((m) => m.app_id);
+
+        const { data: appsData, error: appsError } = await supabase
+          .from("apps_registry")
+          .select("id, key, name, description, is_core")
+          .in("id", appIds);
+
+        if (appsError) {
+          console.error("Error fetching apps registry:", appsError);
+          // Continue even if apps fetch fails, but log the error
+        }
+
+        // Merge the data
+        const mergedData = modulesData.map((module) => ({
+          ...module,
+          apps_registry: appsData?.find((app) => app.id === module.app_id) || null,
+        }));
+        setTenantModules(mergedData);
+      } else {
+        setTenantModules([]);
+      }
+    } catch (error: any) {
+      console.error("Error fetching tenant modules:", error.message);
+      setTenantModules([]);
+    } finally {
+      setTenantModulesLoading(false);
+    }
+  }, [TENANT_ID]);
+
+  /**
+   * Check if a specific module is enabled for the current tenant
+   * @param moduleKey - The key of the module to check (e.g., 'stockqr_orders')
+   * @returns boolean - true if the module is enabled, false otherwise
+   */
+  const isModuleEnabled = useCallback((moduleKey: ModuleKey): boolean => {
+    const module = tenantModules.find(
+      (m) => m.apps_registry?.key === moduleKey
+    );
+
+    if (!module) {
+      console.warn(`⚠️ Module '${moduleKey}' not found in tenant modules`);
+      return false;
+    }
+
+    return module.enabled;
+  }, [tenantModules]);
+
+  // ============================================
+  // EXISTING FUNCTIONS
+  // ============================================
 
   const uploadImageToSupabase = async (file: File | Blob, fileName: string) => {
     try {
@@ -437,10 +560,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     fetchTables();
+    // Fetch tenant modules on mount
+    fetchTenantModules();
     fetchOrders();
     // fetchBars();
     // fetchQRCodes();
-  }, []);
+  }, [fetchTables, fetchTenantModules]);
 
   return (
     <AppContext.Provider
@@ -457,6 +582,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         notificationsData,
         ingredientsData,
         normalizedRecipesData,
+        // Tenant Module Management
+        tenantModules,
+        tenantModulesLoading,
+        isModuleEnabled,
+        fetchTenantModules,
+        // Existing functions
         fetchOrders,
         fetchStaff,
         fetchBars,

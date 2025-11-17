@@ -90,7 +90,6 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { fetchOrders, fetchProducts, ordersData } = useAppContext();
-
   const [metricsData, setMetricsData] = useState(DEFAULT_METRICS);
   const [dailySummaryData, setDailySummaryData] = useState(
     DEFAULT_DAILY_SUMMARY
